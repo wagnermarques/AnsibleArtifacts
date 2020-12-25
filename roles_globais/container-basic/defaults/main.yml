@@ -1,0 +1,6 @@
+---
+# defaults file for container-basic
+default_container_image : alpine
+default_container_name : alpine_container
+default_container_command : ls -lha
+numbers_of_container_instances : 2
