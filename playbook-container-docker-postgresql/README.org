@@ -1,0 +1,28 @@
+#+ Title: Postgresql Container
+* Introducao
+  Este e um ansible playbook que inicia um container docker pra rodar
+  um postgresql
+
+* Como utilizar o container  
+  A gente usa esse container de duas maneiras, ou conectando com um
+  front end ou acessando o banco pela linha de comando mesmo atraves
+  do pgsql.
+ 
+** usando sqlcmd do proprio container
+
+#+NAME: docker exec -it sqlserver /opt/mssql-tools/bin/sqlcmd -v
+#+BEGIN_SRC sh :session s1 :results output :exports both
+  docker exec sqlserver /opt/mssql-tools/bin/sqlcmd -U sa -P admin123 -q "select @@version"
+#+END_SRC
+
+** TODO usando sqlcmd de outra maquina
+   
+** TODO usando um frontend
+
+** mais informacoes
+   Documentacao oficial do postgresql[fn:3]
+* Refs
+[fn:1] https://github.com/matic-insurance/ansible-docker-postgres/blob/master/tasks/main.yml
+[fn:2] https://docs.ansible.com/ansible/2.8/modules/docker_container_module.html
+[fn:3] https://www.postgresql.org/docs/
+

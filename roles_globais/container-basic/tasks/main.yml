@@ -1,22 +1,43 @@
 ---
 # tasks file for container-basic
 
-- name: restarting docker daemeon with reaload
+- name: restarting docker daemon with reaload
   systemd:
     state: restarted
     daemon_reload: yes
     name: docker
 
-- name: Pull default_container_image docker image 
-  docker_image:
-    name: "{{ default_container_image }}"
-    source: pull
-    
+- name: create build directory
+  file:
+    path: "{{ playbook_dir }}/{{ default_container_name }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: copy Dockerfile
+  copy:
+    src: "{{ DockerfilePath }}"
+    dest: "{{ playbook_dir }}/{{ default_container_name }}"
+    owner: root
+    group: root
+    mode: '0644'
+  
+- name: build container image
+  community.general.docker_image:
+    name: "{{ default_container_image }}:0.0.1"
+    build:
+      path: "{{ playbook_dir }}/../../Dockerfiles/R"
+            
 - name: Create default_container_name containers
   docker_container:
     name: "{{ default_container_name }}"
     image: "{{ default_container_image }}"
     command: "{{ default_container_command }}"
     state: present
+    exposed_ports:
+      "{{ container_exposed_ports }}"
+
+
 
         

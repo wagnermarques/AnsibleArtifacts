@@ -1,0 +1,22 @@
+---
+# tasks file for postgresql-install-in-fedora
+# https://computingforgeeks.com/how-to-install-postgresql-12-on-fedora/
+
+- name: upgrade all packages
+  dnf:
+    name: "*"
+    state: latest
+
+#- rpm_key:
+#    state: present
+#    key: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG-13
+  
+#- name: instalar repositorio
+#  dnf:
+#    name: https://download.postgresql.org/pub/repos/yum/reporpms/F-33-x86_64/pgdg-fedora-repo-latest.noarch.rpm
+#    state: present
+
+- name: install postgresql packages
+  dnf:
+    name: postgresql-server, postgresql
+    state: present

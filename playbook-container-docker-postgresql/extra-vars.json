@@ -1,0 +1,9 @@
+{
+    "default_container_name":"fzl_postgresql",
+    "default_container_image":"fedora:33",
+    "pgsql_data_path_in_host":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-postgresql/pgsql_data",
+    "pgsql_data_path_in_container": "/usr/local/pgsql/data",
+    "container_ports":"5432:5432",
+    "default_container_command":"whereis psql",
+    "DockerfilePath":""
+}
