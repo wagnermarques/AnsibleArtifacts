@@ -11,93 +11,99 @@
     container_name: "{{ default_container_name }}"
     container_image: "{{ default_container_image }}"
     postgres_user_password: "admin123"
-  tasks:    
-  - name: Make the base image available
-    docker_image:
-      name: '{{ container_image }}'
 
-  - name: Create the container
-    docker_container:
-      image: '{{ container_image }}'
-      name: '{{ container_name }}'
-      command: sleep infinity
-      ports: "{{ container_ports }}"
-      exposed_ports: "{{ container_ports }}"
-      published_ports: "{{ container_ports }}"
+  tasks:
 
-  - name: Add the newly created container to the inventory
-    add_host:
-      hostname: '{{ container_name }}'
-      ansible_connection: docker
-      ansible_python_interpreter: /usr/bin/python3  # fedora container doesn't ship python2
+    #setting up ansible requirements in host
+  - name: role docker_install
+    include_role:
+      name: docker_install
 
- # - name: installing pyhton in container
- #   dnf:
- #     name: nmap, findutils, procps
- #     state: present
- #   delegate_to: '{{ container_name }}'
+  - name: role install_python
+    include_role:
+      name: install_python
 
-  - name: Add the postgres user
-    user:
-      name: postgres
-      shell: /bin/bash
-      password: "{{ postgres_user_password | password_hash('sha512') }}"
-      update_password: always
-      append: yes
-    register: created_user
-    delegate_to: '{{ container_name }}'
+    #creating container
+  - name: docker pull "{{ default_container_image }}"
+    command: docker pull "{{ default_container_image }}"
+
+  - name: docker run {{ container_image }}
+    script: ./docker-run.sh  '{{ default_container_name }}' '{{ PGPORT_inContainer }}' '{{ PGPORT_inHost }}' '{{ PGDATA_Volume  }}' '{{ PGDATA  }}' '{{ POSTGRES_PASSWORD  }}' '{{ POSTGRES_USER  }}' '{{ POSTGRES_DB  }}' '{{ SqlScriptsDir_Volume  }}' '{{ SqlScriptsDir  }}' 'adsfasdfasdf'
+
+    #preparing to interact with container    
+#  - name: Add the newly created container to the inventory
+#    add_host:
+#      hostname: '{{ container_name }}'
+#      ansible_connection: docker
+#      ansible_python_interpreter: /usr/bin/python3  # fedora container doesn't ship python2
+
+#  - name: installing pyhton in container
+#    dnf:
+#      name: nmap, findutils, procps
+#      state: present
+#    delegate_to: '{{ container_name }}'
+
+#  - name: Add the postgres user
+#    user:
+#      name: postgres
+#      shell: /bin/bash
+#      password: "{{ postgres_user_password | password_hash('sha512') }}"
+#      update_password: always
+#      append: yes
+#    register: created_user
+#    delegate_to: '{{ container_name }}'
 
 #  - name: Debugging posgres username created
 #    debug:
 #      msg: "{{ created_user }}"
     
-  - name: creating "{{ pgsql_data_path_in_container }}" directory with postgres owner
-    file:
-      path: "{{ pgsql_data_path_in_container }}"
-      state: directory
-      owner: "{{ created_user.name }}"
-      recurse: yes
-    delegate_to: '{{ container_name }}'
-    register: pgsqlDataDir
+#  - name: creating "{{ pgsql_data_path_in_container }}" directory with postgres owner
+#    file:
+#      path: "{{ pgsql_data_path_in_container }}"
+#      state: directory
+#      owner: "{{ created_user.name }}"
+#      recurse: yes
+#    delegate_to: '{{ container_name }}'
+#    register: pgsqlDataDir
 
-  - name: Debugging directory created
-    debug:
-      msg: "{{ pgsqlDataDir }}"
+#  - name: Debugging directory created
+#    debug:
+#      msg: "{{ pgsqlDataDir }}"
   
-  - name: include role postgresql-install-in-fedora
-    import_role: 
-      name: postgresql-install-in-fedora
-    delegate_to: '{{ container_name }}'
+#  - name: include role postgresql-install-in-fedora
+#    import_role: 
+#      name: postgresql-install-in-fedora
+#    delegate_to: '{{ container_name }}'
 
-  - name:  ls -l "{{ pgsqlDataDir.path }}"
-    command: ls -l "{{ pgsqlDataDir.path }}"
-    become: yes
-    become_user: postgres
-    delegate_to: '{{ container_name }}'
-    register: lsPgsqlDataDir
+#  - name:  ls -l "{{ pgsqlDataDir.path }}"
+#    command: ls -l "{{ pgsqlDataDir.path }}"
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
+#    register: lsPgsqlDataDir
 
-  - name: Debugging ls -l "{{ pgsqlDataDir.path }}"
-    debug:
-      msg: "{{ lsPgsqlDataDir }}"
+#  - name: Debugging ls -l "{{ pgsqlDataDir.path }}"
+#    debug:
+#      msg: "{{ lsPgsqlDataDir }}"
      
-  - name:  /usr/bin/pg_ctl init -D "{{ pgsql_data_path_in_container }}" as postgres user
-    command: /usr/bin/pg_ctl init -D "{{ pgsql_data_path_in_container }}"
-    become: yes
-    become_user: postgres
-    delegate_to: '{{ container_name }}'
+#  - name:  /usr/bin/pg_ctl init -D "{{ pgsql_data_path_in_container }}" as postgres user
+#    command: /usr/bin/pg_ctl init -D "{{ pgsql_data_path_in_container }}"
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
 
 
-  - name:  ls -l "{{ pgsqlDataDir.path }}"
-    command: ls -l "{{ pgsqlDataDir.path }}"
-    become: yes
-    become_user: postgres
-    delegate_to: '{{ container_name }}'
-    register: lsPgsqlDataDir
+#  - name:  ls -l "{{ pgsqlDataDir.path }}"
+#    command: ls -l "{{ pgsqlDataDir.path }}"
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
+#    register: lsPgsqlDataDir
 
-  - name: Debugging ls -l "{{ pgsqlDataDir.path }}"
-    debug:
-      msg: "{{ lsPgsqlDataDir }}"
-  
+#  - name: Debugging ls -l "{{ pgsqlDataDir.path }}"
+#    debug:
+#      msg: "{{ lsPgsqlDataDir }}"
+#  
 #  - name:  cat "{{ pgsql_data_path_in_container }}"/postgresql.conf
 #    command: cat "{{ pgsql_data_path_in_container }}"/postgresql.conf > "{{ pgsql_data_path_in_container }}"/postgresql-bk.conf
 #    become: yes
@@ -118,11 +124,40 @@
 #      follow: yes
 #    delegate_to: '{{ container_name }}'  
 
-  - name: /usr/bin/pg_ctl start -D "{{pgsql_data_path_in_container}}" -l logfile start  as postgres user
-    command: /usr/bin/pg_ctl -D "{{ pgsql_data_path_in_container }}" -l  "{{pgsql_data_path_in_container}}"/.logfile start
-    become: yes
-    become_user: postgres
-    delegate_to: '{{ container_name }}'
+#  - name:  echo "listen_addresses = '*'" >> "{{ pgsqlDataDir.path }}"/postgresql.conf 
+#    shell: echo listen_addresses = \'*\' >> "{{ pgsqlDataDir.path }}"/postgresql.conf 
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
+
+#  - name:  grep listen_addresses "{{ pgsqlDataDir.path }}"/postgresql.conf
+#    command: grep listen_addresses "{{ pgsqlDataDir.path }}"/postgresql.conf
+#    become: yes
+#    become_user: postgres 
+#    delegate_to: '{{ container_name }}'
+#    register: grepPostgresqlConf
+    
+#  - name: debug grep listen_addresses
+#    debug:
+#      msg: "{{ grepPostgresqlConf }}"
+
+#  - name:  echo "host all all 0.0.0.0/0 md5" >> "{{ pgsqlDataDir.path }}"/pg_hba.conf 
+#    shell: echo \'host    all       all      0.0.0.0/0         md5\' >> "{{ pgsqlDataDir.path }}"/pg_hba.conf
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
+
+#  - name:  echo "host all all 0.0.0.0/0 md5" >> "{{ pgsqlDataDir.path }}"/pg_hba.conf 
+#    shell: echo \'host    all       all      ::/0 \' >> "{{ pgsqlDataDir.path }}"/pg_hba.conf
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
+        
+#  - name: /usr/bin/pg_ctl start -D "{{pgsql_data_path_in_container}}" -l logfile start  as postgres user
+#    command: /usr/bin/pg_ctl -D "{{ pgsql_data_path_in_container }}" -l  "{{pgsql_data_path_in_container}}"/.logfile start
+#    become: yes
+#    become_user: postgres
+#    delegate_to: '{{ container_name }}'
     
 #    args:
 #      apply:

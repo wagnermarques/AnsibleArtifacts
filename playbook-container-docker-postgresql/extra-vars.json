@@ -1,13 +1,13 @@
 {
-    "default_container_name":"fzl_postgresql",
-    "default_container_image":"fedora:33",
-    "pgsql_data_path_in_host":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-postgresql/pgsql_data",
-    "pgsql_data_path_in_container": "/usr/local/pgsql/data",
-    "postgresql_conf_source_file":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-postgresql/postgresql.conf",
-    "postgresql_conf_destination_file":"/usr/local/pgsql/data/postgresql.conf",
-    "pg_hba_conf_source_file":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-postgresql/pg_hba.conf",
-    "pg_hba_conf_destination_file":"/usr/local/pgsql/data/pg_hba.conf", 
-    "container_ports":"5432:5432",
-    "default_container_command":"whereis psql",
-    "DockerfilePath":""
+    "default_container_name":"fzl_postgresql",    
+    "default_container_image":"postgres:13.1-alpine",
+    "PGPORT_inContainer":"5432",
+    "PGPORT_inHost":"5432",    
+    "PGDATA_Volume":"/home/wagner/fzlbpms/var/pgsql_data",
+    "PGDATA":"/usr/local/pgsql/data",    
+    "POSTGRES_PASSWORD":"admin123",
+    "POSTGRES_USER":"postgres",
+    "POSTGRES_DB":"defaultdb",
+    "SqlScriptsDir_Volume":"/home/wagner/fzlbpms/workspaces/posgresql_scripts",
+    "SqlScriptsDir":"/scripts"   
 }

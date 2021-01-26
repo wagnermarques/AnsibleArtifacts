@@ -1,11 +1,11 @@
 ---
 # tasks file for container-basic
 
-- name: restarting docker daemon with reaload
-  systemd:
-    state: restarted
-    daemon_reload: yes
-    name: docker
+#- name: restarting docker daemon with reaload
+#  systemd:
+#    state: restarted
+#    daemon_reload: yes
+#    name: docker
 
 - name: create build directory
   file:
@@ -13,7 +13,7 @@
     state: directory
     owner: root
     group: root
-    mode: '0755'
+    mode: '0777'
 
 - name: copy Dockerfile
   copy:
@@ -21,23 +21,29 @@
     dest: "{{ playbook_dir }}/{{ default_container_name }}"
     owner: root
     group: root
-    mode: '0644'
+    mode: '0777'
   
 - name: build container image
-  community.general.docker_image:
-    name: "{{ default_container_image }}:0.0.1"
-    build:
-      path: "{{ playbook_dir }}/../../Dockerfiles/R"
-            
-- name: Create default_container_name containers
-  docker_container:
-    name: "{{ default_container_name }}"
-    image: "{{ default_container_image }}"
-    command: "{{ default_container_command }}"
-    state: present
-    exposed_ports:
-      "{{ container_exposed_ports }}"
+  shell: |
+    cd "{{ playbook_dir }}/{{ default_container_name }}" && ls
+  
+- name: build image
+  shell: |
+    docker build -t "{{ default_container_image }}" .
+  args:
+    chdir: "{{ playbook_dir }}/{{ default_container_name }}"
+  register: outMsg
+    
+- name: debug pwdOut
+  debug:
+    msg: "{{ outMsg }}"
 
+#- name: Create default_container_name containers
+#  docker_container:
+#    name: "{{ default_container_name }}"
+#    image: "{{ default_container_image }}"
+##    command: "{{ default_container_command }}"
+#    state: present
+#    exposed_ports:
+#      "{{ container_exposed_ports }}"
 
-
-        

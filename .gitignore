@@ -1,2 +1,16 @@
-wordpress-nginx/hosts
-.DS_Store
+#all log files
+**/*.log
+
+
+####### vi temp files
+**/*.swp
+
+####### emacs temp files
+#ignore emacs temporary # files in any subdirectory
+*\#
+
+#ignore emacs temporary .#filename in any directory
+*.\#*
+
+#ignore emacs temp ~ file in any subdirectory
+*~
