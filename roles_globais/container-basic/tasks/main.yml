@@ -9,7 +9,7 @@
 
 - name: create build directory
   file:
-    path: "{{ playbook_dir }}/{{ default_container_name }}"
+    path: "{{ default_build_directory }}"
     state: directory
     owner: root
     group: root
@@ -17,21 +17,21 @@
 
 - name: copy Dockerfile
   copy:
-    src: "{{ DockerfilePath }}"
-    dest: "{{ playbook_dir }}/{{ default_container_name }}"
+    src: "{{ DockerfileHomeDir }}/Dockerfile"
+    dest: "{{ default_build_directory }}"
     owner: root
     group: root
     mode: '0777'
   
 - name: build container image
   shell: |
-    cd "{{ playbook_dir }}/{{ default_container_name }}" && ls
+    cd "{{ default_build_directory }}" && ls
   
 - name: build image
   shell: |
     docker build -t "{{ default_container_image }}" .
   args:
-    chdir: "{{ playbook_dir }}/{{ default_container_name }}"
+    chdir: "{{ default_build_directory }}"
   register: outMsg
     
 - name: debug pwdOut

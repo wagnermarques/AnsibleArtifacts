@@ -1,0 +1,100 @@
+#+Title: R-Script Container
+
+* como utilizar essa playbook
+** rodando o playbook pra criar a imagem do container
+
+#+NAME: parseShellAnsiColorCharacters
+#+BEGIN_SRC elisp :session s1 :var data=""  :results silent  :exports node
+  (print (ansi-color-apply data))
+#+END_SRC
+
+
+#+NAME: visualizando dir do playbook
+#+BEGIN_SRC shell :session s1 :results output :exports both :post parseShellAnsiColorCharacters(data=*this*)
+  export playbookDir=/home/wagner/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-r
+  cd $playbookDir
+  ls -l
+#+END_SRC
+
+Segue abaixo os arquivos dentro do diretorio onde se encontra o
+playbook
+
+repare que tem um script shell run-ansible-playbook.sh
+
+Se quizer pode examinar ele, ele so roda um ansible-playbook apontando
+para o arquivo site.yml...
+
+#+RESULTS: visualizando dir do playbook
+#+begin_example
+
+ [wagner@wagner-Insp153567 playbook-container-docker-r]$ total 32
+-rw-rw-r-- 1 wagner wagner  339 jan 26 00:20 extra-vars.json
+drwxrwxrwx 2 root   root   4096 jan 18 17:51 fzl_r
+-rw-rw-r-- 1 wagner wagner  127 dez 24 21:40 hosts
+-rw-r--r-- 1 wagner wagner 1677 jan 30 20:07 README.org
+-rwxrwxr-x 1 wagner wagner  107 jan 18 16:16 run-ansible-playbook.sh
+-rw-r--r-- 1 wagner wagner   13 jan 30 15:39 run_script.sh
+-rwxr-xr-x 1 wagner wagner   63 jan 30 15:54 script.R
+-rw-rw-r-- 1 wagner wagner  414 jan 26 00:23 site.yml
+#+end_example
+
+Antes de rodar o script, vc devera conferir os argumentos que sao
+passados para o playbook atraves do arquivo extra-vars.json
+
+Entao vamos rodar esse script...
+
+#+NAME: rodando o playbook
+#+BEGIN_SRC shell :session s1 :results output :exports both :post parseShellAnsiColorCharacters(data=*this*)
+  cd $playbookDir
+  ./run-ansible-playbook.sh
+#+END_SRC
+
+o resultado e a criacao da imagem do container
+
+
+#+NAME: docker images
+#+BEGIN_SRC shell :session s1 :results output :exports both
+  docker images 
+#+END_SRC
+
+A imagem que foi criada foi a wagnermarques/fzl_r:0.0.1, conforme abaixo..
+
+#+RESULTS: docker images
+: REPOSITORY            TAG           IMAGE ID       CREATED      SIZE
+: wagnermarques/fzl_r   0.0.1         6098e9fc3392   4 days ago   2.08GB
+: <none>        610c4403de83   4 days ago   201MB
+: fedora                32            19612781672c   4 days ago   201MB
+: postgres              13.1-alpine   91aed320ad01   9 days ago   160MB
+
+
+
+* rodando um script R de exempl
+
+  no diretorio aqui do nosso ansible playbook tem um script de
+  exemplo...
+
+  A gente vai apresentar esse script pra dentro do container usando um
+  volume... ou seja, esse diretorio aqui do nosso container sera sendo
+  compartilhado pra dentro do container e o container tera acesso aos
+  arquivos desse diretorio... o arquivo que o container estara
+  interessado sera o script.R que é um script hello world que será
+  executado pelo container...
+
+  O que e legal e que tem um shell scriptizinho chamado run_script.sh
+  que roda pra gente esse script... e o basicao do comando dorker
+  run... vale a pena dar uma olhada nele...
+
+  
+#+NAME: rodando script
+#+BEGIN_SRC shell :session s1 :results output :exports both :post parseShellAnsiColorCharacters(data=*this*)
+  cd $playbookDir
+  ./run_script.sh
+#+END_SRC
+
+#+RESULTS: rodando script
+: 
+:  [1] "Hello World!"
+
+
+
+

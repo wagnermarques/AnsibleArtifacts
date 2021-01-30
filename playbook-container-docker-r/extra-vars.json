@@ -1,0 +1,7 @@
+{
+    "default_container_name":"fzl_r",
+    "default_container_image":"wagnermarques/fzl_r:0.0.1",
+    "default_build_directory":"/home/wagner/fzlbpms/var/containers-docker-build-dir/{{ default_container_name }}",
+    "default_container_command":"R -v",
+    "DockerfileHomeDir":"/home/wagner/fzlbpms/submodules/Dockerfiles/R"
+}
