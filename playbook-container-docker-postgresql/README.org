@@ -3,6 +3,15 @@
   Este e um ansible playbook que inicia um container docker pra rodar
   um postgresql
 
+* criando e rodando o container
+  pra criar e rodar o container basta rodar o script
+  run-ansible-playbook.sh
+
+  Esse script usa todos tudo o que esta dentro deste diretorio pra
+  fazer essa tarefa...
+
+  
+
 * Como utilizar o container  
   A gente usa esse container de duas maneiras, ou conectando com um
   front end ou acessando o banco pela linha de comando mesmo atraves
