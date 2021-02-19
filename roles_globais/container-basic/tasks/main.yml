@@ -15,13 +15,11 @@
     group: root
     mode: '0777'
 
-- name: copy Dockerfile
-  copy:
-    src: "{{ DockerfileHomeDir }}/Dockerfile"
+- name: copy Dockerfile dir content to defaultBuildDir  "{{ default_build_directory }}"
+  synchronize:
+    mode: pull
+    src: "{{ DockerfileHomeDir }}/"
     dest: "{{ default_build_directory }}"
-    owner: root
-    group: root
-    mode: '0777'
   
 - name: build container image
   shell: |

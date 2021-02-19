@@ -2,7 +2,7 @@
     
     "default_container_name":"cc++debian10slim",
     "default_container_image":"wagnermarques/ccppdeb10:0.0.1",
-    "default_build_directory":"/home/wagner/fzlbpms/var/containers-docker-build-dir/{{ default_container_name }}",
+    "default_build_directory":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/var/containers-docker-build-dir/{{ default_container_name }}",
     "default_container_command":"R -v",
-    "DockerfileHomeDir":"/home/wagner/fzlbpms/submodules/Dockerfiles/cc++debian10"
+    "DockerfileHomeDir":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/Dockerfiles/cc++debian10"
 }
