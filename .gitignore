@@ -14,3 +14,7 @@
 
 #ignore emacs temp ~ file in any subdirectory
 *~
+
+
+#ocassional c/c++ compiled output
+**/**/*.out

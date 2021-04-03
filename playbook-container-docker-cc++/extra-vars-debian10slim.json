@@ -1,5 +1,4 @@
-{
-    
+{    
     "default_container_name":"cc++debian10slim",
     "default_container_image":"wagnermarques/ccppdeb10:0.0.1",
     "default_build_directory":"/home/wagner/fzlbpms/var/containers-docker-build-dir/{{ default_container_name }}",
