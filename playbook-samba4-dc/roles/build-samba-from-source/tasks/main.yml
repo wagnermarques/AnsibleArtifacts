@@ -1,0 +1,14 @@
+---
+# tasks file for build-samba-from-source
+# https://wiki.samba.org/index.php/Creating_a_Samba_patch_series
+# https://www.oreilly.com/openbook/samba/book/ch02_01.html
+# https://www.oreilly.com/openbook/samba/book/ch02_03.html
+# https://wiki.samba.org/index.php/Build_Samba_from_Source
+# https://gitlab.com/samba-team/samba
+
+
+- name: Clone a repo with separate git directory
+  git:
+    repo: https://github.com/ansible/ansible-examples.git
+    dest: /src/ansible-examples
+    separate_git_dir: /src/ansible-examples.git

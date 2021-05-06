@@ -1,0 +1,73 @@
+#+ Title: Samba DC Server 
+* Introducao
+  Ansible playbook inpired in previous works[fn:1] to setup a samba4
+  dc server on debian
+
+p10[fn:2]
+
+* instalacao de pacotes
+        - cifs-utils
+      - build-essential
+      - python3-dev
+      #Common UNIX Printing System(tm) - biblioteca central
+      - libcups2
+      #Common UNIX Printing System UNIX (tm) -- biblioteca CUPS de arquivos de desenvolvimento
+      - libcups2-dev  
+      - cups
+      - git
+      - acl
+      - gdb
+      - ntp
+      - krb5-config
+       # basic programs to authenticate using MIT Kerberos
+      - krb5-user
+      - winbind
+      - smbclient     
+      - docbook-xsl
+      #bibliotecas de desenvolvimento do OpenLDAP
+      - libldap2-dev
+       #extended attribute handling - shared library
+      - libattr1
+      #extended attributes handling - static libraries and headers
+      - libattr1-dev
+       # access control list - shared library
+      - libacl1
+       # access control list - static libraries and headers
+      - libacl1-dev
+       # GNU TLS library - DANE security support
+      - libgnutls-dane0
+       # GNU TLS library - OpenSSL wrapper
+      - libgnutls-openssl27
+       # GNU TLS library - development files
+      - libgnutls28-dev
+       # GNU TLS library - main runtime library
+      - libgnutls30
+      # GNU TLS library - C++ runtime library
+      - libgnutlsxx28
+       # utilities for manipulating filesystem extended attributes
+      - attr
+       # Ferramentas DNS para Python
+      - python-dnspython
+       # DNS client module for Python 3      
+      - python3-dns
+      - libreadline-dev # GNU readline and history libraries, development files
+      - libreadline-gplv2-dev # GNU readline and history libraries, development files
+      - libbsd-dev # utility functions from BSD systems - development files
+      - libblkid-dev # block device ID library - headers and static libraries
+      - libpopt-dev # lib for parsing cmdline parameters - development files
+      - xsltproc # processador XSLT 1.0 de linha de comando
+      - libsasl2-dev # Cyrus SASL - arquivos de desenvolvimento para a biblioteca de abstração de autenticação
+      - libaio-dev # Linux kernel AIO access library - development files
+      - ibpam0g-dev # Development files for PAM
+      - valgrind # instrumentation framework for building dynamic analysis tools
+      - resolvconf # manipulador de informações de servidor de nomes
+      - autoconf # construtor automático de script configure
+      - ldap-utils # utilitários OpenLDAP
+      - ldaptor-utils # command-line LDAP utilities
+      - isc-dhcp-server # ISC DHCP server for automatic IP address assignment
+
+
+  
+* Refs
+[fn:1] https://github.com/geerlingguy/ansible-role-samba/blob/master/tasks/main.yml
+[fn:2] implementing-samba-4 by Constantin Goncalez

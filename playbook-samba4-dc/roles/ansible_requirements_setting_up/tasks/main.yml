@@ -1,0 +1,13 @@
+---
+# tasks file for ansible_requirements_setting_up
+#setting up ansible requirements in host
+
+- name: Checking docker on latest version
+  apt: name=docker.io state=latest
+  when: ansible_os_family == "Debian"
+  ignore_errors: True
+
+- name: Checking python
+  apt: name=python state=latest
+  when: ansible_os_family == "Debian"
+  ignore_errors: True

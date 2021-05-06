@@ -1,0 +1,17 @@
+---
+# tasks file for check_the_availability_of_the_features_of_filesystems
+#From implementing samba4 book 
+#In a standard Debian installation, we can check the availability of the features of filesystems
+#grep CONFIG_EXT4_FS /boot/config-`uname -r`
+#The output for that command must be like the following:
+#CONFIG_EXT4_FS=m
+#CONFIG_EXT4_FS_XATTR=y
+#CONFIG_EXT4_FS_POSIX_ACL=y
+#CONFIG_EXT4_FS_SECURITY=y
+
+#It is important to know if filesystem was configured as a dynamically loadable module
+# and the features of xattr, posix_acl and security can be used.
+
+#I checked manually..
+
+# todo it

@@ -1,0 +1,17 @@
+#+ Title: playbook-container-docker-fedora33
+* Introducao
+  Este e um ansible playbook que inicia um container docker fedora33 
+
+  O objetivo e estudar ansible pra gerenciar containers
+
+  Neste caso a gente sobe um fedora33 com um volume (shared folder)
+
+  Obviamente os trabalhos realizados aqui neste playbook podem e serao reutilizados
+
+* Como utilizar o container  
+
+* Refs
+[fn:1] https://github.com/matic-insurance/ansible-docker-postgres/blob/master/tasks/main.yml
+[fn:2] https://docs.ansible.com/ansible/2.8/modules/docker_container_module.html
+[fn:3] https://www.postgresql.org/docs/
+
