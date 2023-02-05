@@ -1,8 +1,0 @@
-[local_machine]
-localhost ansible_connection=local ansible_python_interpreter=python3.9
-
-[container_hosts]
-
-
-[containers]
-        

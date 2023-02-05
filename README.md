@@ -1,2 +1,0 @@
-# ansible-artifacts
-using ansible

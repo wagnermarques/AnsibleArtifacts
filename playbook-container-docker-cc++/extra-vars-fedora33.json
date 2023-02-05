@@ -1,8 +1,0 @@
-{
-    
-    "default_container_name":"cc++fed33",
-    "default_container_image":"wagnermarques/cc++:0.0.1",
-    "default_build_directory":"/home/wagner/fzlbpms/var/containers-docker-build-dir/{{ default_container_name }}",
-    "default_container_command":"R -v",
-    "DockerfileHomeDir":"/home/wagner/fzlbpms/submodules/Dockerfiles/cc++"
-}
