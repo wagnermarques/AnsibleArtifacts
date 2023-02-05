@@ -1,0 +1,50 @@
+---
+# This playbook deploys a simple standalone JBoss server.
+
+- hosts: local_machine
+  become: yes
+  become_method: su
+  become_user: root
+  tasks:
+#    - name: "show some important facts"
+#      ansible.builtin.debug:
+#        msg:
+#          - "{{ ansible_facts['all_ipv4_addresses'] }}"
+#          - "{{ ansible_facts['env'] }}"
+#          - "{{ ansible_facts['env']['FZL_HOME'] }}"
+#          - "{{ playbook_dir }}"
+#          - "{{ ansible_facts['lsb'] }}"
+#          - "{{ ansible_facts['lsb']['id'] }}"
+#          - "{{ ansible_facts['mounts'] }}"
+#          - "{{ ansible_facts['python'] }}"
+#          - "{{ ansible_facts['selinux'] }}"
+#          - "{{ ansible_facts['os_family'] }}"
+
+#    - name: This Playbook features
+#      debug:
+#        msg: "{{ item }}"
+#      with_items:
+#        - ==>show some relevant facts
+#        - ==>install python docker docker-py for ansible and docker work requirements
+#        - ==>pull postgresql docker container image
+#        - ==>runs postgresql docker image
+#          
+#    - name:  install python docker module for ansible and docker works together 
+#      pip:
+#        name: "{{ item.name }}"
+#        state: present
+#      with_items:
+#        - { name: docker}
+
+#    - name: remove docker-py because its do not works with docker with python module
+#      pip:
+#        name: "{{ item.name }}"
+#        state: absent
+#      with_items:
+#        - { name: docker-py}
+
+#    - name: restarting docker daemon with reaload
+#      systemd:
+#        state: restarted
+#        daemon_reload: yes
+#        name: docker

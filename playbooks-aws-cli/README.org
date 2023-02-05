@@ -1,0 +1,85 @@
+#+ Title: playbook-container-docker-awscli
+* Introducao
+  Imagem de container que vai disponibilizar um cliente aws
+
+* Como rodar este playbook
+  
+  rode run-ansible-playbook.sh
+
+  depois rode um docker images pra confirmar a imagem criada
+
+  
+  #+NAME:docker images
+  #+BEGIN_SRC shell :session s1 :results output :exports both
+  docker images
+  #+END_SRC 
+
+  dentre suas imagem devera aparecer:
+
+  amazon/aws-cli            latest
+
+  conforme abaixo...
+
+  #+RESULTS: docker images
+o  #+begin_example
+
+  REPOSITORY                TAG           IMAGE ID       CREATED       SIZE
+  amazon/aws-cli            latest        e7ea80ece6b8   2 days ago    293MB
+  wagnermarques/ccppdeb10   0.0.1         4068809b9e24   6 days ago    429MB
+  <none>        9340197a14dd   6 days ago    429MB
+  postgres                  13.1-alpine   8c6053d81a45   9 days ago    159MB
+  wagnermarques/fzl_r       0.0.1         6098e9fc3392   12 days ago   2.08GB
+  <none>        610c4403de83   12 days ago   201MB
+  fedora                    32            19612781672c   12 days ago   201MB
+  91aed320ad01   2 weeks ago   160MB
+  debian                    10-slim       589ac6f94be4   3 weeks ago   69.2MB
+  #+end_example
+
+* Como utilizar o container[fn:1]  
+  
+  com a imagem criada agora da pra rodar comandos do cliente aws
+
+  #+NAME:docker run --rm -it amazon/aws-cli --version
+  #+BEGIN_SRC shell :session s1 :results output :exports both  
+  docker run --rm -it amazon/aws-cli --version
+  #+END_SRC 
+
+  #+RESULTS: docker run --rm -it amazon/aws-cli --version
+  : aws-cli/2.1.24 Python/3.7.3 Linux/5.9.16-1-MANJARO docker/x86_64.amzn.2 prompt/off
+
+* Usando o container com credenciais da aws
+
+  Antes de fazer o teste, instale e aws-cli na sua maquina e rode 
+  
+ #+NAME:aws configure
+ #+BEGIN_SRC shell :session s1 :results output :exports both
+ aws configure
+ #+END_SRC
+
+ responda as perguntas que o comando vai te fazer e no final será  gerarado a credencial no diretorio /home/$USER/.aws
+
+  
+  #+NAME:docker run --rm -it -v ~/.aws:/root/.aws amazon/aws-cli s3 ls
+  #+BEGIN_SRC shell :session s1 :results output :exports code
+  docker run --rm -it -v /home/wagner/fzlbpms/credentials/aws:/root/.aws amazon/aws-cli s3 ls
+  #+END_SRC
+
+  #+RESULTS: docker run --rm -it -v ~/.aws:/root/.aws amazon/aws-cli s3 ls
+  : 2019-10-13 22:06:58 br.com.fzlbpms
+  : 2019-10-29 18:02:05 br.usp.sin5009
+  : 2020-04-12 22:36:08 ec2-moodle-etc-httpd
+  : 2020-04-12 22:27:19 ec2-moodle-www-moodle
+  : 2020-04-05 18:10:01 www.planosdeaulas.com.br
+
+  #+RESULTS: docker run --rm -it -v ~/.aws:/root/.aws -v $(pwd):/shared_folder amazon/aws-cli aws s3api list-buckets --query "Buckets[].Name"
+
+
+
+
+
+   
+* Refs
+[fn:1] https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2-docker.html
+[fn:2] 
+[fn:3] 
+

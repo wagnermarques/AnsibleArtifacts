@@ -1,0 +1,5 @@
+{
+    "default_container_name":"aws-cli",
+    "default_container_image":"amazon/aws-cli",
+    "volPath1":""
+}

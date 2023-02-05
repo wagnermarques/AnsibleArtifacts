@@ -1,0 +1,11 @@
+---
+# tasks file for aws-cli-prepare
+
+#https://docs.ansible.com/ansible/latest/collections/ansible/builtin/pip_module.html
+#https://aws.amazon.com/pt/sdk-for-python/
+
+
+- name: Install boto
+  pip: 
+    name: awscli
+    

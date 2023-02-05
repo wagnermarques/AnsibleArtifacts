@@ -1,0 +1,8 @@
+{
+    "FZLBPMS_HOME":"~/fzlbpms",
+    "fzlbpms_containers":"",
+    "ntp_server1":"server 0.br.pool.ntp.org"
+    "ntp_server2":"server 1.br.pool.ntp.org"
+    "ntp_server3":"server 2.br.pool.ntp.org"
+    "ntp_server4":"server 3.br.pool.ntp.org"
+}

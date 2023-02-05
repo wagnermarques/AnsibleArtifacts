@@ -1,0 +1,7 @@
+{
+    "default_container_name":"fzl_emacs",
+    "default_container_image":"wagnermarques/fzl_emacs:0.0.1",
+    "default_build_directory":"/home/wagner/fzlbpms/var/containers-docker-build-dir/{{ default_container_name }}",
+    "default_container_command":"emacs -version",
+    "DockerfileHomeDir":"/home/wagner/fzlbpms/submodules/Dockerfiles/emacs"
+}

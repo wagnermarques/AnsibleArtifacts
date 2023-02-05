@@ -1,0 +1,13 @@
+#+ Title: Python3 Container
+* Introducao
+
+* Como utilizar o container  
+
+#+NAME: docker exec -it sqlserver /opt/mssql-tools/bin/sqlcmd -v
+#+BEGIN_SRC sh :session s1 :results output :exports both
+  docker exec 
+#+END_SRC
+
+* Refs
+[fn:1] https://ansible-community.github.io/ansible-bender/build/html/configuration.html
+

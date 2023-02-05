@@ -1,0 +1,66 @@
+---
+# tasks file for samba4_cloning_and_compiling
+
+- name: create home user sources directory
+  file:
+    state: directory
+    path: ~/sources
+  register: srcDir
+
+- name: debug srcDir
+  debug:
+    msg: "{{ srcDir }}"
+
+- name: configure wget behind a proxy (creating  ~/.wgetrc file)
+  file:
+    state: touch
+    path: ~/.wgetrc
+
+- name: configure wget behind a proxy (configuring  ~/.wgetrc file_)
+  lineinfile:
+    path:  ~/.wgetrc
+    line: "{{ item }}"
+  with_items:
+    - use_proxy=yes
+    - http_proxy=http://osinstall:admin123@192.168.0.2:3128
+    - https_proxy=http://osinstall:admin123@192.168.0.2:3128
+    
+  
+  #https://wiki.samba.org/index.php/Creating_a_Samba_patch_series
+  #https://wiki.samba.org/index.php/Samba_Release_Planning#Current_Stable_Release
+  #https://vapour-apps.com/build-samba-4-9-from-source-on-debian-9-or-ubuntu-18-04/
+  #https://download.samba.org/pub/samba/stable/
+  #- name: git config --global http.proxy http://osinstall:admin123@192.168.0.2:3128
+  #command: git config --global http.proxy http://osinstall:admin123@192.168.0.2:3128
+  #
+- name: wget https://download.samba.org/pub/samba/stable/samba-4.13.3.tar.gz
+  command: wget  https://download.samba.org/pub/samba/stable/samba-4.13.3.tar.gz
+  args:
+    chdir: "{{ srcDir.path }}"
+
+- name: wget https://download.samba.org/pub/samba/stable/samba-4.13.3.tar.gz
+  command: tar xf samba-4.13.3.tar.gz
+  args:
+    chdir: "{{ srcDir.path }}"
+    
+- name: Modify systemd service
+  command: ls -l
+  args:
+    chdir: "{{ srcDir.path }}/samba-4.13.3"
+  register: lsSources
+
+- name: debug
+  debug:
+    msg:
+      "{{ lsSources }}"
+
+  
+#- name: wget https://download.samba.org/pub/samba/stable/samba-4.9.1.tar.gz
+#  command: wget https://download.samba.org/pub/samba/stable/samba-4.9.1.tar.gz
+#  args:
+#    chdir: "{{ srcDir.path }}"
+
+  
+#tar xf samba-4.9.1.tar.gz
+#cd samba-4.9.1
+    

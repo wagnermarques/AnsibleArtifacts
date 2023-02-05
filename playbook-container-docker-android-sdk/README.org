@@ -1,0 +1,22 @@
+#+ Title: playbook-container-docker-android-sdk
+* Introducao
+  Configurar um ambiente pra programar com android sdk requer
+  instalacao do android sdk do java e configuracao de algumas
+  variaveis de ambiente e o ideal e fazer uma vez so vc nao acha?
+
+  Esse e  motivo desse container, os comandos do android sdk vai
+  funcionar dentro dele de boa pra poder criar as apks etc...
+
+  Ja fizeram alguma coisa nessa direcao conforme o link
+  https://github.com/docker-android-sdk/
+
+  mas a gente quer fazer o nosso...
+
+* Como utilizar o container  
+  
+
+* Refs
+[fn:1] https://github.com/matic-insurance/ansible-docker-postgres/blob/master/tasks/main.yml
+[fn:2] https://docs.ansible.com/ansible/2.8/modules/docker_container_module.html
+[fn:3] https://www.postgresql.org/docs/
+

@@ -1,0 +1,5 @@
+{
+    "default_container_name":"fzl_fed33",
+    "default_container_image":"fedora:33",
+    "volPath1":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-fedora33/shared_folder"
+}

@@ -1,0 +1,38 @@
+---
+# This playbook build fzlbpms development tool
+
+
+- hosts: local_machine
+  become: yes
+  become_method: su
+  become_user: root
+  tasks:
+#    - name: "show some important facts"
+#      ansible.builtin.debug:
+#        msg:
+#          - "{{ ansible_facts['all_ipv4_addresses'] }}"
+#          - "{{ ansible_facts['env'] }}"
+#          - "{{ ansible_facts['env']['FZL_HOME'] }}"
+#          - "{{ playbook_dir }}"
+#          - "{{ ansible_facts['lsb'] }}"
+#          - "{{ ansible_facts['lsb']['id'] }}"
+#          - "{{ ansible_facts['mounts'] }}"
+#          - "{{ ansible_facts['python'] }}"
+#          - "{{ ansible_facts['selinux'] }}"
+#          - "{{ ansible_facts['os_family'] }}"
+
+    - name: This Playbook features
+      debug:
+        msg: "{{ item }}"
+      with_items:
+         - ==> create fzlbpms directory the will be FZL_HOME env var
+         - ==> create $FZL_HOME/fzlStudio the will be FZL_STUDIO env var
+	 - ==> install git and clone fzlbpms core
+	 - ==> install docker,java,python,cc++,nodejs,php,and linux build tools
+	 - ==> install ides emacs, vim, vscode
+	 - ==> configure environment variables to run fzlbpms stufs
+	 - ==> download and/or clone fzlStudio integrated tools
+	 
+
+	 
+

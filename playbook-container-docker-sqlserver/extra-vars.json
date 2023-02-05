@@ -1,0 +1,6 @@
+{
+    "default_container_name":"sqlserver",
+    "default_container_image":"mcr.microsoft.com/mssql/server",
+    "default_container_volumes_from_path":"/run/media/wagner/073c8e64-c4da-49d4-bdfc-221d9ad29e36/fzlbpms/submodules/ansible-artifacts/playbook-container-docker-sqlserver/data", 
+    "DockerfilePath":""
+}

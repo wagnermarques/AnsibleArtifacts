@@ -1,0 +1,97 @@
+---
+# This playbook deploy samba dc server
+
+- hosts: samba-servers-dc
+  become: yes
+  become_method: su
+  become_user: root
+
+  vars:    
+     address: "192.168.0.1"
+     netmask: "255.255.255.0"
+     dns_search: "company.com.br"
+     dns_domain: "company.com.br"
+     dns_nameservers: "192.168.0.1"
+
+  tasks:
+
+#  - name: setting up static ip address (todo)
+  
+#  - name: update_and_upgrade_debian_or_ubuntu (role)
+#    include_role:
+#      name: update_and_upgrade_debian_or_ubuntu
+        
+#  - name: setting up ansible requirements in host
+#    include_role:
+#      name: ansible_requirements_setting_up
+    
+#  - name: setting up ansible requirements in host
+#    include_role:
+#      name: docker_install
+
+#  - name: setting up ansible requirements in host
+#    include_role:
+#      name: samba4_packages_to_build  
+
+# ######### DHCP CONF (example)
+# ddns-updates on; 
+# option domain-name "enterp.com.br";
+# option domain-name-servers 192.168.0.29;
+# option netbios-name-servers 192.168.0.29;
+# option ntp-servers 192.168.0.29;
+# default-lease-time 600;
+# max-lease-time 7200;
+# log-facility local7;
+# subnet 192.168.1.0 netmask 255.255.255.0 {range 192.168.1.10 192.168.1.30;
+# option routers 192.168.0.2;
+# TODO Nao fiz alteracoes ainda no dhcp.conf
+
+# After packag instalation stops dhcp service in order to prevent
+# conflict with dhcp existent
+  - name: disable dhcp service
+    command: systemctl disable isc-dhcp-server
+
+  - name: stop dhcp service
+    command: systemctl stop  isc-dhcp-server
+
+
+#/etc/default/isc-dhcp-server to setup  interface  dhcp server will
+
+
+  - name: cloning and compiling samba in ~/sources dir
+    include_role:
+      name: samba4_cloning_and_compiling
+
+ 
+
+
+
+
+#  - name: setting up ansible requirements in host
+#    include_role:
+#      name: check_the_availability_of_the_features_of_filesystems
+
+#  Default Realm will already be filled with the right information.
+#  (add the information about the Realm and Administrative Server)
+#  Default Realm: EALL.COM.BR
+#  Realm: 127.0.0.1
+#  Administrative Server: 127.0.0.1
+#   Kerberos Default Realm (FQDN) MUST BE uppercase
+#  - name: update krb5.conf to setup default realm
+#    include_role:
+#      name: kerberos_default_realm
+
+# nao alterei o fstab original
+
+  - name: Disable resolvconf
+    command: systemctl disable systemd-resolved.service
+
+
+# add and test brazil ntp pools 
+#server 0.br.pool.ntp.org
+#server 1.br.pool.ntp.org
+#server 2.br.pool.ntp.org
+#server 3.br.pool.ntp.org
+# - name: ntp config
+#   include_role:
+#      name: ntp_config

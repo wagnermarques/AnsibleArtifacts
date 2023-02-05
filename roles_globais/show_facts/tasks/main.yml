@@ -1,0 +1,74 @@
+---
+# tasks file for show_facts
+
+- name: "show some important facts"
+  ansible.builtin.debug:
+    msg: "---------------------------------"
+
+- name: "all_ipv4_addresses"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['all_ipv4_addresses'] }}"
+  when: ansible_facts['all_ipv4_addresses'] is defined
+
+- name: "ansible_facts['env']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['env'] }}"
+  when: ansible_facts['env'] is defined
+
+- name: "ansible_facts['env']['FZL_HOME']"
+  ansible.builtin.debug:
+    msg:
+    - "{{ ansible_facts['env']['FZL_HOME'] }}"
+  when: ansible_facts['env']['FZL_HOME']  is defined
+     
+- name: "show playbook_dir"
+  ansible.builtin.debug:
+    msg:
+      - "{{ playbook_dir }}"
+  when: playbook_dir is defined
+
+- name: "show ansible_facts['lsb']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['lsb'] }}"
+  when: ansible_facts['lsb'] is defined
+      
+- name: "show ansible_facts['lsb']['id']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['lsb']['id'] }}"
+  when: ansible_facts['lsb']['id'] is defined
+
+- name: "show ansible_facts['mounts']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['mounts'] }}"
+  when: ansible_facts['mounts'] is defined
+     
+- name: "show ansible_facts['python']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['python'] }}"
+  when: ansible_facts['python'] is defined
+
+- name: "show ansible_facts['selinux']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['selinux'] }}"
+  when: ansible_facts['selinux'] is defined
+
+- name: "show ansible_facts['os_family']"
+  ansible.builtin.debug:
+    msg:
+      - "{{ ansible_facts['os_family'] }}"
+  when: ansible_facts['os_family'] is defined
+
+- name: "show some important facts"
+  ansible.builtin.debug:
+    msg:
+      - "---------------------------------"
+
+
+      
