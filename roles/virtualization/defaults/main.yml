@@ -1,0 +1,13 @@
+---
+virtualization_packages_fedora:
+  - "@virtualization"
+  - virt-manager
+  - libvirt
+  - qemu-kvm
+  - virt-viewer
+  - virt-install
+  - bridge-utils
+  - libvirt-devel
+  - libguestfs-tools
+  - virtio-win
+  - iptables-services

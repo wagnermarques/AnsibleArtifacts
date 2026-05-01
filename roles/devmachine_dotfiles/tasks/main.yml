@@ -1,0 +1,20 @@
+---
+- name: Ensure .bashrc exists
+  file:
+    path: "~/.bashrc"
+    state: touch
+  when: ansible_os_family != "Alpine"
+
+- name: Basic bash customization
+  lineinfile:
+    path: "~/.bashrc"
+    line: "alias ll='ls -lah'"
+    state: present
+  when: ansible_os_family != "Alpine"
+
+- name: Alpine basic shell customization
+  lineinfile:
+    path: "~/.profile"
+    line: "alias ll='ls -lah'"
+    state: present
+  when: ansible_os_family == "Alpine"

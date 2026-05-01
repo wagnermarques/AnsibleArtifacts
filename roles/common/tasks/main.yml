@@ -1,0 +1,26 @@
+---
+- name: Update package cache (Debian/Ubuntu)
+  apt:
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+- name: Update package cache (Fedora)
+  dnf:
+    update_cache: yes
+  when: ansible_os_family == "RedHat"
+
+- name: Update package cache (Alpine)
+  apk:
+    update_cache: yes
+  when: ansible_os_family == "Alpine"
+
+- name: Install essential packages
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ (ansible_os_family == 'Debian') | ternary(common_packages_debian, (ansible_os_family == 'RedHat') | ternary(common_packages_fedora, common_packages_alpine)) }}"
+
+- name: Ensure sudo/wheel group exists
+  group:
+    name: "{{ (ansible_os_family == 'Debian') | ternary('sudo', 'wheel') }}"
+    state: present

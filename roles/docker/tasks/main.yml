@@ -1,0 +1,23 @@
+---
+- name: Install Docker
+  package:
+    name: "{{ (ansible_os_family == 'Debian') | ternary(docker_packages_debian, (ansible_os_family == 'RedHat') | ternary(docker_packages_fedora, docker_packages_alpine)) }}"
+    state: present
+
+- name: Start and enable Docker service
+  service:
+    name: docker
+    state: started
+    enabled: yes
+  when: ansible_os_family != "Alpine"
+
+- name: Start Docker (Alpine/OpenRC)
+  shell: rc-service docker start && rc-update add docker boot
+  when: ansible_os_family == "Alpine"
+  changed_when: false
+
+- name: Add user to docker group
+  user:
+    name: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+    groups: docker
+    append: yes

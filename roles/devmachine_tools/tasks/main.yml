@@ -1,0 +1,18 @@
+---
+- name: Install Dev Tools (Debian)
+  package:
+    name: "{{ dev_tools_debian }}"
+    state: present
+  when: ansible_os_family == "Debian"
+
+- name: Install Dev Tools (Fedora)
+  package:
+    name: "{{ dev_tools_fedora }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Install Dev Tools (Alpine)
+  package:
+    name: "{{ dev_tools_alpine }}"
+    state: present
+  when: ansible_os_family == "Alpine"

@@ -1,0 +1,13 @@
+---
+# Docker packages for different distros
+docker_packages_debian:
+  - docker.io
+  - docker-compose
+
+docker_packages_fedora:
+  - moby-engine
+  - docker-compose
+
+docker_packages_alpine:
+  - docker
+  - docker-compose

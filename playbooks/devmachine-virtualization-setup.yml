@@ -1,0 +1,5 @@
+---
+- name: Setup Virtualization on Fedora
+  hosts: workstations
+  roles:
+    - virtualization

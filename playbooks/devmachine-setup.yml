@@ -1,0 +1,8 @@
+---
+- name: Setup Local Development Machine
+  hosts: devmachines-workstations
+  roles:
+    - common
+    - docker
+    - devmachine_tools
+    - devmachine_dotfiles

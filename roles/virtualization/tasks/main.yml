@@ -1,0 +1,52 @@
+---
+- name: Uninstall existing virtualization packages (Fedora)
+  dnf:
+    name: "{{ virtualization_packages_fedora }}"
+    state: absent
+  become: yes
+  when: ansible_distribution == "Fedora"
+
+- name: Install virtualization packages (Fedora)
+  dnf:
+    name: "{{ virtualization_packages_fedora }}"
+    state: present
+  become: yes
+  when: ansible_distribution == "Fedora"
+
+- name: Start and enable libvirtd service
+  systemd:
+    name: libvirtd
+    state: started
+    enabled: yes
+  become: yes
+  when: ansible_distribution == "Fedora"
+
+- name: Add user to libvirt group
+  user:
+    name: "{{ ansible_user | default(lookup('env', 'USER')) }}"
+    groups: libvirt
+    append: yes
+  become: yes
+  when: ansible_distribution == "Fedora"
+
+- name: Allow Libvirt traffic through iptables (Fix Docker conflict)
+  shell: |
+    iptables -I FORWARD -i virbr0 -j ACCEPT
+    iptables -I FORWARD -o virbr0 -j ACCEPT
+  become: yes
+  when: ansible_distribution == "Fedora"
+  changed_when: false
+
+- name: Ensure iptables rules persist
+  systemd:
+    name: iptables
+    state: started
+    enabled: yes
+  become: yes
+  when: ansible_distribution == "Fedora"
+
+- name: Save iptables rules
+  shell: iptables-save > /etc/sysconfig/iptables
+  become: yes
+  when: ansible_distribution == "Fedora"
+  changed_when: false

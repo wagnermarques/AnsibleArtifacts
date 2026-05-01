@@ -1,0 +1,52 @@
+#+TITLE: Solução para Internet no Windows 11 (Virt-manager) vs Docker
+#+AUTHOR: Gemini CLI & wgn
+#+DATE: [2026-05-01 sex]
+
+* O Problema: Por que a internet sumiu?
+
+Sabe aquele ditado "muito cacique pra pouco índio"? É mais ou menos o que rola entre o *Docker* e o *Virt-manager* (Libvirt).
+
+Quando você instala o Docker, ele chega "sentando na janela" e altera as regras de firewall do seu Linux (o tal do ~iptables~). Por segurança, o Docker muda a política de encaminhamento (~FORWARD~) para ~DROP~ (bloquear tudo). 
+
+O resultado? A ponte de rede do Virt-manager (~virbr0~), que é por onde o seu Windows 11 tenta "conversar" com o roteador da sua casa, acaba sendo barrada pelo Docker. O Windows até ganha um IP, mas os pacotes de dados ficam presos no firewall e não conseguem sair para a internet.
+
+* A Causa Raiz (O "Pulo do Gato")
+
+1. *Política de FORWARD:* O Docker trava o tráfego que passa de uma placa de rede para outra.
+2. *Conflito de Regras:* O Fedora usa o ~firewalld~, mas o Docker mexe direto no ~iptables~. Às vezes, a zona do libvirt no firewall também fica com o encaminhamento desativado por padrão.
+
+* A Solução: Como resolvemos a parada
+
+Para o Windows voltar a navegar, fizemos um "bem bolado" em três etapas:
+
+** 1. Abrir o caminho no Firewall do Sistema (~firewalld~)
+Demos permissão para a zona do ~libvirt~ fazer o que ela precisa:
+#+BEGIN_SRC bash
+sudo firewall-cmd --zone=libvirt --add-forward
+sudo firewall-cmd --zone=libvirt --add-masquerade
+#+END_SRC
+/Isso diz ao Linux: "Pode deixar o pessoal da virbr0 passar e mascara o IP deles pra eles acessarem a web"./
+
+** 2. Dar um "passa fora" no bloqueio do Docker
+O Docker tem uma regra especial chamada ~DOCKER-USER~. É o único lugar onde a gente pode meter a mão sem o Docker sobrescrever depois. Adicionamos a ~virbr0~ na lista de exceções:
+#+BEGIN_SRC bash
+sudo iptables -I DOCKER-USER -i virbr0 -j ACCEPT
+sudo iptables -I DOCKER-USER -o virbr0 -j ACCEPT
+#+END_SRC
+/Aqui a gente falou: "Docker, se o pacote vier ou for para a virbr0, não se mete, deixa o cara passar!"./
+
+** 3. Verificação
+Depois disso, o Windows 11 conseguiu pegar o IP ~192.168.122.77~ e os pacotes finalmente acharam a saída para a rua.
+
+* Resumo para o Futuro
+
+Se a internet do Windows sumir de novo depois de uma atualização ou de mexer muito no Docker:
+1. Verifica se o Docker tá rodando (~systemctl status docker~).
+2. Roda as regras de ~iptables~ do passo 2 acima.
+3. Dá um "refresh" na rede do Windows.
+
+Agora o Windows tá "voando" na rede de novo! 🚀
+
+#+BEGIN_NOTES
+Este documento foi redigido e organizado pelo *Gemini CLI*, seu assistente de engenharia, para documentar a solução técnica aplicada ao ambiente.
+#+END_NOTES

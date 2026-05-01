@@ -1,0 +1,29 @@
+---
+# OS-specific package lists
+common_packages_debian:
+  - git
+  - curl
+  - vim
+  - tmux
+  - htop
+  - ufw
+  - sudo
+
+common_packages_fedora:
+  - git
+  - curl
+  - vim-enhanced
+  - tmux
+  - htop
+  - ufw
+  - sudo
+
+common_packages_alpine:
+  - git
+  - curl
+  - vim
+  - tmux
+  - htop
+  - ufw
+  - sudo
+  - bash

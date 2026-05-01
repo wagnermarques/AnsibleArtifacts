@@ -1,0 +1,7 @@
+---
+- name: Setup Project Catracas VM
+  hosts: catracas_vms
+  roles:
+    - common
+    - docker
+    # Add project-specific roles here later
