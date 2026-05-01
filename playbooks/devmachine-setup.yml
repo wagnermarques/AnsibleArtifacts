@@ -1,6 +1,6 @@
 ---
 - name: Setup Local Development Machine
-  hosts: devmachines-workstations
+  hosts: devmachines_workstations
   roles:
     - common
     - docker

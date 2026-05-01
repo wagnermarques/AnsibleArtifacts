@@ -1,9 +1,17 @@
 ---
+- name: Get list of installed Docker-related packages
+  shell: "rpm -qa | grep -E '^(docker|moby-engine|docker-client|docker-common|docker-latest|docker-selinux|docker-engine)' || true"
+  register: installed_docker_packages
+  changed_when: false
+  when: ansible_distribution == "Fedora"
+
 - name: Remove conflicting Fedora Docker packages
   dnf:
-    name: "{{ docker_conflicts_fedora }}"
+    name: "{{ installed_docker_packages.stdout_lines }}"
     state: absent
-  when: ansible_distribution == "Fedora"
+  when: 
+    - ansible_distribution == "Fedora"
+    - installed_docker_packages.stdout_lines | length > 0
 
 - name: Add Docker CE repository for Fedora
   get_url:

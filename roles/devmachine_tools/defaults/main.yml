@@ -7,7 +7,7 @@ dev_tools_debian:
   - npm
 
 dev_tools_fedora:
-  - development-tools
+  - "@development-tools"
   - python3-pip
   - nodejs
 

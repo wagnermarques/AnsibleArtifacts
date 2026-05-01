@@ -5,6 +5,7 @@ docker_packages_debian:
   - docker-compose
 
 docker_packages_fedora:
+  - container-selinux
   - docker-ce
   - docker-ce-cli
   - containerd.io
