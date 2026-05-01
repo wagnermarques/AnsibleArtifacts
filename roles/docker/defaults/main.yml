@@ -5,9 +5,26 @@ docker_packages_debian:
   - docker-compose
 
 docker_packages_fedora:
-  - moby-engine
-  - docker-compose
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
 
 docker_packages_alpine:
   - docker
   - docker-compose
+
+# Fedora packages that conflict with docker-ce
+docker_conflicts_fedora:
+  - docker
+  - docker-client
+  - docker-client-latest
+  - docker-common
+  - docker-latest
+  - docker-latest-logrotate
+  - docker-logrotate
+  - docker-selinux
+  - docker-engine-selinux
+  - docker-engine
+  - moby-engine
