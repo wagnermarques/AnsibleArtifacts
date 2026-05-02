@@ -1,0 +1,9 @@
+---
+azure_cli_package: azure-cli
+azure_python_requirements:
+  - azure-mgmt-compute
+  - azure-mgmt-network
+  - azure-mgmt-resource
+  - azure-mgmt-storage
+  - azure-identity
+  - msrestazure

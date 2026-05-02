@@ -1,0 +1,17 @@
+---
+- name: Install Azure CLI on Fedora
+  dnf:
+    name: "{{ azure_cli_package }}"
+    state: present
+  when: ansible_distribution == "Fedora"
+
+- name: Install Python requirements for Azure modules
+  pip:
+    name: "{{ azure_python_requirements }}"
+    state: present
+    executable: pip3
+
+- name: Install Azure Ansible Collection
+  command: ansible-galaxy collection install azure.azcollection
+  register: collection_install
+  changed_when: "'is already installed' not in collection_install.stdout"
