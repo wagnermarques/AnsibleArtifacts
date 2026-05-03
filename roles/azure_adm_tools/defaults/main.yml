@@ -1,9 +1,12 @@
 ---
 azure_cli_package: azure-cli
-azure_python_requirements:
-  - azure-mgmt-compute
+# Using the full bundle PLUS specific missing modules
+azure_python_bundle: "ansible[azure]"
+azure_python_extra_requirements:
+  - azure-mgmt-automation
+  - azure-mgmt-dns
   - azure-mgmt-network
+  - azure-mgmt-compute
   - azure-mgmt-resource
   - azure-mgmt-storage
   - azure-identity
-  - msrestazure

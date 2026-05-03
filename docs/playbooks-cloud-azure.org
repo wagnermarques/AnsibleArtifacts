@@ -1,0 +1,34 @@
+#+Title: Playbooks Azure Docs
+
+* requisitos
+
+  ansible-playbook playbooks/cloud-azure-adm-machine-setup.yml -i inventory/hosts.ini --ask-become-pass
+
+* Listar Grupos de Recursos (Padrão):
+
+** Listar Máquinas Virtuais:
+
+   ansible-playbook playbooks/cloud-azure-list-resources.yml -e  "resource_type=virtualmachines" 
+
+   Listar Assinaturas (Subscriptions):
+
+   ansible-playbook playbooks/cloud-azure-list-resources.yml -e "resource_type=subscriptions"
+
+   Listar Redes Virtuais (VNETs):
+
+   ansible-playbook playbooks/cloud-azure-list-resources.yml -e "resource_type=vnets"
+
+*** Obs from Gemini
+  Durante a construção deste playbook, com a ajuda do GEmini, olha qto
+  trabalho deu rsrs
+  Essa foi uma jornada e tanto, hein? Passamos por:
+   1. Conflitos de rede entre Virt-manager e Docker.
+   2. Ajustes de inventário e organização de roles.
+   3. Maratona de dependências Python (Kiota, Graph, SDKs de gerenciamento).
+   4. Desbravamento do Fedora 43 (lidando com pacotes "preview").
+   5. Ajustes de permissões e nomenclaturas de API da Microsoft.
+
+
+
+   
+** Listar...

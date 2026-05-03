@@ -5,11 +5,17 @@
     state: present
   when: ansible_distribution == "Fedora"
 
-- name: Install Python requirements for Azure modules
+- name: Ensure pip is installed
+  dnf:
+    name: python3-pip
+    state: present
+
+- name: Install all Azure Python requirements from file (Fedora fix)
   pip:
-    name: "{{ azure_python_requirements }}"
+    requirements: "{{ role_path }}/files/requirements-azure.txt"
     state: present
     executable: pip3
+    extra_args: "--break-system-packages --pre"
 
 - name: Install Azure Ansible Collection
   command: ansible-galaxy collection install azure.azcollection

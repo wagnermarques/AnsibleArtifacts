@@ -1,0 +1,56 @@
+---
+- name: List Azure Resources
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    # Default resource type if none is provided
+    resource_type: "resourcegroups"
+    
+  tasks:
+    - name: "Informações sobre Assinaturas (Subscriptions)"
+      azure.azcollection.azure_rm_subscription_info:
+      register: subscription_info
+      when: resource_type == "subscriptions"
+
+    - name: "Exibir Assinaturas"
+      debug:
+        msg: "{{ subscription_info.subscriptions | map(attribute='display_name') | list }}"
+      when: resource_type == "subscriptions"
+
+    - name: "Informações sobre Grupos de Recursos (Resource Groups)"
+      azure.azcollection.azure_rm_resourcegroup_info:
+      register: rg_info
+      when: resource_type == "resourcegroups"
+
+    - name: "Exibir Grupos de Recursos"
+      debug:
+        msg: "{{ rg_info.resource_groups | map(attribute='name') | list }}"
+      when: resource_type == "resourcegroups"
+
+    - name: "Informações sobre Máquinas Virtuais (VMs)"
+      azure.azcollection.azure_rm_virtualmachine_info:
+      register: vm_info
+      when: resource_type == "virtualmachines"
+
+    - name: "Exibir Máquinas Virtuais"
+      debug:
+        msg: "{{ vm_info.vms | map(attribute='name') | list }}"
+      when: resource_type == "virtualmachines"
+
+    - name: "Informações sobre Redes Virtuais (VNETs)"
+      azure.azcollection.azure_rm_virtualnetwork_info:
+      register: vnet_info
+      when: resource_type == "vnets"
+
+    - name: "Exibir Redes Virtuais"
+      debug:
+        msg: "{{ vnet_info.virtualnetworks | map(attribute='name') | list }}"
+      when: resource_type == "vnets"
+
+
+    - name: "Alerta para tipo de recurso desconhecido"
+      debug:
+        msg: "Tipo de recurso '{{ resource_type }}' não suportado ou não implementado neste exemplo."
+      when: resource_type not in ['subscriptions', 'resourcegroups', 'virtualmachines', 'vnets']

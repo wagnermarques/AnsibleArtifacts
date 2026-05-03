@@ -5,11 +5,15 @@ dev_tools_debian:
   - python3-pip
   - nodejs
   - npm
+  - rustc
+  - cargo
 
 dev_tools_fedora:
   - "@development-tools"
   - python3-pip
   - nodejs
+  - rust
+  - cargo
 
 dev_tools_alpine:
   - build-base
@@ -17,3 +21,5 @@ dev_tools_alpine:
   - py3-pip
   - nodejs
   - npm
+  - rust
+  - cargo
