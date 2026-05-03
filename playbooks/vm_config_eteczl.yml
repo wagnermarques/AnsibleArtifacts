@@ -1,0 +1,11 @@
+vm_name: "eteczl"
+vm_size: "Standard_B2ats_v2"
+location: "northcentralus"
+image:
+  offer: "ubuntu-24_04-lts"
+  publisher: "canonical"
+  sku: "server"
+  version: "latest"
+resource_group: "CATRACAS"
+# NOTE: Manual override needed due to Read-Only subscription
+has_docker: true 

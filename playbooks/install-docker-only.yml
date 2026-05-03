@@ -1,0 +1,10 @@
+---
+- name: Install Docker on Existing VM
+  hosts: all
+  become: true
+  gather_facts: true
+  
+  tasks:
+    - name: Include Docker role
+      include_role:
+        name: docker

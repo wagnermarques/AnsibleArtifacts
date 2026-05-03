@@ -34,9 +34,41 @@
       register: vm_info
       when: resource_type == "virtualmachines"
 
+    - name: "Buscar detalhes das interfaces de rede"
+      azure.azcollection.azure_rm_networkinterface_info:
+        resource_group: "{{ item.resource_group }}"
+        name: "{{ item.network_interface_names[0] }}"
+      register: nic_results
+      loop: "{{ vm_info.vms }}"
+      when: 
+        - resource_type == "virtualmachines"
+        - item.network_interface_names | length > 0
+
+    - name: "Buscar detalhes dos IPs Públicos"
+      azure.azcollection.azure_rm_publicipaddress_info:
+        resource_group: "{{ item.invocation.module_args.resource_group }}"
+        name: "{{ item.networkinterfaces[0].ip_configurations[0].public_ip_address | basename }}"
+      register: pip_results
+      loop: "{{ nic_results.results }}"
+      when: 
+        - resource_type == "virtualmachines"
+        - item.networkinterfaces is defined
+        - item.networkinterfaces | length > 0
+        - item.networkinterfaces[0].ip_configurations[0].public_ip_address is defined
+        - item.networkinterfaces[0].ip_configurations[0].public_ip_address != none
+
     - name: "Exibir Máquinas Virtuais"
       debug:
-        msg: "{{ vm_info.vms | map(attribute='name') | list }}"
+        msg: |
+          {{"%-20s | %-15s | %-15s" | format('VM Name', 'Admin User', 'Public IP')}}
+          {{'-' * 20}} + {{'-' * 15}} + {{'-' * 15}}
+          {% for vm in vm_info.vms %}
+          {% set nic = nic_results.results | selectattr('item.name', 'equalto', vm.name) | first | default({}) %}
+          {% set pip_name = (nic.networkinterfaces[0].ip_configurations[0].public_ip_address | basename) if (nic.networkinterfaces is defined and nic.networkinterfaces[0].ip_configurations[0].public_ip_address is defined) else none %}
+          {% set pip = pip_results.results | selectattr('item.item.name', 'equalto', vm.name) | first | default({}) if pip_name else {} %}
+          {% set ip = pip.publicipaddresses[0].ip_address if (pip.publicipaddresses is defined and pip.publicipaddresses | length > 0) else 'N/A' %}
+          {{"%-20s | %-15s | %-15s" | format(vm.name, vm.admin_username, ip)}}
+          {% endfor %}
       when: resource_type == "virtualmachines"
 
     - name: "Informações sobre Redes Virtuais (VNETs)"

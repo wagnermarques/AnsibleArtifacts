@@ -1,0 +1,21 @@
+---
+- name: Remove Azure Resources
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    resource_group: "CATRACAS-MIGRATED"
+    state: absent # Set to 'absent' to remove the resource group
+
+  tasks:
+    - name: "Remover Grupo de Recursos (Resource Group): {{ resource_group }}"
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}"
+        state: "{{ state }}"
+        force_delete_nonempty: true
+      register: rg_result
+
+    - name: "Resultado da Remoção"
+      debug:
+        msg: "O grupo de recursos {{ resource_group }} foi {{ 'removido' if rg_result.changed else 'já estava ausente ou não pôde ser removido' }}."

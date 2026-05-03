@@ -1,5 +1,9 @@
 #+Title: Playbooks Azure Docs
 
+Esta documentacao he sobre varios playbooks para trabalhar com a nuvem
+da azure
+
+
 * requisitos
 
   ansible-playbook playbooks/cloud-azure-adm-machine-setup.yml -i inventory/hosts.ini --ask-become-pass
@@ -32,3 +36,6 @@
 
    
 ** Listar...
+* Instalar software em alguma vm da azure
+ansible-playbook -i "azure vm ip" playbooks/install-docker-only.yml -u azureadmin
+* asdf

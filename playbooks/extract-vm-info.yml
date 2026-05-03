@@ -1,0 +1,46 @@
+- name: Extract Azure VM Metadata (Read-Only)
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    vm_name: "eteczl"
+    resource_group: "CATRACAS"
+    output_file: "vm_config_{{ vm_name }}.yml"
+
+  tasks:
+    - name: Get Virtual Machine info
+      azure.azcollection.azure_rm_virtualmachine_info:
+        resource_group: "{{ resource_group }}"
+        name: "{{ vm_name }}"
+      register: vm_info_raw
+
+    - name: Fail if VM not found
+      fail:
+        msg: "VM {{ vm_name }} not found in resource group {{ resource_group }}"
+      when: vm_info_raw.vms | length == 0
+
+    - set_fact:
+        vm_details: "{{ vm_info_raw.vms[0] }}"
+
+    - name: Get Network Interface info
+      azure.azcollection.azure_rm_networkinterface_info:
+        resource_group: "{{ vm_details.resource_group }}"
+        name: "{{ (vm_details.network_interface_names | first) if (vm_details.network_interface_names is defined and vm_details.network_interface_names | length > 0) else (vm_details.network_profile.network_interfaces[0].id | basename) }}"
+      register: nic_info
+
+    - name: Save Metadata to File
+      copy:
+        content: |
+          vm_name: "{{ vm_details.name }}"
+          vm_size: "{{ vm_details.vm_size }}"
+          location: "{{ vm_details.location }}"
+          image:
+            offer: "{{ vm_details.image.offer }}"
+            publisher: "{{ vm_details.image.publisher }}"
+            sku: "{{ vm_details.image.sku }}"
+            version: "{{ vm_details.image.version }}"
+          resource_group: "{{ vm_details.resource_group }}"
+          # NOTE: Manual override needed due to Read-Only subscription
+          has_docker: true 
+        dest: "{{ output_file }}"

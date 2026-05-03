@@ -1,0 +1,132 @@
+---
+- name: Provision New Azure VM from Metadata
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    config_file: "vm_config_eteczl.yml"
+    target_resource_group: "CATRACAS-MIGRATED"
+    target_vnet_name: "eteczl-vnet"
+    target_subnet_name: "eteczl-subnet"
+    target_nsg_name: "eteczl-nsg"
+    # Provide the path to your public key here
+    local_ssh_key_path: "~/.ssh/id_ed25519.pub"
+
+  tasks:
+    - name: Load VM configuration
+      include_vars:
+        file: "{{ config_file }}"
+        name: vm_config
+
+    - name: Ensure SSH public key exists
+      stat:
+        path: "{{ local_ssh_key_path | expanduser }}"
+      register: ssh_key_stat
+
+    - name: Fail if SSH public key is missing
+      fail:
+        msg: "SSH public key not found at {{ local_ssh_key_path }}. Please ensure it exists."
+      when: not ssh_key_stat.stat.exists
+
+    - name: Create Resource Group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ target_resource_group }}"
+        location: "{{ vm_config.location }}"
+
+    - name: Create Virtual Network
+      azure.azcollection.azure_rm_virtualnetwork:
+        resource_group: "{{ target_resource_group }}"
+        name: "{{ target_vnet_name }}"
+        address_prefixes: "10.0.0.0/16"
+
+    - name: Create Subnet
+      azure.azcollection.azure_rm_subnet:
+        resource_group: "{{ target_resource_group }}"
+        virtual_network: "{{ target_vnet_name }}"
+        name: "{{ target_subnet_name }}"
+        address_prefix: "10.0.1.0/24"
+
+    - name: Create Network Security Group
+      azure.azcollection.azure_rm_securitygroup:
+        resource_group: "{{ target_resource_group }}"
+        name: "{{ target_nsg_name }}"
+        rules:
+          - name: AllowSSH
+            protocol: Tcp
+            destination_port_range: 22
+            access: Allow
+            priority: 1001
+            direction: Inbound
+          - name: AllowHTTP
+            protocol: Tcp
+            destination_port_range: 80
+            access: Allow
+            priority: 1002
+            direction: Inbound
+          - name: AllowCustom7856
+            protocol: Tcp
+            destination_port_range: 7856
+            access: Allow
+            priority: 1003
+            direction: Inbound
+
+    - name: Create Public IP
+      azure.azcollection.azure_rm_publicipaddress:
+        resource_group: "{{ target_resource_group }}"
+        allocation_method: Static
+        sku: Standard
+        name: "{{ vm_config.vm_name }}-pip"
+      register: output_pip
+
+    - name: Create Network Interface
+      azure.azcollection.azure_rm_networkinterface:
+        resource_group: "{{ target_resource_group }}"
+        name: "{{ vm_config.vm_name }}-nic"
+        virtual_network_name: "{{ target_vnet_name }}"
+        subnet_name: "{{ target_subnet_name }}"
+        security_group: "{{ target_nsg_name }}"
+        ip_configurations:
+          - name: ipconfig1
+            public_ip_address_name: "{{ vm_config.vm_name }}-pip"
+            primary: true
+
+    - name: Create Virtual Machine
+      azure.azcollection.azure_rm_virtualmachine:
+        resource_group: "{{ target_resource_group }}"
+        name: "{{ vm_config.vm_name }}"
+        vm_size: "{{ vm_config.vm_size }}"
+        admin_username: "azureadmin"
+        ssh_password_enabled: false
+        ssh_public_keys:
+          - path: "/home/azureadmin/.ssh/authorized_keys"
+            key_data: "{{ lookup('file', local_ssh_key_path | expanduser) }}"
+        image: "{{ vm_config.image }}"
+        network_interfaces: "{{ vm_config.vm_name }}-nic"
+        managed_disk_type: Standard_LRS
+        os_disk_caching: ReadWrite
+      register: vm_creation
+
+    - name: Add new VM to temporary inventory
+      add_host:
+        name: "{{ output_pip.state.ip_address }}"
+        groups: target_vm
+        ansible_user: "azureadmin"
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    - name: Wait for SSH to be available
+      wait_for:
+        host: "{{ output_pip.state.ip_address }}"
+        port: 22
+        delay: 10
+        timeout: 300
+
+- name: Configure Guest OS (Install Docker)
+  hosts: target_vm
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Include Docker role
+      include_role:
+        name: docker
+      when: hostvars['localhost'].vm_config.has_docker | bool
