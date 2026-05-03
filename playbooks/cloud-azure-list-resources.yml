@@ -26,7 +26,7 @@
 
     - name: "Exibir Grupos de Recursos"
       debug:
-        msg: "{{ rg_info.resource_groups | map(attribute='name') | list }}"
+        msg: "{{ rg_info.resourcegroups | map(attribute='name') | list }}"
       when: resource_type == "resourcegroups"
 
     - name: "Informações sobre Máquinas Virtuais (VMs)"
