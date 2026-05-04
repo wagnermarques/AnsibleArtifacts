@@ -38,4 +38,26 @@ da azure
 ** Listar...
 * Instalar software em alguma vm da azure
 ansible-playbook -i "azure vm ip" playbooks/install-docker-only.yml -u azureadmin
+* Casos de Usos Comuns
+
+- ansible-playbook -i inventory/local.ini playbooks/virtualization-setup.yml --ask-become-pass
+  Instala tudo que he necessario pra trabalhar com kvm (vitualizacao)
+
+- ansible-playbook playbooks/devmachine-azure-cli-setup.yml -i inventory/hosts.ini --ask-become-pass
+  Instala cliente da azure, necessario pra usar os playbooks pra azure
+
+  Todos os playbooks da azure necessitam de az login antes de roda-lo
+
+  Os playbooks da azure nao devem rodar com --ask-become-pass porque
+  as credencias apois az login ficam presentes no usuario nao no root
+  
+- ansible-playbook playbooks/cloud-azure-list-resources.yml -e "resource_type=virtualmachines"
+  Lista maquinas virtuais
+
+- ansible-playbook -i "vm ip," playbooks/setup-swap.yml -u azureadmin
+  Instala um arquivo e o monta com 2G de swap
+
+  nao e necessario restart a vm
+
+  
 * asdf
