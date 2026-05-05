@@ -3,14 +3,14 @@
   shell: "rpm -qa | grep -E '^(docker|moby-engine|docker-client|docker-common|docker-latest|docker-selinux|docker-engine)' || true"
   register: installed_docker_packages
   changed_when: false
-  when: ansible_distribution == "Fedora"
+  when: ansible_facts['distribution'] == "Fedora"
 
 - name: Remove conflicting Fedora Docker packages
   dnf:
     name: "{{ installed_docker_packages.stdout_lines }}"
     state: absent
   when: 
-    - ansible_distribution == "Fedora"
+    - ansible_facts['distribution'] == "Fedora"
     - installed_docker_packages.stdout_lines | length > 0
 
 - name: Create keyring directory
@@ -18,31 +18,31 @@
     path: /etc/apt/keyrings
     state: directory
     mode: '0755'
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Download Docker GPG key for Debian/Ubuntu
   get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
     dest: /etc/apt/keyrings/docker.asc
     mode: '0644'
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Add Docker repository for Debian/Ubuntu
   apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
     state: present
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Add Docker CE repository for Fedora
   get_url:
     url: https://download.docker.com/linux/fedora/docker-ce.repo
     dest: /etc/yum.repos.d/docker-ce.repo
     mode: '0644'
-  when: ansible_distribution == "Fedora"
+  when: ansible_facts['distribution'] == "Fedora"
 
 - name: Install Docker
   package:
-    name: "{{ (ansible_os_family == 'Debian') | ternary(docker_packages_debian, (ansible_os_family == 'RedHat') | ternary(docker_packages_fedora, docker_packages_alpine)) }}"
+    name: "{{ (ansible_facts['os_family'] == 'Debian') | ternary(docker_packages_debian, (ansible_facts['os_family'] == 'RedHat') | ternary(docker_packages_fedora, docker_packages_alpine)) }}"
     state: present
 
 - name: Start and enable Docker service
@@ -50,11 +50,11 @@
     name: docker
     state: started
     enabled: yes
-  when: ansible_os_family != "Alpine"
+  when: ansible_facts['os_family'] != "Alpine"
 
 - name: Start Docker (Alpine/OpenRC)
   shell: rc-service docker start && rc-update add docker boot
-  when: ansible_os_family == "Alpine"
+  when: ansible_facts['os_family'] == "Alpine"
   changed_when: false
 
 - name: Add user to docker group

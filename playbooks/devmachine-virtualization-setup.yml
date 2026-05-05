@@ -1,5 +1,5 @@
 ---
 - name: Setup Virtualization on Fedora
-  hosts: workstations
+  hosts: devmachines_workstations
   roles:
     - virtualization

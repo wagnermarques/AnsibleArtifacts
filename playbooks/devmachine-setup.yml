@@ -2,8 +2,12 @@
 - name: Setup Local Development Machine
   hosts: devmachines_workstations
   roles:
+    - fedora_dnf_optimization
+    - fedora_rpmfusion_codecs
     - common
+    - devmachine_fonts
     - docker
     - devmachine_install_dev_langs
     - devmachine_install_ai_tools
+    - devmachine_ides
     - devmachine_dotfiles

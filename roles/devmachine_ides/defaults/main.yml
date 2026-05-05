@@ -1,0 +1,4 @@
+---
+# Defaults for devmachine_ides role
+install_vscode: true
+vscode_package_name: code

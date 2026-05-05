@@ -1,0 +1,15 @@
+---
+- name: Optimize DNF configuration
+  lineinfile:
+    path: /etc/dnf/dnf.conf
+    regexp: "^#?{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    state: present
+    insertafter: "^\\[main\\]"
+  loop:
+    - { key: 'fastestmirror', value: 'True' }
+    - { key: 'max_parallel_downloads', value: '10' }
+    - { key: 'defaultyes', value: 'True' }
+    - { key: 'keepcache', value: 'True' }
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat" and ansible_facts['distribution'] == "Fedora"

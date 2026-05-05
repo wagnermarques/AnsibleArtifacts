@@ -8,6 +8,5 @@ virtualization_packages_fedora:
   - virt-install
   - bridge-utils
   - libvirt-devel
-  - libguestfs-tools
-  - virtio-win
+  - guestfs-tools
   - iptables-services

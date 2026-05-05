@@ -2,25 +2,57 @@
 - name: Update package cache (Debian/Ubuntu)
   apt:
     update_cache: yes
-  when: ansible_os_family == "Debian"
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Update package cache (Fedora)
   dnf:
     update_cache: yes
-  when: ansible_os_family == "RedHat"
+  when: ansible_facts['os_family'] == "RedHat"
 
 - name: Update package cache (Alpine)
   apk:
     update_cache: yes
-  when: ansible_os_family == "Alpine"
+  when: ansible_facts['os_family'] == "Alpine"
 
 - name: Install essential packages
   package:
     name: "{{ item }}"
     state: present
-  loop: "{{ (ansible_os_family == 'Debian') | ternary(common_packages_debian, (ansible_os_family == 'RedHat') | ternary(common_packages_fedora, common_packages_alpine)) }}"
+  loop: "{{ (ansible_facts['os_family'] == 'Debian') | ternary(common_packages_debian, (ansible_facts['os_family'] == 'RedHat') | ternary(common_packages_fedora, common_packages_alpine)) }}"
 
 - name: Ensure sudo/wheel group exists
   group:
-    name: "{{ (ansible_os_family == 'Debian') | ternary('sudo', 'wheel') }}"
+    name: "{{ (ansible_facts['os_family'] == 'Debian') | ternary('sudo', 'wheel') }}"
     state: present
+
+- name: Start and enable SSH service
+  service:
+    name: "{{ (ansible_facts['os_family'] == 'Alpine') | ternary('sshd', 'ssh') if ansible_facts['os_family'] != 'RedHat' else 'sshd' }}"
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Allow SSH through UFW (Debian/Alpine)
+  ufw:
+    rule: allow
+    port: 22
+    proto: tcp
+  become: yes
+  when: ansible_facts['os_family'] in ['Debian', 'Alpine']
+
+- name: Start and enable firewalld (Fedora)
+  service:
+    name: firewalld
+    state: started
+    enabled: yes
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Allow SSH through firewalld (Fedora)
+  firewalld:
+    service: ssh
+    permanent: yes
+    state: enabled
+    immediate: yes
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"

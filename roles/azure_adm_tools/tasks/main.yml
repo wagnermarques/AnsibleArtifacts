@@ -3,7 +3,7 @@
   dnf:
     name: "{{ azure_cli_package }}"
     state: present
-  when: ansible_distribution == "Fedora"
+  when: ansible_facts['distribution'] == "Fedora"
 
 - name: Ensure pip is installed
   dnf:

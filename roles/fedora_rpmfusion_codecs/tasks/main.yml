@@ -1,0 +1,51 @@
+---
+- name: Install RPM Fusion repositories
+  dnf:
+    name:
+      - "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
+      - "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
+    state: present
+    disable_gpg_check: yes
+  become: yes
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Swap ffmpeg-free for ffmpeg (RPM Fusion)
+  dnf:
+    name: ffmpeg
+    state: present
+    allowerasing: yes
+  become: yes
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Update multimedia groups
+  dnf:
+    name: 
+      - "@multimedia"
+      - "@sound-and-video"
+    state: present
+  become: yes
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Install additional GStreamer and multimedia packages
+  dnf:
+    name:
+      - gstreamer1-plugins-ugly
+      - gstreamer1-plugins-bad-free-extras
+      - gstreamer1-plugins-bad-freeworld
+      - gstreamer1-libav
+      - lame
+      - vlc
+    state: present
+  become: yes
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Install hardware accelerated codecs
+  dnf:
+    name:
+      - intel-media-driver
+      - libva-intel-driver
+    state: present
+  become: yes
+  when: 
+    - ansible_facts['distribution'] == "Fedora"
+    - ansible_facts['processor'] | string is search("Intel")

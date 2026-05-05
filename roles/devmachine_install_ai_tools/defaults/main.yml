@@ -3,8 +3,8 @@
 ai_npm_packages:
   - "@google/gemini-cli"
   - "@githubnext/github-copilot-cli"
+  - "@anthropic-ai/claude-code"
 
-# Claude CLI tools (using the common community ones)
-claude_cli_packages:
-  - name: "claude-cli"
-    package: "claude-ai-cli" # Common npm package for Claude
+ai_python_packages:
+  - "anthropic"
+  - "google-generativeai"

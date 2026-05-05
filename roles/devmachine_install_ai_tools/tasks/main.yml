@@ -4,22 +4,11 @@
     name: "{{ item }}"
     global: yes
     state: present
-  loop:
-    - "@google/gemini-cli"
-    - "@githubnext/github-copilot-cli"
-    - "claude-ai-cli"
-
-- name: Install Anthropic Claude Shell (claude-shell)
-  npm:
-    name: "claude-shell"
-    global: yes
-    state: present
+  loop: "{{ ai_npm_packages }}"
 
 - name: Check for Python AI tools
   pip:
-    name:
-      - "anthropic"
-      - "google-generativeai"
+    name: "{{ ai_python_packages }}"
     state: present
     executable: pip3
     extra_args: "--break-system-packages"

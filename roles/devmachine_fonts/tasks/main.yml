@@ -1,0 +1,48 @@
+---
+- name: Ensure font directory exists
+  file:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/share/fonts"
+    state: directory
+    mode: '0755'
+
+- name: Check if FiraCode Nerd Font is installed
+  stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.local/share/fonts/FiraCodeNerdFont-Regular.ttf"
+  register: firacode_font_stat
+
+- name: Download and install Nerd Fonts
+  block:
+    - name: Ensure unzip is installed
+      package:
+        name: unzip
+        state: present
+      become: yes
+
+    - name: Create temporary directory for fonts
+      tempfile:
+        state: directory
+        suffix: fonts
+      register: font_temp_dir
+
+    - name: Download Nerd Fonts
+      get_url:
+        url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ nerd_fonts_version }}/{{ item }}.zip"
+        dest: "{{ font_temp_dir.path }}/{{ item }}.zip"
+      loop: "{{ nerd_fonts_to_install }}"
+
+    - name: Unarchive Nerd Fonts
+      unarchive:
+        src: "{{ font_temp_dir.path }}/{{ item }}.zip"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/fonts"
+        remote_src: yes
+      loop: "{{ nerd_fonts_to_install }}"
+
+    - name: Update font cache
+      command: fc-cache -f
+      changed_when: true
+
+    - name: Remove temporary directory
+      file:
+        path: "{{ font_temp_dir.path }}"
+        state: absent
+  when: not firacode_font_stat.stat.exists
