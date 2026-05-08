@@ -1,56 +1,82 @@
 ---
-- name: Install VS Code (Fedora)
-  block:
-    - name: Add Microsoft GPG key (Fedora)
-      rpm_key:
-        state: present
-        key: https://packages.microsoft.com/keys/microsoft.asc
-      become: yes
+- name: Ensure target directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  loop:
+    - "{{ intellij_dir }}"
+    - "{{ pycharm_dir }}"
+    - "{{ webstorm_dir }}"
+    - "{{ vscode_dir }}"
+    - "{{ dbeaver_dir }}"
+    - "{{ datagrip_dir }}"
+    - "{{ squirrelsql_dir }}"
+  become: yes
 
-    - name: Add Visual Studio Code repository (Fedora)
-      yum_repository:
-        name: vscode
-        description: Visual Studio Code
-        baseurl: https://packages.microsoft.com/yumrepos/vscode
-        enabled: yes
-        gpgcheck: yes
-        gpgkey: https://packages.microsoft.com/keys/microsoft.asc
-      become: yes
+- name: Install Tools via Extraction (JetBrains)
+  unarchive:
+    src: "{{ item.url }}"
+    dest: "{{ item.dest }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ item.dest }}/bin"
+    owner: "{{ tools_owner }}"
+  loop:
+    - { url: "{{ intellij_url }}", dest: "{{ intellij_dir }}" }
+    - { url: "{{ pycharm_url }}", dest: "{{ pycharm_dir }}" }
+    - { url: "{{ webstorm_url }}", dest: "{{ webstorm_dir }}" }
+    - { url: "{{ datagrip_url }}", dest: "{{ datagrip_dir }}" }
+  become: yes
 
-    - name: Install VS Code (Fedora)
-      dnf:
-        name: "{{ vscode_package_name }}"
-        state: present
-      become: yes
-  when: ansible_facts['os_family'] == "RedHat" and install_vscode
+- name: Install VS Code
+  unarchive:
+    src: "{{ vscode_url }}"
+    dest: "{{ vscode_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ vscode_dir }}/bin"
+    owner: "{{ tools_owner }}"
+  become: yes
 
-- name: Install VS Code (Debian/Ubuntu)
-  block:
-    - name: Install dependencies for VS Code (Debian)
-      apt:
-        name:
-          - wget
-          - gpg
-        state: present
-      become: yes
+- name: Install DBeaver
+  unarchive:
+    src: "{{ dbeaver_url }}"
+    dest: "{{ dbeaver_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ dbeaver_dir }}/dbeaver"
+    owner: "{{ tools_owner }}"
+  become: yes
 
-    - name: Add Microsoft GPG key (Debian)
-      shell: wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/packages.microsoft.gpg
-      args:
-        creates: /usr/share/keyrings/packages.microsoft.gpg
-      become: yes
+- name: Install SQuirreL SQL
+  unarchive:
+    src: "{{ squirrelsql_url }}"
+    dest: "{{ squirrelsql_dir }}"
+    remote_src: yes
+    creates: "{{ squirrelsql_dir }}/squirrel-sql.sh"
+    owner: "{{ tools_owner }}"
+  become: yes
 
-    - name: Add Visual Studio Code repository (Debian)
-      apt_repository:
-        repo: "deb [arch=amd64,arm64,armhf signed-by=/usr/share/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main"
-        state: present
-        filename: vscode
-      become: yes
+- name: Create shell integration for Tools PATH
+  copy:
+    dest: "~/.bashrc_dev_tools"
+    content: |
+      # Dev Tools Path Configuration
+      export PATH="$PATH:{{ intellij_dir }}/bin"
+      export PATH="$PATH:{{ pycharm_dir }}/bin"
+      export PATH="$PATH:{{ webstorm_dir }}/bin"
+      export PATH="$PATH:{{ vscode_dir }}/bin"
+      export PATH="$PATH:{{ dbeaver_dir }}"
+      export PATH="$PATH:{{ datagrip_dir }}/bin"
+      export PATH="$PATH:{{ squirrelsql_dir }}"
+    mode: '0644'
+  become: no
 
-    - name: Install VS Code (Debian)
-      apt:
-        name: "{{ vscode_package_name }}"
-        state: present
-        update_cache: yes
-      become: yes
-  when: ansible_facts['os_family'] == "Debian" and install_vscode
+- name: Source Dev Tools in .bashrc
+  lineinfile:
+    path: "~/.bashrc"
+    line: "source ~/.bashrc_dev_tools"
+    state: present
+  become: no

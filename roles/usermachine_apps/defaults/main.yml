@@ -1,0 +1,23 @@
+---
+# Configuration for user applications
+user_apps_install_dir: "{{ lookup('env', 'HOME') }}/Apps"
+
+# Telegram configuration
+install_telegram: true
+telegram_download_url: "https://telegram.org/dl/desktop/linux"
+telegram_archive_name: "tsetup.tar.xz"
+
+# User applications packages
+user_packages_fedora:
+  - gimp
+  - blender
+  - chromium
+  - epiphany
+  - firefox
+
+user_packages_debian:
+  - gimp
+  - blender
+  - chromium-browser
+  - epiphany-browser
+  - firefox-esr

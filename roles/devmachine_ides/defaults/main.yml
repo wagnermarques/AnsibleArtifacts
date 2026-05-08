@@ -1,4 +1,28 @@
 ---
-# Defaults for devmachine_ides role
-install_vscode: true
-vscode_package_name: code
+# Base directory configuration
+#tools_owner: "{{ ansible_user_id }}"
+#tools_disk_name: "ext4"
+tools_basedir: "/home/wgn/WORK"
+progsativos_dir: "{{ tools_basedir }}/PROGSATIVOS"
+ides_base_dir: "{{ progsativos_dir }}/ides"
+db_tools_base_dir: "{{ progsativos_dir }}/db_tools"
+
+# IDE Specific Paths
+intellij_dir: "{{ ides_base_dir }}/intellij-ides/intellij"
+pycharm_dir: "{{ ides_base_dir }}/pycharm-ides/pycharm"
+webstorm_dir: "{{ ides_base_dir }}/webstorm-ides/webstorm"
+vscode_dir: "{{ ides_base_dir }}/vscode"
+
+# DB Tools Specific Paths
+dbeaver_dir: "{{ db_tools_base_dir }}/dbeaver"
+datagrip_dir: "{{ db_tools_base_dir }}/datagrip"
+squirrelsql_dir: "{{ db_tools_base_dir }}/squirrelsql"
+
+# Download URLs
+intellij_url: "https://download.jetbrains.com/idea/ideaIC-2024.1.1.tar.gz"
+pycharm_url: "https://download.jetbrains.com/python/pycharm-community-2024.1.1.tar.gz"
+webstorm_url: "https://download.jetbrains.com/webstorm/WebStorm-2024.1.1.tar.gz"
+vscode_url: "https://code.visualstudio.com/sha/download?build=stable&os=linux-x64"
+dbeaver_url: "https://dbeaver.io/files/dbeaver-ce-latest-linux.gtk.x86_64.tar.gz"
+datagrip_url: "https://download.jetbrains.com/datagrip/datagrip-2024.1.2.tar.gz"
+squirrelsql_url: "https://downloads.sourceforge.net/project/squirrel-sql/1-stable/4.7.1/squirrel-sql-4.7.1-standard.zip"

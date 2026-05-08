@@ -1,0 +1,82 @@
+---
+- name: Ensure Apps directory exists
+  file:
+    path: "{{ user_apps_install_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_facts['user_id'] }}"
+
+- name: Add Google Chrome repository (Fedora)
+  yum_repository:
+    name: google-chrome
+    description: Google Chrome
+    baseurl: https://dl.google.com/linux/chrome/rpm/stable/x86_64
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://dl.google.com/linux/linux_signing_key.pub
+  become: yes
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Add Google Chrome GPG key (Debian)
+  apt_key:
+    url: https://dl.google.com/linux/linux_signing_key.pub
+    state: present
+  become: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Add Google Chrome repository (Debian)
+  apt_repository:
+    repo: deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main
+    state: present
+  become: yes
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install Google Chrome
+  package:
+    name: google-chrome-stable
+    state: present
+  become: yes
+  when: ansible_facts['os_family'] in ['RedHat', 'Debian']
+
+- name: Install user applications
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ (ansible_facts['os_family'] == 'Debian') | ternary(user_packages_debian, (ansible_facts['os_family'] == 'RedHat') | ternary(user_packages_fedora, [])) }}"
+  become: yes
+
+- name: Install Telegram Desktop
+  block:
+    - name: Download Telegram Desktop
+      get_url:
+        url: "{{ telegram_download_url }}"
+        dest: "/tmp/{{ telegram_archive_name }}"
+        mode: '0644'
+      register: telegram_download
+      become: no
+
+    - name: Extract Telegram Desktop
+      unarchive:
+        src: "/tmp/{{ telegram_archive_name }}"
+        dest: "{{ user_apps_install_dir }}"
+        remote_src: yes
+      when: telegram_download.changed
+      become: no
+
+    - name: Create Desktop Entry for Telegram
+      copy:
+        dest: "{{ lookup('env', 'HOME') }}/.local/share/applications/telegram.desktop"
+        content: |
+          [Desktop Entry]
+          Name=Telegram Desktop
+          Comment=Official desktop version of Telegram messaging app
+          Exec={{ user_apps_install_dir }}/Telegram/Telegram -- %u
+          Icon={{ user_apps_install_dir }}/Telegram/Telegram
+          Terminal=false
+          Type=Application
+          Categories=Network;InstantMessaging;Qt;
+          MimeType=x-scheme-handler/tg;
+          Keywords=tg;messenger;chat;
+        mode: '0644'
+      become: no
+  when: install_telegram
