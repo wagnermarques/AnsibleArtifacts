@@ -1,0 +1,57 @@
+---
+- name: Configure LaTeX environment for Emacs Org-mode
+  hosts: localhost
+  become: true
+  vars:
+    # Minimal TeX packages for org-latex-preview (dvisvgm backend)
+    latex_packages_minimal:
+      - texlive-latex-bin
+      - texlive-dvisvgm
+      - texlive-amsmath
+      - texlive-fontspec
+      - texlive-graphics
+      - texlive-xcolor
+
+    # Optional: Full TeX Live scheme (approximately 5-8 GB)
+    latex_packages_full:
+      - texlive-scheme-full
+
+    # Toggle installation mode: 'minimal' or 'full'
+    latex_install_mode: minimal
+
+  tasks:
+    - name: Update DNF cache (dnf5 compatible)
+      ansible.builtin.dnf:
+        update_cache: true
+      when: ansible_pkg_mgr == 'dnf' or ansible_pkg_mgr == 'dnf5'
+
+    - name: Install minimal LaTeX packages for Org-mode preview
+      ansible.builtin.dnf:
+        name: "{{ latex_packages_minimal }}"
+        state: present
+      when: latex_install_mode == 'minimal'
+
+    - name: Install full TeX Live scheme (optional)
+      ansible.builtin.dnf:
+        name: "{{ latex_packages_full }}"
+        state: present
+      when: latex_install_mode == 'full'
+
+    - name: Verify latex executable is available
+      ansible.builtin.command: which latex
+      register: latex_check
+      changed_when: false
+      failed_when: latex_check.rc != 0
+
+    - name: Verify dvisvgm executable is available
+      ansible.builtin.command: which dvisvgm
+      register: dvisvgm_check
+      changed_when: false
+      failed_when: dvisvgm_check.rc != 0
+
+    - name: Display installation status
+      ansible.builtin.debug:
+        msg:
+          - "LaTeX toolchain installed successfully"
+          - "latex: {{ latex_check.stdout }}"
+          - "dvisvgm: {{ dvisvgm_check.stdout }}"

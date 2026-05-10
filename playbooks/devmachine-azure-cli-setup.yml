@@ -1,0 +1,5 @@
+---
+- name: Setup Azure Administration Tools
+  hosts: devmachines_workstations
+  roles:
+    - azure_adm_tools

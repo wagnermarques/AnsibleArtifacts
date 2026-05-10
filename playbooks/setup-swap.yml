@@ -1,0 +1,60 @@
+---
+- name: Setup Swap Space
+  hosts: all
+  become: true
+  vars:
+    swap_file_path: "/swapfile"
+    swap_file_size_gb: 2 # Default to 2GB, change as needed
+
+  tasks:
+    - name: Check if swap file already exists
+      stat:
+        path: "{{ swap_file_path }}"
+      register: swap_file_check
+
+    - name: Create swap file
+      command: "fallocate -l {{ swap_file_size_gb }}G {{ swap_file_path }}"
+      when: not swap_file_check.stat.exists
+
+    - name: Set correct permissions for swap file
+      file:
+        path: "{{ swap_file_path }}"
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Check if swap is already formatted
+      command: "file {{ swap_file_path }}"
+      register: swap_file_type
+      changed_when: false
+
+    - name: Format swap file
+      command: "mkswap {{ swap_file_path }}"
+      when: "'swap file' not in swap_file_type.stdout"
+
+    - name: Get active swaps
+      command: swapon --show --noheadings --bytes
+      register: swapon_output
+      changed_when: false
+
+    - name: Enable swap file
+      command: "swapon {{ swap_file_path }}"
+      when: swap_file_path not in swapon_output.stdout
+
+    - name: Ensure swap file is in /etc/fstab for persistence
+      mount:
+        name: none
+        src: "{{ swap_file_path }}"
+        fstype: swap
+        opts: sw
+        passno: 0
+        dump: 0
+        state: present
+
+    - name: Display current swap status
+      command: free -h
+      register: free_output
+
+    - name: Show free memory
+      debug:
+        msg: "{{ free_output.stdout_lines }}"

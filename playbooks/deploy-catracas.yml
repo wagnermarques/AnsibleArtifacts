@@ -1,0 +1,65 @@
+---
+- name: Deploy Catracas Secretaria (Yii2)
+  hosts: all
+  become: true
+  vars:
+    repo_url: "https://github.com/wagnermarques/catracas-secretaria-yii2"
+    dest_path: "/var/www/catracas"
+    php_container_name: "eteczlcatracas-php-fpm"
+
+  vars_files:
+    - "../vars/vault.yml"
+
+  tasks:
+    - name: Install Git
+      package:
+        name: git
+        state: present
+
+    - name: Ensure destination directory exists
+      file:
+        path: "{{ dest_path }}"
+        state: directory
+        owner: "{{ ansible_user | default('azureadmin') }}"
+        group: "{{ ansible_user | default('azureadmin') }}"
+        mode: '0755'
+
+    - name: Clone Repository
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ dest_path }}"
+        version: main
+        force: yes
+
+    - name: Generate .env file from template
+      template:
+        src: "../templates/env.j2"
+        dest: "{{ dest_path }}/.env"
+        owner: root
+        group: root
+        mode: '0600'
+
+    - name: Build and start containers
+      command: "docker compose up -d --build"
+      args:
+        chdir: "{{ dest_path }}"
+
+    - name: Run Composer Install
+      command: "docker exec {{ php_container_name }} composer install"
+      args:
+        chdir: "{{ dest_path }}"
+
+    - name: Set directory permissions (web/assets)
+      command: "docker exec {{ php_container_name }} chmod -R 777 web/assets"
+      args:
+        chdir: "{{ dest_path }}"
+
+    - name: Set directory permissions (runtime)
+      command: "docker exec {{ php_container_name }} chmod -R 777 runtime"
+      args:
+        chdir: "{{ dest_path }}"
+
+    - name: Run Database Migrations
+      command: "docker exec {{ php_container_name }} php yii migrate --interactive=0"
+      args:
+        chdir: "{{ dest_path }}"

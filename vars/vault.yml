@@ -1,0 +1,28 @@
+# Placeholder Vault Variables
+# Fill these values and then encrypt with: ansible-vault encrypt vars/vault.yml
+
+app_name: "Catracas Secretaria"
+app_env: "prod"
+app_debug: "false"
+
+# Database
+db_password: "your_secure_db_password_here"
+
+# Admin User
+default_admin_password: "your_secure_admin_password_here"
+
+# Firebase Credentials
+firebase_auth_email: "your_email@example.com"
+firebase_auth_password: "your_password_here"
+firebase_api_key: "your_api_key_here"
+firebase_auth_domain: "your_project.firebaseapp.com"
+firebase_project_id: "your_project_id"
+firebase_storage_bucket: "your_project.firebasestorage.app"
+firebase_messaging_id: "your_sender_id"
+firebase_app_id: "your_app_id"
+
+# Optional/Defaults
+# google_analytics_id: ""
+# google_tag_manager_id: ""
+# firebase_id_token: ""
+# firebase_measurement_id: ""
