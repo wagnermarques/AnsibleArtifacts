@@ -70,6 +70,12 @@
             access: Allow
             priority: 1003
             direction: Inbound
+          - name: AllowPhpMyAdmin
+            protocol: Tcp
+            destination_port_range: 8888
+            access: Allow
+            priority: 1004
+            direction: Inbound
 
     - name: Create Public IP
       azure.azcollection.azure_rm_publicipaddress:
