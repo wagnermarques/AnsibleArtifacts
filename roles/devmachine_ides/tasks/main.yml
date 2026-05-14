@@ -55,6 +55,7 @@
     src: "{{ squirrelsql_url }}"
     dest: "{{ squirrelsql_dir }}"
     remote_src: yes
+    extra_opts: ["--strip-components=1"]
     creates: "{{ squirrelsql_dir }}/squirrel-sql.sh"
     owner: "{{ tools_owner }}"
   become: yes
@@ -71,6 +72,15 @@
       export PATH="$PATH:{{ dbeaver_dir }}"
       export PATH="$PATH:{{ datagrip_dir }}/bin"
       export PATH="$PATH:{{ squirrelsql_dir }}"
+
+      # FZL Start Aliases
+      alias fzl-intellij-start='nohup {{ intellij_dir }}/bin/idea.sh > /dev/null 2>&1 &'
+      alias fzl-pycharm-start='nohup {{ pycharm_dir }}/bin/pycharm.sh > /dev/null 2>&1 &'
+      alias fzl-webstorm-start='nohup {{ webstorm_dir }}/bin/webstorm.sh > /dev/null 2>&1 &'
+      alias fzl-vscode-start='nohup {{ vscode_dir }}/bin/code > /dev/null 2>&1 &'
+      alias fzl-dbeaver-start='nohup {{ dbeaver_dir }}/dbeaver > /dev/null 2>&1 &'
+      alias fzl-datagrip-start='nohup {{ datagrip_dir }}/bin/datagrip.sh > /dev/null 2>&1 &'
+      alias fzl-squirrelsql-start='nohup {{ squirrelsql_dir }}/squirrel-sql.sh > /dev/null 2>&1 &'
     mode: '0644'
   become: no
 

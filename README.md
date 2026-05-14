@@ -54,6 +54,30 @@ This provides a clean environment with only the essentials and Docker.
 ansible-playbook playbooks/projcatracasvm-setup.yml -i inventory/hosts.ini -K
 ```
 
+## Custom Start Commands (FZL Pattern)
+
+This project implements a custom pattern for starting manually installed applications using `fzl-<app>-start` commands. These aliases run applications in the background using `nohup` to ensure they persist even after the terminal is closed.
+
+### Available Commands
+
+| Application | Provided by Playbook | Command |
+| :--- | :--- | :--- |
+| **Telegram Desktop** | `usermachine-setup.yml` | `fzl-telegram-start` |
+| **IntelliJ IDEA** | `devmachine-setup.yml` | `fzl-intellij-start` |
+| **PyCharm** | `devmachine-setup.yml` | `fzl-pycharm-start` |
+| **WebStorm** | `devmachine-setup.yml` | `fzl-webstorm-start` |
+| **VS Code** | `devmachine-setup.yml` | `fzl-vscode-start` |
+| **DBeaver** | `devmachine-setup.yml` | `fzl-dbeaver-start` |
+| **DataGrip** | `devmachine-setup.yml` | `fzl-datagrip-start` |
+| **SQuirreL SQL** | `devmachine-setup.yml` | `fzl-squirrelsql-start` |
+
+### How to use
+After running the corresponding playbook, source your shell configuration to activate the new commands:
+```bash
+source ~/.bashrc
+```
+Then simply type the command (e.g., `fzl-telegram-start`) in your terminal to launch the application.
+
 ## Future Work
 *   **Phase 2:** Implement Azure Cloud infrastructure automation in `playbooks/azure-infra.yml`.
 *   **Project Roles:** Add roles specific to the 'Catracas' project requirements.

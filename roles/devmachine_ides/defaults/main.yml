@@ -1,6 +1,6 @@
 ---
 # Base directory configuration
-#tools_owner: "{{ ansible_user_id }}"
+tools_owner: "{{ lookup('env', 'USER') }}"
 #tools_disk_name: "ext4"
 tools_basedir: "/home/wgn/WORK"
 progsativos_dir: "{{ tools_basedir }}/PROGSATIVOS"
@@ -25,4 +25,4 @@ webstorm_url: "https://download.jetbrains.com/webstorm/WebStorm-2024.1.1.tar.gz"
 vscode_url: "https://code.visualstudio.com/sha/download?build=stable&os=linux-x64"
 dbeaver_url: "https://dbeaver.io/files/dbeaver-ce-latest-linux.gtk.x86_64.tar.gz"
 datagrip_url: "https://download.jetbrains.com/datagrip/datagrip-2024.1.2.tar.gz"
-squirrelsql_url: "https://downloads.sourceforge.net/project/squirrel-sql/1-stable/4.7.1/squirrel-sql-4.7.1-standard.zip"
+squirrelsql_url: "https://netactuate.dl.sourceforge.net/project/squirrel-sql/1-stable/5.1.0-plainzip/squirrelsql-5.1.0-optional.zip?viasf=1&fid=3b97e6aa00c25c0c"
