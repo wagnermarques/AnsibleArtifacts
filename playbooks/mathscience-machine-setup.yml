@@ -1,0 +1,8 @@
+---
+- name: Setup Math and Science Tools
+  hosts: mathscience-machines-workstations
+  become: yes
+  roles:
+    - common
+    - mathscience_tools
+

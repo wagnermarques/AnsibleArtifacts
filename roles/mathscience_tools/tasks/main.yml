@@ -1,0 +1,94 @@
+---
+- name: Ensure math and science base directory exists
+  file:
+    path: "{{ math_science_base_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Ensure tool directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  loop:
+    - "{{ geogebra_dir }}"
+    - "{{ scilab_dir }}"
+    - "{{ paraview_dir }}"
+    - "{{ stellarium_dir }}"
+    - "{{ zotero_dir }}"
+  become: yes
+
+- name: Install GeoGebra (Extraction)
+  unarchive:
+    src: "{{ geogebra_url }}"
+    dest: "{{ geogebra_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ geogebra_dir }}/GeoGebra"
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Install Scilab (Extraction)
+  unarchive:
+    src: "{{ scilab_url }}"
+    dest: "{{ scilab_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ scilab_dir }}/bin/scilab"
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Install ParaView (Extraction)
+  unarchive:
+    src: "https://www.paraview.org/paraview-downloads/download.php?submit=Download&version=v5.12&type=binary&os=Linux&download_resource=ParaView-5.12.0-MPI-Linux-Python3.10-x86_64.tar.gz"
+    dest: "{{ paraview_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ paraview_dir }}/bin/paraview"
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Install Stellarium (AppImage)
+  get_url:
+    url: "{{ stellarium_url }}"
+    dest: "{{ stellarium_dir }}/stellarium.AppImage"
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Install Zotero (Extraction)
+  unarchive:
+    src: "{{ zotero_url }}"
+    dest: "{{ zotero_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ zotero_dir }}/zotero"
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Create shell integration for Math/Science Tools PATH
+  copy:
+    dest: "~{{ ansible_user_id }}/.bashrc_math_science_tools"
+    content: |
+      # Math and Science Tools Path Configuration
+      export PATH="$PATH:{{ geogebra_dir }}"
+      export PATH="$PATH:{{ scilab_dir }}/bin"
+      export PATH="$PATH:{{ paraview_dir }}/bin"
+      export PATH="$PATH:{{ stellarium_dir }}"
+      export PATH="$PATH:{{ zotero_dir }}"
+      
+      # Alias for AppImage
+      alias stellarium='{{ stellarium_dir }}/stellarium.AppImage'
+    mode: '0644'
+    owner: "{{ tools_owner }}"
+  become: no
+
+- name: Source Math/Science Tools in .bashrc
+  lineinfile:
+    path: "~{{ ansible_user_id }}/.bashrc"
+    line: "source ~/.bashrc_math_science_tools"
+    state: present
+  become: no

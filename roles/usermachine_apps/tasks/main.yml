@@ -4,7 +4,7 @@
     path: "{{ user_apps_install_dir }}"
     state: directory
     mode: '0755'
-    owner: "{{ ansible_facts['user_id'] }}"
+    owner: "{{ lookup('env', 'USER') }}"
 
 - name: Add Google Chrome repository (Fedora)
   yum_repository:
@@ -55,12 +55,18 @@
       register: telegram_download
       become: no
 
+    - name: Check if Telegram is installed
+      stat:
+        path: "{{ user_apps_install_dir }}/Telegram/Telegram"
+      register: telegram_binary
+      become: no
+
     - name: Extract Telegram Desktop
       unarchive:
         src: "/tmp/{{ telegram_archive_name }}"
         dest: "{{ user_apps_install_dir }}"
         remote_src: yes
-      when: telegram_download.changed
+      when: telegram_download.changed or not telegram_binary.stat.exists
       become: no
 
     - name: Create Desktop Entry for Telegram
@@ -78,5 +84,23 @@
           MimeType=x-scheme-handler/tg;
           Keywords=tg;messenger;chat;
         mode: '0644'
+      become: no
+
+    - name: Add fzl-telegram-start alias (Bash)
+      lineinfile:
+        path: "~/.bashrc"
+        line: "alias fzl-telegram-start='nohup {{ user_apps_install_dir }}/Telegram/Telegram > /dev/null 2>&1 &'"
+        state: present
+        create: yes
+      when: ansible_facts['os_family'] != "Alpine"
+      become: no
+
+    - name: Add fzl-telegram-start alias (Profile)
+      lineinfile:
+        path: "~/.profile"
+        line: "alias fzl-telegram-start='nohup {{ user_apps_install_dir }}/Telegram/Telegram > /dev/null 2>&1 &'"
+        state: present
+        create: yes
+      when: ansible_facts['os_family'] == "Alpine"
       become: no
   when: install_telegram
