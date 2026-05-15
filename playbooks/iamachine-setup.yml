@@ -1,0 +1,10 @@
+---
+- name: Setup AI Machine with Common Agents
+  hosts: devmachines_workstations
+  become: yes
+  vars_files:
+    - ../vars/vault.yml
+  roles:
+    - common
+    - devmachine_install_dev_langs
+    - devmachine_install_ai_tools

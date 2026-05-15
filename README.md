@@ -54,6 +54,27 @@ This provides a clean environment with only the essentials and Docker.
 ansible-playbook playbooks/projcatracasvm-setup.yml -i inventory/hosts.ini -K
 ```
 
+### 4. Setup AI Machine (IAMachine)
+This playbook installs the most common AI agents and SDKs using NPM and Python (isolated via `pipx`).
+```bash
+ansible-playbook playbooks/iamachine-setup.yml --ask-become-pass
+```
+
+## AI Agents & Documentation
+
+The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. Below are the links to their official documentation and repositories:
+
+| Agent | Category | Documentation / Link |
+| :--- | :--- | :--- |
+| **Claude Code** | NPM | [Official Docs](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code) |
+| **Gemini CLI** | NPM | [GitHub Repo](https://github.com/google/gemini-cli) |
+| **GitHub Copilot** | NPM | [Official Docs](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line) |
+| **OpenClaude** | NPM | [GitHub Repo](https://github.com/Gitlawb/openclaude) |
+| **v0 CLI** | NPM | [Vercel v0](https://v0.dev) |
+| **Aider** | Python | [Official Site](https://aider.chat) |
+| **Shell-GPT** | Python | [GitHub Repo](https://github.com/TheR1D/shell_gpt) |
+| **Open Interpreter**| Python | [Official Docs](https://docs.openinterpreter.com) |
+
 ## Custom Start Commands (FZL Pattern)
 
 This project implements a custom pattern for starting manually installed applications using `fzl-<app>-start` commands. These aliases run applications in the background using `nohup` to ensure they persist even after the terminal is closed.

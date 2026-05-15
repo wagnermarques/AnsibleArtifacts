@@ -1,5 +1,0 @@
----
-- name: Bootstrap Base System
-  hosts: all
-  roles:
-    - common

@@ -6,9 +6,27 @@
     state: present
   loop: "{{ ai_npm_packages }}"
 
-- name: Check for Python AI tools
+- name: Install Python AI SDKs (Libraries)
   pip:
-    name: "{{ ai_python_packages }}"
-    state: present
+    name: "{{ ai_python_libraries }}"
+    state: latest
     executable: pip3
     extra_args: "--break-system-packages"
+
+- name: Ensure pipx is ready
+  command: pipx ensurepath
+  become: no
+
+- name: Install Python AI Apps via pipx
+  command: "pipx install {{ item }} --force"
+  loop: "{{ ai_python_apps }}"
+  become: no
+  register: pipx_result
+  changed_when: 
+    - "'installed package' in pipx_result.stdout or 'upgraded package' in pipx_result.stdout"
+    - "'git+' in item or 'installed package' in pipx_result.stdout"
+  failed_when: 
+    - pipx_result.rc != 0
+    - "'already installed' not in pipx_result.stderr"
+    - "item != 'open-interpreter'"
+    - "'git+' not in item or 'failed' in pipx_result.stderr"

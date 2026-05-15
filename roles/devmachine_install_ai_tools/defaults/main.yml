@@ -2,9 +2,19 @@
 # AI Tools configuration
 ai_npm_packages:
   - "@google/gemini-cli"
-  - "@githubnext/github-copilot-cli"
   - "@anthropic-ai/claude-code"
+  - "@gitlawb/openclaude"
+  - "@github/copilot"
+  - "v0"
 
-ai_python_packages:
+# SDKs and libraries (installed via pip)
+ai_python_libraries:
   - "anthropic"
   - "google-generativeai"
+
+# CLI Applications (installed via pipx for isolation)
+ai_python_apps:
+  - "git+https://github.com/paul-gauthier/aider.git"
+  - "shell-gpt"
+  - "open-interpreter"
+  - "aider-install"
