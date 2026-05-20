@@ -12,7 +12,8 @@
     - "{{ vscode_dir }}"
     - "{{ dbeaver_dir }}"
     - "{{ datagrip_dir }}"
-    - "{{ squirrelsql_dir }}"
+    - "{{ antigravity_dir }}"
+    - "{{ cursor_dir }}"
   become: yes
 
 - name: Install Tools via Extraction (JetBrains)
@@ -28,6 +29,7 @@
     - { url: "{{ pycharm_url }}", dest: "{{ pycharm_dir }}" }
     - { url: "{{ webstorm_url }}", dest: "{{ webstorm_dir }}" }
     - { url: "{{ datagrip_url }}", dest: "{{ datagrip_dir }}" }
+    - { url: "{{ antigravity_url }}", dest: "{{ antigravity_dir }}" }
   become: yes
 
 - name: Install VS Code
@@ -50,13 +52,11 @@
     owner: "{{ tools_owner }}"
   become: yes
 
-- name: Install SQuirreL SQL
-  unarchive:
-    src: "{{ squirrelsql_url }}"
-    dest: "{{ squirrelsql_dir }}"
-    remote_src: yes
-    extra_opts: ["--strip-components=1"]
-    creates: "{{ squirrelsql_dir }}/squirrel-sql.sh"
+- name: Install Cursor
+  get_url:
+    url: "{{ cursor_url }}"
+    dest: "{{ cursor_dir }}/cursor.AppImage"
+    mode: '0755'
     owner: "{{ tools_owner }}"
   become: yes
 
@@ -71,7 +71,8 @@
       export PATH="$PATH:{{ vscode_dir }}/bin"
       export PATH="$PATH:{{ dbeaver_dir }}"
       export PATH="$PATH:{{ datagrip_dir }}/bin"
-      export PATH="$PATH:{{ squirrelsql_dir }}"
+      export PATH="$PATH:{{ antigravity_dir }}/bin"
+      export PATH="$PATH:{{ cursor_dir }}"
 
       # FZL Start Aliases
       alias fzl-intellij-start='nohup {{ intellij_dir }}/bin/idea.sh > /dev/null 2>&1 &'
@@ -80,7 +81,8 @@
       alias fzl-vscode-start='nohup {{ vscode_dir }}/bin/code > /dev/null 2>&1 &'
       alias fzl-dbeaver-start='nohup {{ dbeaver_dir }}/dbeaver > /dev/null 2>&1 &'
       alias fzl-datagrip-start='nohup {{ datagrip_dir }}/bin/datagrip.sh > /dev/null 2>&1 &'
-      alias fzl-squirrelsql-start='nohup {{ squirrelsql_dir }}/squirrel-sql.sh > /dev/null 2>&1 &'
+      alias fzl-antigravity-start='nohup {{ antigravity_dir }}/bin/antigravity > /dev/null 2>&1 &'
+      alias fzl-cursor-start='nohup {{ cursor_dir }}/cursor.AppImage > /dev/null 2>&1 &'
     mode: '0644'
   become: no
 

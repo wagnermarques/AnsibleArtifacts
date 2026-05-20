@@ -5,33 +5,23 @@ Infrastructure as Code (IaC) for setting up development environments, math/scien
 
 ## Key Playbooks
 
-### 1. Bootstrap Local Machine
-Sets up common tools, repositories (RPMFusion), and optimized DNF settings.
-```bash
-ansible-playbook playbooks/bootstrap.yml --ask-become-pass
-```
+### 1. playbooks/devmachine-setup.yml
+Installs development languages (Node.js, Python, Java), IDEs (VSCode,
+JetBrains), and Docker.
 
-### 2. Setup Dev Machine
-Installs development languages (Node.js, Python, Java), IDEs (VSCode, JetBrains), and Docker.
 ```bash
 ansible-playbook playbooks/devmachine-setup.yml --ask-become-pass
 ```
 
-### 3. Deploy ProjCatracas VM
-This provides a clean environment with only the essentials and Docker. 
-1. Edit `inventory/hosts.ini` and add your VM IP under `[catracas_vms]`.
-2. Run the playbook:
-```bash
-ansible-playbook playbooks/projcatracasvm-setup.yml -i inventory/hosts.ini -K
-```
+### 2. Setup AI Machine (IAMachine)
+This playbook installs the most common AI agents and SDKs using NPM
+and Python (isolated via `pipx`). 
 
-### 4. Setup AI Machine (IAMachine)
-This playbook installs the most common AI agents and SDKs using NPM and Python (isolated via `pipx`). It also configures **Gemini CLI Extensions (MCP)** including GitHub, Google Maps, Brave Search, Fetch, and Sequential Thinking.
+It also configures **Gemini CLI Extensions (MCP)** including GitHub, Google Maps, Brave Search, Fetch, and Sequential Thinking.
 
 **Note:** For MCP extensions to work fully, you must provide the following tokens in `vars/vault.yml`:
 - `github_mcp_token`: GitHub Personal Access Token (with `repo` and `user` scopes).
 - `google_maps_mcp_key`: Google Maps API Key.
-- `brave_search_mcp_key`: Brave Search API Key.
 
 ```bash
 ansible-playbook playbooks/iamachine-setup.yml --ask-become-pass
@@ -53,6 +43,15 @@ The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. B
 | **Shell-GPT** | Python | [GitHub Repo](https://github.com/TheR1D/shell_gpt) |
 | **Open Interpreter**| Python | [Official Docs](https://docs.openinterpreter.com) |
 
+### 2. Deploy ProjCatracas VM
+This provides a clean environment with only the essentials and Docker. 
+1. Edit `inventory/hosts.ini` and add your VM IP under `[catracas_vms]`.
+2. Run the playbook:
+```bash
+ansible-playbook playbooks/projcatracasvm-setup.yml -i inventory/hosts.ini -K
+```
+
+
 ## Custom Start Commands (FZL Pattern)
 
 This project implements a custom pattern for starting manually installed applications using `fzl-<app>-start` commands. These aliases run applications in the background using `nohup` to ensure they persist even after the terminal is closed.
@@ -68,7 +67,8 @@ This project implements a custom pattern for starting manually installed applica
 | **VS Code** | `devmachine-setup.yml` | `fzl-vscode-start` |
 | **DBeaver** | `devmachine-setup.yml` | `fzl-dbeaver-start` |
 | **DataGrip** | `devmachine-setup.yml` | `fzl-datagrip-start` |
-| **SQuirreL SQL** | `devmachine-setup.yml` | `fzl-squirrelsql-start` |
+| **Antigravity** | `devmachine-setup.yml` | `fzl-antigravity-start` |
+| **Cursor** | `devmachine-setup.yml` | `fzl-cursor-start` |
 
 ### How to use
 After running the corresponding playbook, source your shell configuration to activate the new commands:

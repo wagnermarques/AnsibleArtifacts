@@ -12,11 +12,12 @@ intellij_dir: "{{ ides_base_dir }}/intellij-ides/intellij"
 pycharm_dir: "{{ ides_base_dir }}/pycharm-ides/pycharm"
 webstorm_dir: "{{ ides_base_dir }}/webstorm-ides/webstorm"
 vscode_dir: "{{ ides_base_dir }}/vscode"
+antigravity_dir: "{{ ides_base_dir }}/antigravity"
+cursor_dir: "{{ ides_base_dir }}/cursor"
 
 # DB Tools Specific Paths
 dbeaver_dir: "{{ db_tools_base_dir }}/dbeaver"
 datagrip_dir: "{{ db_tools_base_dir }}/datagrip"
-squirrelsql_dir: "{{ db_tools_base_dir }}/squirrelsql"
 
 # Download URLs
 intellij_url: "https://download.jetbrains.com/idea/ideaIC-2024.1.1.tar.gz"
@@ -25,4 +26,5 @@ webstorm_url: "https://download.jetbrains.com/webstorm/WebStorm-2024.1.1.tar.gz"
 vscode_url: "https://code.visualstudio.com/sha/download?build=stable&os=linux-x64"
 dbeaver_url: "https://dbeaver.io/files/dbeaver-ce-latest-linux.gtk.x86_64.tar.gz"
 datagrip_url: "https://download.jetbrains.com/datagrip/datagrip-2024.1.2.tar.gz"
-#squirrelsql_url: "https://netactuate.dl.sourceforge.net/project/squirrel-sql/1-stable/5.1.0-plainzip/squirrelsql-5.1.0-optional.zip?viasf=1&fid=3b97e6aa00c25c0c"
+antigravity_url: "https://antigravity.google/download/linux"
+cursor_url: "https://downloader.cursor.sh/linux/appImage/x64"
