@@ -21,6 +21,11 @@ firebase_storage_bucket: "your_project.firebasestorage.app"
 firebase_messaging_id: "your_sender_id"
 firebase_app_id: "your_app_id"
 
+# Gemini CLI MCP Extensions
+github_mcp_token: "your_github_pat_here"
+google_maps_mcp_key: "your_google_maps_api_key_here"
+brave_search_mcp_key: "your_brave_search_api_key_here"
+
 # Optional/Defaults
 # google_analytics_id: ""
 # google_tag_manager_id: ""

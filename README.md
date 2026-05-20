@@ -1,52 +1,23 @@
-# Ansible Artifacts for Linux and Cloud
 
-A modular and portable Ansible project for automating personal development workstations and project-specific virtual machines.
+# Ansible Artifacts
 
-## Architecture & Philosophy
+Infrastructure as Code (IaC) for setting up development environments, math/science workstations, and application deployment.
 
-This project distinguishes between your **Personal Development Machine** (your desktop/laptop) and **Project VMs** (remote or local environments for specific projects like 'Catracas').
+## Key Playbooks
 
-*   **Universal Roles:** `common` and `docker` are applied to all machines.
-*   **Specialized Roles:** `devmachine_*` roles are exclusive to your personal workstation.
-*   **Project Playbooks:** Each project or environment type has its own top-level playbook.
-
-## Supported Distributions
-*   Debian / Ubuntu
-*   Fedora
-*   Alpine Linux
-
-## Project Structure
-
-```text
-AnsibleArtifacts/
-├── inventory/
-│   └── hosts.ini            # Define [workstations] and [catracas_vms] here
-├── playbooks/
-│   ├── devmachine-setup.yml  # Full setup for your personal desktop
-│   └── projcatracasvm-setup.yml # Clean setup for project VMs
-├── roles/
-│   ├── common/              # Base system tools (All targets)
-│   ├── docker/              # Container engine (All targets)
-│   ├── devmachine_tools/    # Personal dev packages (Workstation only)
-│   └── devmachine_dotfiles/ # Personal shell/config (Workstation only)
-└── README.md
-```
-
-## Usage
-
-### 1. Prerequisites
-Install the required Ansible collections:
+### 1. Bootstrap Local Machine
+Sets up common tools, repositories (RPMFusion), and optimized DNF settings.
 ```bash
-ansible-galaxy collection install -r requirements.yml
+ansible-playbook playbooks/bootstrap.yml --ask-become-pass
 ```
 
-### 2. Setup your Local Desktop (DevMachine)
-This installs your base tools, docker, development languages (Node/Python), and applies your dotfile customizations.
+### 2. Setup Dev Machine
+Installs development languages (Node.js, Python, Java), IDEs (VSCode, JetBrains), and Docker.
 ```bash
-ansible-playbook playbooks/devmachine-setup.yml -K
+ansible-playbook playbooks/devmachine-setup.yml --ask-become-pass
 ```
 
-### 3. Setup a Project VM (Catracas)
+### 3. Deploy ProjCatracas VM
 This provides a clean environment with only the essentials and Docker. 
 1. Edit `inventory/hosts.ini` and add your VM IP under `[catracas_vms]`.
 2. Run the playbook:
@@ -55,7 +26,13 @@ ansible-playbook playbooks/projcatracasvm-setup.yml -i inventory/hosts.ini -K
 ```
 
 ### 4. Setup AI Machine (IAMachine)
-This playbook installs the most common AI agents and SDKs using NPM and Python (isolated via `pipx`).
+This playbook installs the most common AI agents and SDKs using NPM and Python (isolated via `pipx`). It also configures **Gemini CLI Extensions (MCP)** including GitHub, Google Maps, Brave Search, Fetch, and Sequential Thinking.
+
+**Note:** For MCP extensions to work fully, you must provide the following tokens in `vars/vault.yml`:
+- `github_mcp_token`: GitHub Personal Access Token (with `repo` and `user` scopes).
+- `google_maps_mcp_key`: Google Maps API Key.
+- `brave_search_mcp_key`: Brave Search API Key.
+
 ```bash
 ansible-playbook playbooks/iamachine-setup.yml --ask-become-pass
 ```
@@ -68,6 +45,7 @@ The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. B
 | :--- | :--- | :--- |
 | **Claude Code** | NPM | [Official Docs](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code) |
 | **Gemini CLI** | NPM | [GitHub Repo](https://github.com/google/gemini-cli) |
+| **Gemini CLI MCP**| NPM | [MCP Servers Info](https://modelcontextprotocol.io) |
 | **GitHub Copilot** | NPM | [Official Docs](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line) |
 | **OpenClaude** | NPM | [GitHub Repo](https://github.com/Gitlawb/openclaude) |
 | **v0 CLI** | NPM | [Vercel v0](https://v0.dev) |
@@ -98,7 +76,3 @@ After running the corresponding playbook, source your shell configuration to act
 source ~/.bashrc
 ```
 Then simply type the command (e.g., `fzl-telegram-start`) in your terminal to launch the application.
-
-## Future Work
-*   **Phase 2:** Implement Azure Cloud infrastructure automation in `playbooks/azure-infra.yml`.
-*   **Project Roles:** Add roles specific to the 'Catracas' project requirements.

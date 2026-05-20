@@ -6,6 +6,13 @@
     state: present
   loop: "{{ ai_npm_packages }}"
 
+- name: Install MCP Server Packages for Gemini CLI
+  npm:
+    name: "{{ item }}"
+    global: yes
+    state: present
+  loop: "{{ mcp_npm_packages }}"
+
 - name: Install Python AI SDKs (Libraries)
   pip:
     name: "{{ ai_python_libraries }}"
@@ -30,3 +37,23 @@
     - "'already installed' not in pipx_result.stderr"
     - "item != 'open-interpreter'"
     - "'git+' not in item or 'failed' in pipx_result.stderr"
+
+- name: Get the actual user home directory
+  set_fact:
+    real_user_home: "{{ ansible_env.HOME if ansible_env.SUDO_USER is not defined else '/home/' + ansible_env.SUDO_USER }}"
+
+- name: Ensure .gemini directory exists in user home
+  file:
+    path: "{{ real_user_home }}/.gemini"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+  become: yes
+
+- name: Configure Gemini CLI extensions (MCP)
+  template:
+    src: gemini_settings.json.j2
+    dest: "{{ real_user_home }}/.gemini/settings.json"
+    mode: '0644'
+    owner: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+  become: yes

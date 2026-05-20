@@ -7,6 +7,14 @@ ai_npm_packages:
   - "@github/copilot"
   - "v0"
 
+# MCP Server Packages for Gemini CLI
+mcp_npm_packages:
+  - "@modelcontextprotocol/server-github"
+  - "@modelcontextprotocol/server-google-maps"
+  - "@modelcontextprotocol/server-brave-search"
+  - "mcp-server-fetch-typescript"
+  - "@modelcontextprotocol/server-sequential-thinking"
+
 # SDKs and libraries (installed via pip)
 ai_python_libraries:
   - "anthropic"
