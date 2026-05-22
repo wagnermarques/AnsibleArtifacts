@@ -40,14 +40,14 @@
 
 - name: Get the actual user home directory
   set_fact:
-    real_user_home: "{{ ansible_env.HOME if ansible_env.SUDO_USER is not defined else '/home/' + ansible_env.SUDO_USER }}"
+    real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
 
 - name: Ensure .gemini directory exists in user home
   file:
     path: "{{ real_user_home }}/.gemini"
     state: directory
     mode: '0755'
-    owner: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+    owner: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
   become: yes
 
 - name: Configure Gemini CLI extensions (MCP)
@@ -55,5 +55,5 @@
     src: gemini_settings.json.j2
     dest: "{{ real_user_home }}/.gemini/settings.json"
     mode: '0644'
-    owner: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+    owner: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
   become: yes
