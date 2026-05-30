@@ -1,0 +1,60 @@
+---
+- name: Install Ventoy on USB Disk
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_prompt:
+    - name: usb_device
+      prompt: "Enter the USB device path (e.g., /dev/sdX)"
+      private: false
+
+    - name: confirm_wipe
+      prompt: "WARNING: ALL DATA ON THE SPECIFIED DEVICE WILL BE WIPED. Type 'YES' to continue"
+      private: false
+
+  vars:
+    # Check https://github.com/ventoy/Ventoy/releases for the latest version
+    ventoy_version: "1.0.99"
+    ventoy_download_url: "https://github.com/ventoy/Ventoy/releases/download/v{{ ventoy_version }}/ventoy-{{ ventoy_version }}-linux.tar.gz"
+
+  tasks:
+    - name: Validate confirmation
+      ansible.builtin.fail:
+        msg: "Installation aborted. You must type 'YES' to proceed."
+      when: confirm_wipe != 'YES'
+
+    - name: Ventoy Installation Block
+      block:
+        - name: Create temporary directory for Ventoy
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: ventoy
+          register: temp_dir
+
+        - name: Download and extract Ventoy
+          ansible.builtin.unarchive:
+            src: "{{ ventoy_download_url }}"
+            dest: "{{ temp_dir.path }}"
+            remote_src: yes
+
+        - name: Install Ventoy to disk
+          become: yes
+          ansible.builtin.shell:
+            # The script asks for confirmation twice. 
+            # We use 'echo -e "y\ny"' to answer both prompts automatically.
+            cmd: 'echo -e "y\ny" | sh Ventoy2Disk.sh -I {{ usb_device }}'
+            chdir: "{{ temp_dir.path }}/ventoy-{{ ventoy_version }}"
+          register: ventoy_install_result
+          changed_when: true
+
+        - name: Show Ventoy installation output
+          ansible.builtin.debug:
+            var: ventoy_install_result.stdout_lines
+
+      always:
+        - name: Cleanup temporary directory
+          ansible.builtin.file:
+            path: "{{ temp_dir.path }}"
+            state: absent
+          when: temp_dir.path is defined
