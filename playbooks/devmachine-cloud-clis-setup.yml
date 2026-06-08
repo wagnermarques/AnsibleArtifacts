@@ -1,0 +1,7 @@
+---
+- name: Setup Multi-Cloud Administration Tools
+  hosts: devmachines_workstations
+  roles:
+    - azure_adm_tools
+    - aws_cli
+    - gcp_cli

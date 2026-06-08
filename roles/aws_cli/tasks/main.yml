@@ -1,0 +1,23 @@
+---
+- name: Install AWS CLI on Fedora
+  dnf:
+    name: "{{ aws_cli_package }}"
+    state: present
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Ensure pip is installed
+  dnf:
+    name: python3-pip
+    state: present
+
+- name: Install AWS Python requirements
+  pip:
+    name: "{{ aws_python_requirements }}"
+    state: present
+    executable: pip3
+    extra_args: "--break-system-packages"
+
+- name: Install AWS Ansible Collection
+  command: ansible-galaxy collection install amazon.aws
+  register: collection_install
+  changed_when: "'is already installed' not in collection_install.stdout"

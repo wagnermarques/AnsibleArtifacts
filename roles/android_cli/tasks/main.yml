@@ -1,0 +1,50 @@
+---
+- name: Ensure install directory exists
+  ansible.builtin.file:
+    path: "{{ android_cli_install_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Check if Android CLI is already in PATH
+  ansible.builtin.command: which android
+  register: android_check
+  ignore_errors: true
+  changed_when: false
+
+- name: Download Android CLI binary
+  ansible.builtin.get_url:
+    url: "{{ android_cli_url }}"
+    dest: "{{ android_cli_install_dir }}/{{ android_cli_binary_name }}"
+    mode: '0755'
+  register: download_result
+
+- name: Add ~/.local/bin to PATH in .bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ ansible_env.HOME }}/.bashrc"
+    line: 'export PATH="$HOME/.local/bin:$PATH"'
+    regexp: '^\s*export PATH="\$HOME/\.local/bin:\$PATH"'
+    state: present
+  when: ansible_facts['os_family'] != "Alpine"
+
+- name: Initialize Android CLI
+  ansible.builtin.shell: |
+    export PATH="{{ android_cli_install_dir }}:$PATH"
+    {{ android_cli_binary_name }} init
+  args:
+    executable: /bin/bash
+  when: download_result.changed or android_check.rc != 0
+  changed_when: true
+  ignore_errors: true
+
+- name: Verify Android CLI installation
+  ansible.builtin.shell: |
+    export PATH="{{ android_cli_install_dir }}:$PATH"
+    {{ android_cli_binary_name }} --version
+  args:
+    executable: /bin/bash
+  register: android_version
+  changed_when: false
+
+- name: Display Android CLI version
+  ansible.builtin.debug:
+    msg: "Android CLI version: {{ android_version.stdout }}"

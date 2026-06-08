@@ -1,0 +1,35 @@
+---
+- name: Add Google Cloud SDK repo
+  yum_repository:
+    name: google-cloud-sdk
+    description: Google Cloud SDK
+    baseurl: https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64
+    enabled: yes
+    gpgcheck: yes
+    repo_gpgcheck: no
+    gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg
+           https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Install Google Cloud CLI on Fedora
+  dnf:
+    name: "{{ gcp_cli_package }}"
+    state: present
+  when: ansible_facts['distribution'] == "Fedora"
+
+- name: Ensure pip is installed
+  dnf:
+    name: python3-pip
+    state: present
+
+- name: Install GCP Python requirements
+  pip:
+    name: "{{ gcp_python_requirements }}"
+    state: present
+    executable: pip3
+    extra_args: "--break-system-packages"
+
+- name: Install GCP Ansible Collection
+  command: ansible-galaxy collection install google.cloud
+  register: collection_install
+  changed_when: "'is already installed' not in collection_install.stdout"

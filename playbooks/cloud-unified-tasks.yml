@@ -1,0 +1,19 @@
+---
+- name: Unified Cloud Task Runner
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    # Set this to 'azure', 'aws', or 'gcp'
+    provider: "azure"
+    
+  tasks:
+    - name: "Include Provider Tasks"
+      include_tasks: "cloud_tasks/{{ provider }}.yml"
+      
+    - name: "Display Standardized Results"
+      debug:
+        msg: |
+          Cloud Provider: {{ cloud_provider_name }}
+          Resources Found:
+          {{ cloud_resources | to_nice_json }}

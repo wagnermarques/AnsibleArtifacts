@@ -1,0 +1,10 @@
+---
+# Standardized tasks for Azure
+- name: "Azure: Get Resource Groups"
+  azure.azcollection.azure_rm_resourcegroup_info:
+  register: azure_rg_info
+
+- name: "Azure: Format Results"
+  set_fact:
+    cloud_resources: "{{ azure_rg_info.resourcegroups | map(attribute='name') | list }}"
+    cloud_provider_name: "Azure"

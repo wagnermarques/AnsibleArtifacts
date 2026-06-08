@@ -1,0 +1,15 @@
+---
+android_cli_binary_name: android
+android_cli_install_dir: "{{ ansible_env.HOME }}/.local/bin"
+android_cli_url_base: "https://dl.google.com/android/cli/latest"
+
+android_cli_os_map:
+  Linux: linux
+  Darwin: darwin
+
+android_cli_arch_map:
+  x86_64: x86_64
+  aarch64: arm64
+  arm64: arm64
+
+android_cli_url: "{{ android_cli_url_base }}/{{ android_cli_os_map[ansible_system] }}_{{ android_cli_arch_map[ansible_architecture] }}/{{ android_cli_binary_name }}"

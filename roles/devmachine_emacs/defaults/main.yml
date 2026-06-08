@@ -1,0 +1,42 @@
+---
+emacs_repo_url: "https://git.savannah.gnu.org/git/emacs.git"
+emacs_version: "master"  # Or a specific branch like "emacs-29"
+emacs_install_dir: "{{ ides_base_dir }}/emacs"
+emacs_config_repo: "https://github.com/wagnermarques/fzl-emacs"
+emacs_config_dir: "~/.emacs.d"
+
+# Build dependencies for Fedora
+emacs_fedora_deps:
+  - git
+  - make
+  - autoconf
+  - gcc
+  - gcc-c++
+  - gtk3-devel
+  - libXpm-devel
+  - libjpeg-turbo-devel
+  - libtiff-devel
+  - giflib-devel
+  - libpng-devel
+  - libxml2-devel
+  - gnutls-devel
+  - ncurses-devel
+  - libgccjit-devel
+  - jansson-devel
+  - libtree-sitter-devel
+  - ImageMagick-devel
+  - texinfo
+  - texlive-scheme-basic
+  - texlive-dvipng
+  - texlive-dvisvgm
+
+# Compilation flags for X11 and performance
+emacs_configure_flags: >-
+  --with-native-compilation=aot
+  --with-json
+  --with-tree-sitter
+  --with-x-toolkit=gtk3
+  --with-xwidgets
+  --with-imagemagick
+  --with-mailutils
+  --prefix={{ emacs_install_dir }}

@@ -1,0 +1,12 @@
+---
+# Standardized tasks for GCP
+- name: "GCP: Get Compute Instances"
+  google.cloud.gcp_compute_instance_info:
+    project: "{{ gcp_project_id }}"
+    auth_kind: "{{ gcp_auth_kind | default('application') }}"
+  register: gcp_instance_info
+
+- name: "GCP: Format Results"
+  set_fact:
+    cloud_resources: "{{ gcp_instance_info.resources | map(attribute='name') | list }}"
+    cloud_provider_name: "GCP"

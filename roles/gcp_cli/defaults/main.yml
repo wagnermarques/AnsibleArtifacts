@@ -1,0 +1,5 @@
+---
+gcp_cli_package: google-cloud-cli
+gcp_python_requirements:
+  - google-auth
+  - requests

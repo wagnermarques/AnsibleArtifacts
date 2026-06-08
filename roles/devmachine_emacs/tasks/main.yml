@@ -1,0 +1,59 @@
+---
+- name: Install Emacs build dependencies
+  dnf:
+    name: "{{ emacs_fedora_deps }}"
+    state: present
+  become: yes
+
+- name: Create Emacs installation directory
+  file:
+    path: "{{ emacs_install_dir }}"
+    state: directory
+    owner: "{{ tools_owner }}"
+    mode: '0755'
+  become: yes
+
+- name: Clone Emacs source repository
+  git:
+    repo: "{{ emacs_repo_url }}"
+    dest: "/tmp/emacs_source"
+    version: "{{ emacs_version }}"
+    depth: 1
+  become: no
+
+- name: Build and Install Emacs
+  shell: |
+    ./autogen.sh
+    ./configure {{ emacs_configure_flags }}
+    make -j$(nproc)
+    make install
+  args:
+    chdir: "/tmp/emacs_source"
+    creates: "{{ emacs_install_dir }}/bin/emacs"
+  become: no
+
+- name: Clone fzl-emacs configuration
+  git:
+    repo: "{{ emacs_config_repo }}"
+    dest: "{{ emacs_config_dir }}"
+    force: yes
+  become: no
+
+- name: Create shell integration for Emacs
+  copy:
+    dest: "~/.bashrc_emacs"
+    content: |
+      # Emacs Configuration
+      export PATH="{{ emacs_install_dir }}/bin:$PATH"
+      
+      # FZL Start Alias
+      alias fzl-emacs-start='nohup {{ emacs_install_dir }}/bin/emacs > /dev/null 2>&1 &'
+    mode: '0644'
+  become: no
+
+- name: Source Emacs in .bashrc
+  lineinfile:
+    path: "~/.bashrc"
+    line: "source ~/.bashrc_emacs"
+    state: present
+  become: no

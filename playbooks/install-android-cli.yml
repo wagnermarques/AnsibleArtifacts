@@ -1,0 +1,5 @@
+---
+- name: Install Android CLI
+  hosts: devmachines_workstations
+  roles:
+    - android_cli

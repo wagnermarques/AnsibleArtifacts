@@ -1,0 +1,5 @@
+---
+aws_cli_package: awscli
+aws_python_requirements:
+  - boto3
+  - botocore

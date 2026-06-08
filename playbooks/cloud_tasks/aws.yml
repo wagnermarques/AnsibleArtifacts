@@ -1,0 +1,10 @@
+---
+# Standardized tasks for AWS
+- name: "AWS: Get EC2 Instances"
+  amazon.aws.ec2_instance_info:
+  register: aws_ec2_info
+
+- name: "AWS: Format Results"
+  set_fact:
+    cloud_resources: "{{ aws_ec2_info.instances | map(attribute='instance_id') | list }}"
+    cloud_provider_name: "AWS"

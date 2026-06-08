@@ -2,8 +2,8 @@
 # Base directory configuration
 tools_owner: "{{ lookup('env', 'USER') }}"
 #tools_disk_name: "ext4"
-tools_basedir: "/home/wgn/WORK"
-progsativos_dir: "{{ tools_basedir }}/PROGSATIVOS"
+tools_basedir: "/home/wgn/WORKING"
+progsativos_dir: "{{ tools_basedir }}/Progsativos"
 ides_base_dir: "{{ progsativos_dir }}/ides"
 db_tools_base_dir: "{{ progsativos_dir }}/db_tools"
 

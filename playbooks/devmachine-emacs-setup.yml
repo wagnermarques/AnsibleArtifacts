@@ -1,0 +1,7 @@
+---
+- name: Setup Emacs from Source
+  hosts: devmachines_workstations
+  vars_files:
+    - ../roles/devmachine_ides/defaults/main.yml
+  roles:
+    - devmachine_emacs
