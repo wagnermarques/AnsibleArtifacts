@@ -1,0 +1,22 @@
+---
+android_tools_owner: "{{ lookup('env', 'USER') }}"
+android_basedir: "/home/{{ android_tools_owner }}/WORKING"
+android_progsativos_dir: "{{ android_basedir }}/Progsativos"
+android_studio_dir: "{{ android_progsativos_dir }}/ides/android-studio"
+android_sdk_dir: "/home/{{ android_tools_owner }}/Android/Sdk"
+
+# Versions and URLs
+# Note: You can find latest versions at https://developer.android.com/studio#downloads
+android_studio_version: "2024.2.1.11"
+android_studio_url: "https://redirector.gvt1.com/edgedl/android/studio/ide-zips/{{ android_studio_version }}/android-studio-{{ android_studio_version }}-linux.tar.gz"
+
+# Command line tools are needed for headless SDK management
+android_cmdline_tools_version: "11076708"
+android_cmdline_tools_url: "https://dl.google.com/android/repository/commandlinetools-linux-{{ android_cmdline_tools_version }}_latest.zip"
+
+android_sdk_packages:
+  - "platform-tools"
+  - "platforms;android-34"
+  - "build-tools;34.0.0"
+  - "emulator"
+  - "system-images;android-34;google_apis;x86_64"

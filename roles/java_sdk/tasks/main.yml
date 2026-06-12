@@ -1,0 +1,36 @@
+---
+- name: Set Java package name (RedHat)
+  ansible.builtin.set_fact:
+    java_package_name: "java-{{ java_version }}-openjdk-devel"
+  when: ansible_facts['os_family'] == 'RedHat'
+
+- name: Set Java package name (Debian)
+  ansible.builtin.set_fact:
+    java_package_name: "openjdk-{{ java_version }}-jdk"
+  when: ansible_facts['os_family'] == 'Debian'
+
+- name: Ensure Java SDK is installed
+  ansible.builtin.package:
+    name: "{{ java_package_name }}"
+    state: present
+  become: yes
+
+- name: Get path for installed Java version
+  ansible.builtin.shell: "update-alternatives --display java | grep 'java-{{ java_version }}-openjdk' | grep 'priority' | awk '{print $1}' | head -n 1"
+  register: java_alt_path
+  changed_when: false
+
+- name: Set default java alternative
+  ansible.builtin.command: "update-alternatives --set java {{ java_alt_path.stdout }}"
+  become: yes
+  when: java_alt_path.stdout != ""
+
+- name: Get path for installed Javac version
+  ansible.builtin.shell: "update-alternatives --display javac | grep 'java-{{ java_version }}-openjdk' | grep 'priority' | awk '{print $1}' | head -n 1"
+  register: javac_alt_path
+  changed_when: false
+
+- name: Set default javac alternative
+  ansible.builtin.command: "update-alternatives --set javac {{ javac_alt_path.stdout }}"
+  become: yes
+  when: javac_alt_path.stdout != ""

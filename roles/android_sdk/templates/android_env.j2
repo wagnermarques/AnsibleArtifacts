@@ -1,0 +1,10 @@
+# Android Development Environment
+export ANDROID_HOME="{{ android_sdk_dir }}"
+export ANDROID_SDK_ROOT="{{ android_sdk_dir }}"
+export PATH="$PATH:{{ android_studio_dir }}/bin"
+export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
+export PATH="$PATH:$ANDROID_HOME/platform-tools"
+export PATH="$PATH:$ANDROID_HOME/emulator"
+
+# Alias for starting Android Studio
+alias fzl-android-studio-start='nohup {{ android_studio_dir }}/bin/studio.sh > /dev/null 2>&1 &'

@@ -1,0 +1,6 @@
+---
+- name: Install and Configure Java SDK
+  hosts: localhost
+  connection: local
+  roles:
+    - role: java_sdk

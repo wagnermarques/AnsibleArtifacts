@@ -1,0 +1,9 @@
+---
+- name: Setup Android Development Environment
+  hosts: devmachines_workstations
+  # Note: The role android_sdk will use become: yes only for system-level packages (Java)
+  # and become: no for user-specific configurations.
+  roles:
+    - role: java_sdk
+    - role: android_sdk
+    - role: android_cli

@@ -1,0 +1,68 @@
+---
+- name: Ensure Android directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ android_tools_owner }}"
+  loop:
+    - "{{ android_studio_dir }}"
+    - "{{ android_sdk_dir }}"
+    - "{{ android_sdk_dir }}/cmdline-tools"
+
+- name: Install Android Studio
+  ansible.builtin.unarchive:
+    src: "{{ android_studio_url }}"
+    dest: "{{ android_studio_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ android_studio_dir }}/bin"
+    owner: "{{ android_tools_owner }}"
+
+- name: Check if Android Command Line Tools are already installed
+  ansible.builtin.stat:
+    path: "{{ android_sdk_dir }}/cmdline-tools/latest/bin/sdkmanager"
+  register: sdkmanager_bin
+
+- name: Install Android Command Line Tools
+  block:
+    - name: Download and extract Command Line Tools
+      ansible.builtin.unarchive:
+        src: "{{ android_cmdline_tools_url }}"
+        dest: "{{ android_sdk_dir }}/cmdline-tools"
+        remote_src: yes
+    
+    - name: Move to 'latest' directory structure
+      ansible.builtin.command:
+        cmd: "mv {{ android_sdk_dir }}/cmdline-tools/cmdline-tools {{ android_sdk_dir }}/cmdline-tools/latest"
+      args:
+        creates: "{{ android_sdk_dir }}/cmdline-tools/latest"
+  when: not sdkmanager_bin.stat.exists
+
+- name: Create Android Environment Configuration
+  ansible.builtin.template:
+    src: android_env.j2
+    dest: "/home/{{ android_tools_owner }}/.bashrc_android"
+    mode: '0644'
+    owner: "{{ android_tools_owner }}"
+
+- name: Source Android Environment in .bashrc
+  ansible.builtin.lineinfile:
+    path: "/home/{{ android_tools_owner }}/.bashrc"
+    line: "source ~/.bashrc_android"
+    state: present
+    owner: "{{ android_tools_owner }}"
+
+- name: Accept Android SDK Licenses
+  ansible.builtin.shell: |
+    yes | {{ android_sdk_dir }}/cmdline-tools/latest/bin/sdkmanager --sdk_root={{ android_sdk_dir }} --licenses
+  changed_when: false
+  # Ignore errors because it might return 0 even if no licenses were accepted if they are already accepted
+  ignore_errors: true
+
+- name: Install Android SDK Packages
+  ansible.builtin.shell: |
+    {{ android_sdk_dir }}/cmdline-tools/latest/bin/sdkmanager --sdk_root={{ android_sdk_dir }} "{{ item }}"
+  loop: "{{ android_sdk_packages }}"
+  changed_when: true
+  register: sdkmanager_install
