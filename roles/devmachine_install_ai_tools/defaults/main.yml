@@ -26,3 +26,9 @@ ai_python_apps:
   - "shell-gpt"
   - "open-interpreter"
   - "aider-install"
+
+# Ollama configuration
+install_ollama: true
+ollama_models:
+  - "gemma4:12b"
+  - "qwen2.5:7b"

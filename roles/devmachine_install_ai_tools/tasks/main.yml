@@ -57,3 +57,17 @@
     mode: '0644'
     owner: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
   become: yes
+
+- name: Install Ollama (Local LLM runner)
+  shell: curl -fsSL https://ollama.com/install.sh | sh
+  when: install_ollama | bool
+  args:
+    creates: /usr/local/bin/ollama
+  become: yes
+
+- name: Pull requested local AI models
+  command: "ollama pull {{ item }}"
+  loop: "{{ ollama_models }}"
+  when: install_ollama | bool
+  register: ollama_pull
+  changed_when: "'pulling' in ollama_pull.stdout"

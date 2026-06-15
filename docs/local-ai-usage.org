@@ -1,0 +1,91 @@
+#+TITLE: Local AI Usage Guide: Gemma 4 & Qwen 2.5
+#+AUTHOR: Gemini CLI
+#+DATE: [2026-06-13 Sat]
+
+* Introduction
+This document provides a quick reference for using the local AI
+environment set up via Ansible.
+
+The system is configured with [[https://ollama.com][Ollama]] running two primary models:
+- *Gemma 4 (12b)*: Google's high-performance open model.
+- *Qwen 2.5 (7b)*: Alibaba's efficient and powerful multilingual model.
+
+* Basic Ollama Commands
+Use these commands in your terminal to manage your local models.
+
+** Check Status and Version
+#+begin_src bash
+ollama --version
+#+end_src
+
+** List Installed Models
+#+begin_src bash
+ollama list
+#+end_src
+
+* Running the Models (Interactive CLI)
+You can chat directly with the models in your terminal.
+
+** Chat with Gemma 4
+#+begin_src bash
+ollama run gemma4:12b
+#+end_src
+
+** Chat with Qwen 2.5
+#+begin_src bash
+ollama run qwen2.5:7b
+#+end_src
+
+** Interactive Shortcuts
+Inside the chat session:
+- =/help= : Show help commands.
+- =/set verbose= : Show performance metrics (tokens/sec).
+- =/bye= : Exit the chat.
+
+* Using Local Models with Installed Agents
+The Ansible setup also installed advanced AI agents that can be "pointed" to your local Ollama instance.
+
+** Using with Aider
+Aider can use Ollama via its OpenAI-compatible API.
+#+begin_src bash
+# Use Qwen 2.5 for coding with Aider
+aider --model ollama/qwen2.5:7b
+#+end_src
+
+** Using with Open Interpreter
+#+begin_src bash
+interpreter --local --model qwen2.5:7b
+#+end_src
+
+** Using with Shell-GPT
+You can configure Shell-GPT to use your local Ollama endpoint (usually =http://localhost:11434/v1=).
+
+* Developer Integration (API)
+Ollama runs a local server that exposes a REST API.
+
+** Generate a Response (Curl)
+#+begin_src bash
+curl http://localhost:11434/api/generate -d '{
+  "model": "qwen2.5:7b",
+  "prompt": "Why is the sky blue?",
+  "stream": false
+}'
+#+end_src
+
+** Python Integration
+If you are developing your own scripts:
+#+begin_src python
+import requests
+
+response = requests.post('http://localhost:11434/api/generate', 
+                         json={
+                             'model': 'gemma4:12b',
+                             'prompt': 'Write a hello world in Rust.',
+                             'stream': False
+                         })
+print(response.json()['response'])
+#+end_src
+
+* Performance Tips
+- *Memory*: Gemma 4 (12b) requires about 8GB-12GB of VRAM/RAM. Qwen 2.5 (7b) is lighter and faster.
+- *GPU Acceleration*: Ollama automatically detects NVIDIA or AMD GPUs. Use =nvtop= or =htop= to monitor resource usage while running a model.

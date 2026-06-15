@@ -1,0 +1,33 @@
+---
+- name: Setup Local AI Environment (Ollama + Gemma 4 + Qwen 2.5)
+  hosts: localhost
+  connection: local
+  become: yes
+  vars:
+    # Overriding defaults if necessary for this specific playbook
+    install_ollama: true
+    ollama_models:
+      - "gemma4:12b"
+      - "qwen2.5:7b"
+
+  roles:
+    - devmachine_install_ai_tools
+
+  post_tasks:
+    - name: Verify Ollama installation
+      command: ollama --version
+      register: ollama_version
+      changed_when: false
+
+    - name: Show installed version
+      debug:
+        msg: "Ollama version installed: {{ ollama_version.stdout }}"
+
+    - name: List pulled models
+      command: ollama list
+      register: ollama_list
+      changed_when: false
+
+    - name: Show available models
+      debug:
+        var: ollama_list.stdout_lines
