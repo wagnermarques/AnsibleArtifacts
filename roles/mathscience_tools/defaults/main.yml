@@ -1,8 +1,8 @@
 ---
 # Base directory configuration (consistent with devmachine_ides)
-tools_owner: "{{ ansible_user_id }}"
-tools_basedir: "/home/wgn/WORK"
-progsativos_dir: "{{ tools_basedir }}/PROGSATIVOS"
+tools_owner: "{{ ansible_facts['user_id'] }}"
+tools_basedir: "/home/wgn/WORKING"
+progsativos_dir: "{{ tools_basedir }}/Progsativos"
 math_science_base_dir: "{{ progsativos_dir }}/math_science"
 
 # Tool Specific Paths
@@ -13,8 +13,8 @@ stellarium_dir: "{{ math_science_base_dir }}/stellarium"
 zotero_dir: "{{ math_science_base_dir }}/zotero"
 
 # Download URLs
-geogebra_url: "https://download.geogebra.org/installers/6.0/GeoGebra-Linux64-Portable.tar.gz"
-scilab_url: "https://www.scilab.org/download/2024.1.0/scilab-2024.1.0.bin.linux-x86_64.tar.gz"
-paraview_url: "https://www.paraview.org/paraview-downloads/download.php?submit=Download&version=v5.12&type=binary&os=Linux&download_resource=ParaView-5.12.0-MPI-Linux-Python3.10-x86_64.tar.gz"
-stellarium_url: "https://github.com/Stellarium/stellarium/releases/download/v24.1/stellarium-24.1-x86_64.AppImage"
-zotero_url: "https://www.zotero.org/download/client/dl?channel=release&platform=linux-x86_64&version=6.0.37"
+geogebra_url: "https://download.geogebra.org/installers/6.0/GeoGebra-Linux64-Portable-6-0-804-0.zip"
+scilab_url: "https://oos.eu-west-2.outscale.com/scilab-releases/6.1.1/scilab-6.1.1.bin.linux-x86_64.tar.gz"
+paraview_url: "https://www.paraview.org/paraview-downloads/download.php?submit=Download&version=v5.12&type=binary&os=Linux&downloadFile=ParaView-5.12.1-MPI-Linux-Python3.10-x86_64.tar.gz"
+stellarium_url: "https://github.com/Stellarium/stellarium/releases/download/v25.4/Stellarium-25.4-qt6-x86_64.AppImage"
+zotero_url: "https://www.zotero.org/download/client/dl?channel=release&platform=linux-x86_64"

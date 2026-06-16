@@ -1,0 +1,127 @@
+---
+- name: Build and Install Bruno from Source
+  hosts: localhost
+  become: false  # Build tasks run as your regular user
+  vars:
+    bruno_dest_dir: "{{ ansible_facts['env']['HOME'] }}/bruno"
+
+  tasks:
+    - name: Ensure Git, Node.js, and development tools are installed
+      ansible.builtin.dnf:
+        name:
+          - git
+          - nodejs
+          - npm
+          - gcc-c++
+          - make
+          - libxcrypt-compat
+          - rpm-build
+          - libsecret
+          - alsa-lib
+          - desktop-file-utils
+          - libXScrnSaver
+          - libXtst
+          - at-spi2-core
+          - libuuid
+          - nss
+          - gtk3
+          - libX11
+          - libXcomposite
+          - libXcursor
+          - libXdamage
+          - libXext
+          - libXfixes
+          - libXi
+          - libXrender
+          - libXrandr
+          - mesa-libgbm
+          - pango
+          - at-spi2-atk
+          - xdg-utils
+          - cups-libs
+        state: present
+      become: true # Requires root privileges to install system packages
+
+    - name: Ensure libcrypt.so.1 symlink exists for fpm
+      ansible.builtin.file:
+        src: "/lib64/libcrypt.so.1"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.cache/electron-builder/fpm/fpm-1.9.3-2.3.1-linux-x86_64/lib/ruby/lib/libcrypt.so.1"
+        state: link
+        force: yes
+      ignore_errors: yes # The fpm directory might not exist yet if it hasn't run
+
+    - name: Clone the Bruno repository
+      ansible.builtin.git:
+        repo: 'https://github.com/usebruno/bruno.git'
+        dest: "{{ bruno_dest_dir }}"
+        version: main
+        clone: yes
+        update: yes
+        force: yes
+
+    - name: Run npm install
+      community.general.npm:
+        path: "{{ bruno_dest_dir }}"
+        state: present
+
+    - name: Run build tasks
+      ansible.builtin.command:
+        cmd: "npm run {{ item.cmd }}"
+        chdir: "{{ bruno_dest_dir }}"
+      loop:
+        - { cmd: "build:bruno-converters" }
+        - { cmd: "build:bruno-common" }
+        - { cmd: "build:bruno-query" }
+        - { cmd: "build:graphql-docs" }
+      # Build internal dependencies in correct order before building the app
+
+    - name: Build the web production environment
+      ansible.builtin.command:
+        cmd: "npm run build:web"
+        chdir: "{{ bruno_dest_dir }}"
+      environment:
+        ENV: "prod"
+
+    - name: Build the Electron AppImage package
+      ansible.builtin.command:
+        cmd: "npm run build:electron"
+        chdir: "{{ bruno_dest_dir }}"
+      # 'build:electron' script usually builds AppImage and/or others
+
+    - name: Find the generated AppImage package
+      ansible.builtin.find:
+        paths: "{{ bruno_dest_dir }}/packages/bruno-electron/out"
+        patterns: "*.AppImage"
+        recurse: no
+      register: appimage_file
+
+    - name: Copy AppImage to /usr/local/bin
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "/usr/local/bin/bruno"
+        mode: '0755'
+        remote_src: yes
+      loop: "{{ appimage_file.files }}"
+      become: true
+      when: appimage_file.matched > 0
+
+    - name: Create Desktop Entry
+      ansible.builtin.copy:
+        dest: "/usr/share/applications/bruno.desktop"
+        content: |
+          [Desktop Entry]
+          Name=Bruno
+          Exec=/usr/local/bin/bruno
+          Icon=bruno
+          Type=Application
+          Categories=Development;
+          Comment=Opensource API Client for Exploring and Testing APIs
+      become: true
+
+    - name: Install Icon
+      ansible.builtin.copy:
+        src: "{{ bruno_dest_dir }}/packages/bruno-electron/resources/icons/png/512x512.png"
+        dest: "/usr/share/icons/hicolor/512x512/apps/bruno.png"
+        remote_src: yes
+      become: true
+      ignore_errors: yes

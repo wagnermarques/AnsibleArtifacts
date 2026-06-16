@@ -1,0 +1,11 @@
+---
+- name: Install and Configure Java SDK
+  hosts: localhost
+  connection: local
+  vars:
+    java_major_version: "21"
+    java_full_version: "21.0.3+9"
+    java_version_clean: "21.0.3_9"
+    # progsativos_dir: "{{ ansible_env.HOME }}/Progsativos" # Uses default from role if commented
+  roles:
+    - role: java_sdk

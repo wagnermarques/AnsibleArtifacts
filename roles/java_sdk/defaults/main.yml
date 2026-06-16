@@ -1,2 +1,13 @@
 ---
-java_version: "21"
+java_major_version: "21"
+java_full_version: "21.0.3+9"
+java_version_clean: "21.0.3_9" # Used in filename
+progsativos_dir: "{{ ansible_env.HOME }}/Progsativos"
+java_install_parent_dir: "{{ progsativos_dir }}/java"
+java_install_dir: "{{ java_install_parent_dir }}/jdk-{{ java_full_version }}"
+
+# Temurin Download URL components
+# https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.3%2B9/OpenJDK21U-jdk_x64_linux_hotspot_21.0.3_9.tar.gz
+java_arch: "x64"
+java_os: "linux"
+java_download_url: "https://github.com/adoptium/temurin{{ java_major_version }}-binaries/releases/download/jdk-{{ java_full_version | urlencode }}/OpenJDK{{ java_major_version }}U-jdk_{{ java_arch }}_{{ java_os }}_hotspot_{{ java_version_clean }}.tar.gz"

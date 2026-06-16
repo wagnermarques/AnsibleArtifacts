@@ -1,36 +1,60 @@
 ---
-- name: Set Java package name (RedHat)
-  ansible.builtin.set_fact:
-    java_package_name: "java-{{ java_version }}-openjdk-devel"
-  when: ansible_facts['os_family'] == 'RedHat'
-
-- name: Set Java package name (Debian)
-  ansible.builtin.set_fact:
-    java_package_name: "openjdk-{{ java_version }}-jdk"
-  when: ansible_facts['os_family'] == 'Debian'
-
-- name: Ensure Java SDK is installed
-  ansible.builtin.package:
-    name: "{{ java_package_name }}"
-    state: present
+- name: Ensure Progsativos directory exists
+  ansible.builtin.file:
+    path: "{{ progsativos_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
   become: yes
 
-- name: Get path for installed Java version
-  ansible.builtin.shell: "update-alternatives --display java | grep 'java-{{ java_version }}-openjdk' | grep 'priority' | awk '{print $1}' | head -n 1"
-  register: java_alt_path
+- name: Ensure Java parent installation directory exists
+  ansible.builtin.file:
+    path: "{{ java_install_parent_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+  become: yes
+
+- name: Download and extract Temurin JDK
+  ansible.builtin.unarchive:
+    src: "{{ java_download_url }}"
+    dest: "{{ java_install_parent_dir }}"
+    remote_src: yes
+    creates: "{{ java_install_dir }}"
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+
+- name: Set facts for Java binaries
+  ansible.builtin.set_fact:
+    java_bin: "{{ java_install_dir }}/bin/java"
+    javac_bin: "{{ java_install_dir }}/bin/javac"
+    jar_bin: "{{ java_install_dir }}/bin/jar"
+
+- name: Register binaries with update-alternatives
+  ansible.builtin.command:
+    command: "update-alternatives --install /usr/bin/{{ item.name }} {{ item.name }} {{ item.path }} 100"
+  loop:
+    - { name: 'java', path: "{{ java_bin }}" }
+    - { name: 'javac', path: "{{ javac_bin }}" }
+    - { name: 'jar', path: "{{ jar_bin }}" }
+  become: yes
   changed_when: false
 
-- name: Set default java alternative
-  ansible.builtin.command: "update-alternatives --set java {{ java_alt_path.stdout }}"
+- name: Set default alternatives
+  ansible.builtin.command:
+    command: "update-alternatives --set {{ item.name }} {{ item.path }}"
+  loop:
+    - { name: 'java', path: "{{ java_bin }}" }
+    - { name: 'javac', path: "{{ javac_bin }}" }
+    - { name: 'jar', path: "{{ jar_bin }}" }
   become: yes
-  when: java_alt_path.stdout != ""
-
-- name: Get path for installed Javac version
-  ansible.builtin.shell: "update-alternatives --display javac | grep 'java-{{ java_version }}-openjdk' | grep 'priority' | awk '{print $1}' | head -n 1"
-  register: javac_alt_path
   changed_when: false
 
-- name: Set default javac alternative
-  ansible.builtin.command: "update-alternatives --set javac {{ javac_alt_path.stdout }}"
+- name: Configure JAVA_HOME environment variable
+  ansible.builtin.template:
+    src: java_env.sh.j2
+    dest: /etc/profile.d/java.sh
+    mode: '0644'
   become: yes
-  when: javac_alt_path.stdout != ""
