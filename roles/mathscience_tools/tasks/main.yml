@@ -26,8 +26,17 @@
     src: "{{ geogebra_url }}"
     dest: "{{ geogebra_dir }}"
     remote_src: yes
-    creates: "{{ geogebra_dir }}/GeoGebra"
+    creates: "{{ geogebra_dir }}/GeoGebra-linux-x64/GeoGebra"
     owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Fix GeoGebra permissions
+  file:
+    path: "{{ geogebra_dir }}/GeoGebra-linux-x64"
+    owner: "{{ tools_owner }}"
+    group: "{{ tools_owner }}"
+    mode: '0755'
+    recurse: yes
   become: yes
 
 - name: Install Scilab (Extraction)
@@ -70,7 +79,7 @@
 
 - name: Create shell integration for Math/Science Tools PATH
   copy:
-    dest: "{{ ansible_facts['env']['HOME'] }}/.bashrc_math_science_tools"
+    dest: "~/.bashrc_math_science_tools"
     content: |
       # Math and Science Tools Path Configuration
       export PATH="$PATH:{{ geogebra_dir }}"
@@ -79,15 +88,18 @@
       export PATH="$PATH:{{ stellarium_dir }}"
       export PATH="$PATH:{{ zotero_dir }}"
       
-      # Alias for AppImage
-      alias stellarium='{{ stellarium_dir }}/stellarium.AppImage'
+      # FZL Start Aliases
+      alias fzl-geogebra-start='nohup {{ geogebra_dir }}/GeoGebra-linux-x64/GeoGebra > /dev/null 2>&1 &'
+      alias fzl-scilab-start='nohup {{ scilab_dir }}/bin/scilab > /dev/null 2>&1 &'
+      alias fzl-paraview-start='nohup {{ paraview_dir }}/bin/paraview > /dev/null 2>&1 &'
+      alias fzl-stellarium-start='nohup {{ stellarium_dir }}/stellarium.AppImage > /dev/null 2>&1 &'
+      alias fzl-zotero-start='nohup {{ zotero_dir }}/zotero > /dev/null 2>&1 &'
     mode: '0644'
-    owner: "{{ tools_owner }}"
   become: no
 
 - name: Source Math/Science Tools in .bashrc
   lineinfile:
-    path: "{{ ansible_facts['env']['HOME'] }}/.bashrc"
+    path: "~/.bashrc"
     line: "source ~/.bashrc_math_science_tools"
     state: present
   become: no
