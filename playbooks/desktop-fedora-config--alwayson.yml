@@ -1,0 +1,39 @@
+---
+- name: Fedora Desktop Always-On Configuration
+  hosts: devmachines_workstations
+  gather_facts: yes
+  tasks:
+    - name: Prevent system from sleeping/hibernating (System-wide)
+      become: yes
+      systemd:
+        name: "{{ item }}"
+        masked: yes
+      loop:
+        - sleep.target
+        - suspend.target
+        - hibernate.target
+        - hybrid-sleep.target
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: GNOME Desktop Always-On Settings
+      # We use gsettings and explicitly point to the user's DBUS session
+      # to avoid 'Broken pipe' or connection errors.
+      environment:
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ lookup('pipe', 'id -u') }}/bus"
+      become: no
+      block:
+        - name: Disable screen blanking (monitor turn off)
+          command: gsettings set org.gnome.desktop.session idle-delay 0
+
+        - name: Disable automatic suspend on AC
+          command: gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+
+        - name: Disable automatic suspend on battery
+          command: gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+
+        - name: Disable screen dimming when idle
+          command: gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
+
+        - name: Disable screen lock when idle
+          command: gsettings set org.gnome.desktop.screensaver lock-enabled false
+      when: ansible_facts['distribution'] == "Fedora"
