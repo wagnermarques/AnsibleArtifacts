@@ -1,0 +1,134 @@
+---
+- name: Setup Infrastructure Network Machine (Install mitmproxy)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Check https://mitmproxy.org/downloads/ or https://github.com/mitmproxy/mitmproxy/releases for the latest version
+    mitmproxy_version: "12.2.3"
+    
+    # Installation method: 'auto', 'binary', or 'package'
+    # - 'binary': downloads the official standalone binary (recommended for up-to-date version)
+    # - 'package': uses the distribution's package manager (apt, apk, dnf, etc.)
+    # - 'auto': uses 'binary' on glibc systems (Debian, Fedora) and 'package' on musl systems (Alpine)
+    mitmproxy_install_method: "auto"
+
+    # Map Ansible architectures to mitmproxy binary architecture naming
+    mitmproxy_arch_map:
+      x86_64: "x86_64"
+      amd64: "x86_64"
+      aarch64: "arm64"
+      arm64: "arm64"
+    
+    mitmproxy_arch: "{{ mitmproxy_arch_map[ansible_facts['architecture']] | default('x86_64') }}"
+    mitmproxy_download_url: "https://downloads.mitmproxy.org/{{ mitmproxy_version }}/mitmproxy-{{ mitmproxy_version }}-linux-{{ mitmproxy_arch }}.tar.gz"
+
+    # Dynamically resolve installation method based on OS characteristics
+    resolved_install_method: >-
+      {%- if mitmproxy_install_method == 'auto' -%}
+        {%- if ansible_facts['os_family'] == 'Alpine' -%}
+          package
+        {%- else -%}
+          binary
+        {%- endif -%}
+      {%- else -%}
+        {{ mitmproxy_install_method }}
+      {%- endif -%}
+
+  tasks:
+    - name: Install tcpdump (cross-platform)
+      ansible.builtin.package:
+        name: tcpdump
+        state: present
+
+    # ----------------------------------------------------
+    # 1. NATIVE PACKAGE MANAGER INSTALLATION
+    # ----------------------------------------------------
+    - name: Install mitmproxy via native package manager (APT/Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: mitmproxy
+        state: present
+        update_cache: yes
+      when:
+        - resolved_install_method == 'package'
+        - ansible_facts['os_family'] == 'Debian'
+
+    - name: Install mitmproxy via native package manager (APK/Alpine)
+      community.general.apk:
+        name: mitmproxy
+        state: present
+        update_cache: yes
+      when:
+        - resolved_install_method == 'package'
+        - ansible_facts['os_family'] == 'Alpine'
+
+    - name: Install mitmproxy via native package manager (DNF/Fedora/RedHat)
+      ansible.builtin.dnf:
+        name: mitmproxy
+        state: present
+      when:
+        - resolved_install_method == 'package'
+        - ansible_facts['os_family'] == 'RedHat' or ansible_facts['distribution'] == 'Fedora'
+
+    # ----------------------------------------------------
+    # 2. STANDALONE BINARY INSTALLATION
+    # ----------------------------------------------------
+    - name: Standalone Binary Installation Block
+      when: resolved_install_method == 'binary'
+      block:
+        - name: Ensure target directory for bin exists
+          ansible.builtin.file:
+            path: /usr/local/bin
+            state: directory
+            mode: '0755'
+
+        - name: Ensure extraction prerequisites are installed (tar and gzip)
+          ansible.builtin.package:
+            name:
+              - tar
+              - gzip
+            state: present
+
+        - name: Create temporary directory for download
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: mitmproxy_setup
+          register: temp_dir
+
+        - name: Download and extract mitmproxy standalone binaries
+          ansible.builtin.unarchive:
+            src: "{{ mitmproxy_download_url }}"
+            dest: "{{ temp_dir.path }}"
+            remote_src: yes
+
+        - name: Install mitmproxy binaries to /usr/local/bin
+          ansible.builtin.copy:
+            src: "{{ temp_dir.path }}/{{ item }}"
+            dest: "/usr/local/bin/{{ item }}"
+            mode: '0755'
+            remote_src: yes
+          loop:
+            - mitmproxy
+            - mitmdump
+            - mitmweb
+
+      always:
+        - name: Clean up temporary extraction directory
+          ansible.builtin.file:
+            path: "{{ temp_dir.path }}"
+            state: absent
+          when: temp_dir.path is defined
+
+    # ----------------------------------------------------
+    # 3. VERIFICATION
+    # ----------------------------------------------------
+    - name: Verify mitmproxy installation and print version
+      ansible.builtin.command:
+        cmd: mitmdump --version
+      register: mitmproxy_version_out
+      changed_when: false
+
+    - name: Display installed mitmproxy version
+      ansible.builtin.debug:
+        var: mitmproxy_version_out.stdout_lines

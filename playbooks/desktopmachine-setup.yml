@@ -2,4 +2,4 @@
 - name: Setup User-specific Applications
   hosts: devmachines_workstations
   roles:
-    - usermachine_apps
+    - desktopmachine_apps

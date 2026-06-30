@@ -1,5 +1,5 @@
 ---
-- name: Fedora Desktop Always-On Configuration
+- name: Fedora Desktop disable suspend, dimming, screen bland and screen lock
   hosts: devmachines_workstations
   gather_facts: yes
   tasks:

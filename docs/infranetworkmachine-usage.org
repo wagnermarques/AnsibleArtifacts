@@ -1,0 +1,102 @@
+#+TITLE: Infrastructure Network Machine: Traffic Monitoring Guide (mitmproxy & tcpdump)
+#+AUTHOR: Gemini CLI
+#+DATE: [2026-06-30 Tue]
+
+* Introduction
+This document provides instructions on how to use the Ansible playbook to install and configure network monitoring tools (=mitmproxy= and =tcpdump=), as well as practical commands for capturing and analyzing traffic between frontend and backend applications.
+
+The setup is managed by the playbook: [[file:../playbooks/infranetworkmachine-setup.yml][playbooks/infranetworkmachine-setup.yml]].
+
+* Installed Tools
+- *tcpdump*: A powerful command-line packet analyzer (installed via native package managers across all platforms).
+- *mitmproxy*: An interactive SSL/TLS capable intercepting HTTP proxy (installed via binary downloads on Fedora/Debian/Ubuntu and apk on Alpine).
+
+* Running the Ansible Playbook
+To run the setup, navigate to the project root and execute the playbook:
+
+#+begin_src bash
+ansible-playbook playbooks/infranetworkmachine-setup.yml --ask-become-pass
+#+end_src
+
+** Customizing Variables
+You can override default configuration variables at runtime:
+#+begin_src bash
+# Install a specific version of mitmproxy
+ansible-playbook playbooks/infranetworkmachine-setup.yml -e "mitmproxy_version=12.2.3" --ask-become-pass
+#+end_src
+
+* 1. tcpdump: Monitoring Frontend/Backend Traffic
+=tcpdump= is invaluable for debugging low-level network packets, headers, TCP handshakes, and raw socket data between web development tiers.
+
+** Common Scenario Setup
+Assume your local development setup has:
+- *Frontend App*: Running on port =3000= (or =5173= for Vite, =8000=, etc.).
+- *Backend API*: Running on port =8080= (or =5000= for Flask/Python, =8000= for Django).
+- *Interface*: =lo= (loopback/localhost) for local development, or =docker0= for containerized apps, or =any= to capture everywhere.
+
+** Key tcpdump Commands for Web Development
+
+*** A. Monitor Traffic on Backend Port (8080)
+Capture packets on all interfaces targeting port 8080:
+#+begin_src bash
+sudo tcpdump -i any port 8080
+#+end_src
+
+*** B. Capture HTTP Requests and Show Plaintext Content (ASCII)
+Use =-A= to display packet payload as ASCII characters. This is extremely useful for reading raw HTTP headers and JSON bodies:
+#+begin_src bash
+sudo tcpdump -i any -A -s 0 port 8080
+#+end_src
+- =-i any=: Capture on all network interfaces.
+- =-A=: Print each packet in ASCII format.
+- =-s 0=: Capture the entire packet length (prevents clipping payloads).
+
+*** C. Display Hex and ASCII Content (JSON/GraphQL payloads)
+Shows both hexadecimal representation and ASCII representation side-by-side:
+#+begin_src bash
+sudo tcpdump -i any -XX -s 0 port 8080
+#+end_src
+
+*** D. Monitor Traffic Flow between Frontend (3000) and Backend (8080)
+Filter packets that are going to/from either the frontend or backend port:
+#+begin_src bash
+sudo tcpdump -i any 'port 3000 or port 8080'
+#+end_src
+
+*** E. Capture Only TCP Packets containing Data (Ignore ACK-only)
+Filters out raw ACK/SYN handshakes that don't carry HTTP request/response payloads:
+#+begin_src bash
+sudo tcpdump -i any 'tcp port 8080 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)' -A -s 0
+#+end_src
+
+*** F. Save Traffic Capture to a File for Wireshark
+Dump packets into a =.pcap= (packet capture) file to open and analyze visually inside Wireshark:
+#+begin_src bash
+sudo tcpdump -i any -w dev_traffic.pcap port 8080
+#+end_src
+
+*** G. Read Packets from a Saved Capture File
+#+begin_src bash
+tcpdump -r dev_traffic.pcap -A -s 0
+#+end_src
+
+* 2. mitmproxy: Intercepting & Decrypting HTTP/HTTPS
+While =tcpdump= is great for raw packets, =mitmproxy= excels at intercepting, modifying, and pretty-printing application-level HTTP/HTTPS/WebSocket traffic.
+
+** Available Interfaces
+- *mitmproxy*: Interactive CLI. Run with =mitmproxy -p 8080=.
+- *mitmweb*: Browser-based GUI. Run with =mitmweb -p 8080=.
+- *mitmdump*: Scriptable dump tool (like tcpdump for HTTP). Run with =mitmdump -p 8080 -w flows.mitm=.
+
+** SSL/TLS Certificate Setup (HTTPS decryption)
+When you run mitmproxy for the first time, it generates CA certificates in =~/.mitmproxy/=.
+To decrypt HTTPS traffic:
+1. Locate =~/.mitmproxy/mitmproxy-ca-cert.pem=.
+2. Import and trust this CA certificate in your browser/operating system's authority store.
+3. Or visit [[http://mitm.it]] on the proxied browser to download it dynamically.
+
+** Configure Terminal Proxy
+#+begin_src bash
+export http_proxy="http://127.0.0.1:8080"
+export https_proxy="http://127.0.0.1:8080"
+#+end_src

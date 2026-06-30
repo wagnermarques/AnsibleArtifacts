@@ -1,0 +1,50 @@
+---
+- name: Configure Laptop Touchpad to Enable Tap-to-Click on Xfce4
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+
+    - name: Ensure X11 xorg.conf.d directory exists
+      become: true
+      ansible.builtin.file:
+        path: /etc/X11/xorg.conf.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create or update X11 touchpad configuration file (Permanent)
+      become: true
+      ansible.builtin.copy:
+        dest: /etc/X11/xorg.conf.d/90-touchpad.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          # Managed by Ansible - desktopmachine-config-xfce--enable-clickontap-on-touchpad.yml
+          Section "InputClass"
+                  Identifier "touchpad"
+                  MatchIsTouchpad "on"
+                  Driver "libinput"
+                  Option "Tapping" "on"
+                  Option "TappingButtonMap" "lmg"
+          EndSection
+
+    - name: Apply live configuration via xfconf-query (Immediate effect)
+      block:
+        - name: Discover Xfce touchpad device names
+          ansible.builtin.command: xfconf-query -c pointers -l
+          register: xfce_pointers
+          changed_when: false
+
+        - name: Enable tapping instantly for detected touchpads
+          ansible.builtin.command: >
+            xfconf-query -c pointers -p "{{ item }}/Properties/libinput_Tapping_Enabled" -n -t int -s 1
+          loop: "{{ xfce_pointers.stdout_lines }}"
+          when: "'TouchPad' in item or 'touchpad' in item or 'Synaptics' in item"
+          changed_when: true
+      rescue:
+        - name: Warning fallback
+          ansible.builtin.debug:
+            msg: "Could not apply live settings. The permanent fix is in place, just log out and log back in."

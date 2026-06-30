@@ -27,6 +27,14 @@ It also configures **Gemini CLI Extensions (MCP)** including GitHub, Google Maps
 ansible-playbook playbooks/iamachine-setup.yml --ask-become-pass
 ```
 
+### 3. Setup Infrastructure Network Machine (Install mitmproxy & tcpdump)
+Installs `mitmproxy` (including `mitmproxy`, `mitmdump`, and `mitmweb`) and `tcpdump` portably across Debian/Debian-like (Ubuntu), Fedora, and Alpine Linux distributions.
+
+```bash
+ansible-playbook playbooks/infranetworkmachine-setup.yml --ask-become-pass
+```
+
+
 ## AI Agents & Documentation
 
 The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. Below are the links to their official documentation and repositories:
@@ -50,6 +58,7 @@ This provides a clean environment with only the essentials and Docker.
 ```bash
 ansible-playbook playbooks/projcatracasvm-setup.yml -i inventory/hosts.ini -K
 ```
+
 
 
 ## Custom Start Commands (FZL Pattern)
@@ -76,3 +85,28 @@ After running the corresponding playbook, source your shell configuration to act
 source ~/.bashrc
 ```
 Then simply type the command (e.g., `fzl-telegram-start`) in your terminal to launch the application.
+    
+    
+    
+    
+## TODO
+### Mangage Browsers Plugins
+IPvFoo, Zotero, FireShot, LibJsDetector
+
+### OpenSource Fonts
+sudo dnf install fira-code-fonts jetbrains-mono-fonts liberation-fonts google-noto-sans-fonts google-noto-emoji-color-fonts cascadia-fonts-all
+### desktopmachine-sysadmintools
+sudo dnf install kde-connect sudo dnf install timeshift
+Timeshift creates snapshots of your root (and optionally home) directories. If an update or a bad config ever breaks your system, you can restore a snapshot and get back to a working desktop without reinstalling Fedora 44.
+sudo dnf remove tlp tlp-rdw
+Boost Performance with auto-cpufreq
+
+If you run Fedora 44 on a laptop and want full CPU control, install auto-cpufreq. It automatically manages CPU frequency and power based on your workload. This is best suited for systems with powerful CPUs.
+
+Important: Remove TLP first if it’s installed, to avoid conflicts:
+
+sudo nano /etc/security/pwquality.conf
+minlen = 3
+minclass = 0
+
+

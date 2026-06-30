@@ -1,2 +1,19 @@
-#+Title: Ansible Artifacts Docs
+#+TITLE: Ansible Artifacts - Documentation Index
+#+AUTHOR: Gemini CLI
+#+DATE: [2026-06-30 Tue]
 
+Welcome to the Documentation Index for the Ansible Artifacts workspace. Below you can find guides and references for the playbooks and system configurations implemented in this project.
+
+* Available Documentation
+
+** [[file:infranetworkmachine-usage.org][Infrastructure Network Machine: Traffic Monitoring Guide (mitmproxy & tcpdump)]]
+Instructions for running the playbook to install =mitmproxy= and =tcpdump=, configuring variables, and using them to capture and debug HTTP/HTTPS and low-level TCP/IP traffic between web development services.
+
+** [[file:local-ai-usage.org][Local AI Usage Guide]]
+A guide on running and integrating local AI models like Gemma 4 (12b) and Qwen 2.5 (7b) set up via Ollama and using them with installed coding assistants (Aider, Open Interpreter, Shell-GPT).
+
+** [[file:playbooks-cloud-azure.org][Playbooks Azure Docs]]
+Documentation on playbooks designed for managing cloud infrastructure on Microsoft Azure (listing resources, managing VMs, setting up administration machines).
+
+** [[file:fix_windows_network.org][Windows 11 vs Docker Network Fix]]
+A technical guide explaining and resolving network routing/internet connectivity conflicts between Libvirt (Virt-manager VMs) and Docker on Fedora host machines.

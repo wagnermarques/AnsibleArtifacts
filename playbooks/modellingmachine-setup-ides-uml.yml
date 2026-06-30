@@ -1,0 +1,109 @@
+---
+- name: Setup UML Modeling IDEs and Tools
+  hosts: devmachines_workstations
+  gather_facts: yes
+  vars:
+    tools_owner: "{{ lookup('env', 'USER') }}"
+    tools_basedir: "/home/wgn/WORKING"
+    progsativos_dir: "{{ tools_basedir }}/Progsativos"
+    ides_base_dir: "{{ progsativos_dir }}/ides"
+
+    staruml_dir: "{{ ides_base_dir }}/staruml"
+    papyrus_dir: "{{ ides_base_dir }}/papyrus"
+    plantuml_dir: "{{ ides_base_dir }}/plantuml"
+
+    staruml_deb_url: "https://staruml.io/api/download/releases-v7/StarUML_7.1.0_amd64.deb"
+    staruml_rpm_url: "https://staruml.io/api/download/releases-v7/StarUML-7.1.0.x86_64.rpm"
+    papyrus_url: "https://download.eclipse.org/modeling/mdt/papyrus/papyrus-desktop/rcp/2025-06/7.1.0/papyrus-desktop-2025-06-7.1.0-linux.gtk.x86_64.tar.gz"
+    plantuml_version: "1.2024.6"
+    plantuml_url: "https://github.com/plantuml/plantuml/releases/download/v{{ plantuml_version }}/plantuml-{{ plantuml_version }}.jar"
+
+  tasks:
+    - name: Ensure target directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ tools_owner }}"
+      loop:
+        - "{{ staruml_dir }}"
+        - "{{ papyrus_dir }}"
+        - "{{ plantuml_dir }}"
+      become: yes
+
+    - name: Install system dependencies (Graphviz for PlantUML)
+      package:
+        name: graphviz
+        state: present
+      become: yes
+
+    # 1. StarUML Installation (Local Extraction)
+    - name: Download StarUML (.deb)
+      get_url:
+        url: "{{ staruml_deb_url }}"
+        dest: "/tmp/staruml.deb"
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: Extract StarUML (.deb)
+      command: "dpkg-deb -x /tmp/staruml.deb {{ staruml_dir }}"
+      args:
+        creates: "{{ staruml_dir }}/opt/StarUML/staruml"
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: Download StarUML (.rpm)
+      get_url:
+        url: "{{ staruml_rpm_url }}"
+        dest: "/tmp/staruml.rpm"
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: Extract StarUML (.rpm)
+      shell: "rpm2cpio /tmp/staruml.rpm | cpio -idmv"
+      args:
+        chdir: "{{ staruml_dir }}"
+        creates: "{{ staruml_dir }}/opt/StarUML/staruml"
+      when: ansible_facts['os_family'] == "RedHat"
+
+    # 2. Eclipse Papyrus Installation
+    - name: Download and extract Eclipse Papyrus
+      unarchive:
+        src: "{{ papyrus_url }}"
+        dest: "{{ papyrus_dir }}"
+        remote_src: yes
+        extra_opts: ["--strip-components=1"]
+        creates: "{{ papyrus_dir }}/papyrus"
+        owner: "{{ tools_owner }}"
+      become: yes
+
+    # 3. PlantUML JAR Installation
+    - name: Download PlantUML JAR
+      get_url:
+        url: "{{ plantuml_url }}"
+        dest: "{{ plantuml_dir }}/plantuml.jar"
+        mode: '0644'
+        owner: "{{ tools_owner }}"
+      become: yes
+
+    # 4. Shell Integration and Aliases
+    - name: Add UML Tools to ~/.bashrc_dev_tools
+      blockinfile:
+        path: "~/.bashrc_dev_tools"
+        marker: "# {mark} UML TOOLS ALIASES"
+        block: |
+          # UML Tools PATH
+          export PATH="$PATH:{{ staruml_dir }}/opt/StarUML"
+          export PATH="$PATH:{{ papyrus_dir }}"
+
+          # FZL Start Aliases
+          alias fzl-staruml-start='nohup {{ staruml_dir }}/opt/StarUML/staruml > /dev/null 2>&1 &'
+          alias fzl-papyrus-start='nohup {{ papyrus_dir }}/papyrus > /dev/null 2>&1 &'
+          alias fzl-plantuml-start='nohup java -jar {{ plantuml_dir }}/plantuml.jar -gui > /dev/null 2>&1 &'
+        create: yes
+        mode: '0644'
+      become: no
+
+    - name: Source Dev Tools in .bashrc
+      lineinfile:
+        path: "~/.bashrc"
+        line: "source ~/.bashrc_dev_tools"
+        state: present
+      become: no

@@ -1,0 +1,138 @@
+---
+- name: Install Desktop Web Browsers Cross-Platform
+  hosts: localhost
+  become: true
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. PLATFORM INDEPENDENT / STANDARD REPO BROWSERS
+    # ----------------------------------------------------
+    - name: Install Firefox and Epiphany (Web) via native package manager
+      ansible.builtin.package:
+        name:
+          - firefox
+          - epiphany
+        state: present
+
+    # ----------------------------------------------------
+    # 2. FEDORA CONFIGURATIONS & INSTALLATIONS
+    # ----------------------------------------------------
+    - name: Configure and install third-party browsers on Fedora
+      when: ansible_os_family == "RedHat" or ansible_distribution == "Fedora"
+      block:
+        - name: Enable Google Chrome repository (Fedora native third-party repo)
+          ansible.builtin.dnf:
+            name: fedora-workstation-repositories
+            state: present
+
+        - name: Enable google-chrome dnf repo config
+          ansible.builtin.command:
+            cmd: dnf config-manager --set-enabled google-chrome
+          changed_when: false
+
+        - name: Add Brave Browser repository (Fedora)
+          ansible.builtin.get_url:
+            url: https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+            dest: /etc/yum.repos.d/brave-browser.repo
+            mode: '0644'
+
+        - name: Add Opera Browser repository (Fedora)
+          ansible.builtin.yum_repository:
+            name: opera
+            description: Opera packages
+            baseurl: https://rpm.opera.com/rpm
+            gpgkey: https://rpm.opera.com/rpmrepo.key
+            gpgcheck: true
+
+        - name: Install Chrome, Brave, and Opera on Fedora
+          ansible.builtin.dnf:
+            name:
+              - google-chrome-stable
+              - brave-browser
+              - opera-stable
+            state: present
+
+    # ----------------------------------------------------
+    # 3. DEBIAN / UBUNTU CONFIGURATIONS & INSTALLATIONS
+    # ----------------------------------------------------
+    - name: Configure and install third-party browsers on Debian/Ubuntu
+      when: ansible_os_family == "Debian"
+      block:
+        - name: Ensure prerequisites for custom apt repos are installed
+          ansible.builtin.apt:
+            name:
+              - curl
+              - gpg
+              - software-properties-common
+            state: present
+            update_cache: yes
+
+        # Google Chrome setup
+        - name: Add Google Chrome GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://dl.google.com/linux/linux_signing_key.pub
+            dest: /etc/apt/keyrings/google-chrome.asc
+            mode: '0644'
+
+        - name: Add Google Chrome repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] http://dl.google.com/linux/chrome/deb/ stable main"
+            state: present
+            filename: google-chrome
+
+        # Brave Browser setup
+        - name: Add Brave GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+            dest: /usr/share/keyrings/brave-browser-archive-keyring.gpg
+            mode: '0644'
+
+        - name: Add Brave repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"
+            state: present
+            filename: brave-browser
+
+        # Opera Browser setup
+        - name: Add Opera GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://deb.opera.com/archive.key
+            dest: /etc/apt/keyrings/opera.asc
+            mode: '0644'
+
+        - name: Add Opera repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/opera.asc] https://deb.opera.com/opera-stable/ stable non-free"
+            state: present
+            filename: opera-stable
+
+        - name: Install Chrome, Brave, and Opera on Debian/Ubuntu
+          ansible.builtin.apt:
+            name:
+              - google-chrome-stable
+              - brave-browser
+              - opera-stable
+            state: present
+            update_cache: yes
+
+    # ----------------------------------------------------
+    # 4. ALPINE LINUX NOTEWORTHY DETAILS
+    # ----------------------------------------------------
+    - name: Notify/Install missing browsers on Alpine
+      when: ansible_os_family == "Alpine"
+      block:
+        - name: Update Alpine repository index
+          community.general.apk:
+            update_cache: yes
+
+        # Note: Chromium is used on Alpine as proprietary binaries like official Google Chrome, 
+        # Brave, and Opera do not offer native glibc-static/musl compiler versions for pure apk architectures.
+        - name: Install alternative Chromium engine on Alpine
+          community.general.apk:
+            name:
+              - chromium
+            state: present
+
+        - name: Display warning about proprietary browsers on Alpine
+          ansible.builtin.debug:
+            msg: "Notice: Google Chrome, Brave, and Opera do not natively support Alpine (musl libc). Installed Open-Source 'Chromium' as the structural alternative."

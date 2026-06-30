@@ -1,0 +1,5 @@
+---
+- name: devmachine-setup-ides
+  hosts: devmachines_workstations
+  roles:
+    - devmachine_ides
