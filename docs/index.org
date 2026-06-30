@@ -12,6 +12,9 @@ Instructions for running the playbook to install =mitmproxy= and =tcpdump=, conf
 ** [[file:local-ai-usage.org][Local AI Usage Guide]]
 A guide on running and integrating local AI models like Gemma 4 (12b) and Qwen 2.5 (7b) set up via Ollama and using them with installed coding assistants (Aider, Open Interpreter, Shell-GPT).
 
+** [[file:java-scenebuilder-usage.org][Java Development: Gluon Scene Builder Installation & IDE Integration]]
+Instructions for running the playbook to install Gluon Scene Builder, and integrating it with development IDEs like IntelliJ IDEA and Eclipse.
+
 ** [[file:playbooks-cloud-azure.org][Playbooks Azure Docs]]
 Documentation on playbooks designed for managing cloud infrastructure on Microsoft Azure (listing resources, managing VMs, setting up administration machines).
 

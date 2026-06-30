@@ -1,0 +1,116 @@
+---
+- name: Install Gluon Scene Builder (JavaFX UI Designer)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Scene Builder version aligned with Java 21 environment
+    scenebuilder_version: "21.0.0"
+    
+    scenebuilder_deb_url: "https://github.com/gluonhq/scenebuilder/releases/download/{{ scenebuilder_version }}/SceneBuilder-{{ scenebuilder_version }}.deb"
+    scenebuilder_rpm_url: "https://github.com/gluonhq/scenebuilder/releases/download/{{ scenebuilder_version }}/SceneBuilder-{{ scenebuilder_version }}.rpm"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. DEBIAN / UBUNTU / DEBIAN-LIKE INSTALLATION
+    # ----------------------------------------------------
+    - name: Install Scene Builder on Debian-based systems
+      when: ansible_facts['os_family'] == 'Debian'
+      block:
+        - name: Create temporary directory for download
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: scenebuilder_setup
+          register: temp_deb_dir
+
+        - name: Download Scene Builder DEB package
+          ansible.builtin.get_url:
+            url: "{{ scenebuilder_deb_url }}"
+            dest: "{{ temp_deb_dir.path }}/SceneBuilder-{{ scenebuilder_version }}.deb"
+            mode: '0644'
+
+        - name: Install Scene Builder DEB package via apt
+          ansible.builtin.apt:
+            deb: "{{ temp_deb_dir.path }}/SceneBuilder-{{ scenebuilder_version }}.deb"
+            state: present
+            update_cache: yes
+
+      always:
+        - name: Clean up temporary download directory
+          ansible.builtin.file:
+            path: "{{ temp_deb_dir.path }}"
+            state: absent
+          when: temp_deb_dir.path is defined
+
+    # ----------------------------------------------------
+    # 2. FEDORA / REDHAT / REDHAT-LIKE INSTALLATION
+    # ----------------------------------------------------
+    - name: Install Scene Builder on Fedora/RedHat systems
+      when: ansible_facts['os_family'] == 'RedHat' or ansible_facts['distribution'] == 'Fedora'
+      block:
+        - name: Create temporary directory for download
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: scenebuilder_setup
+          register: temp_rpm_dir
+
+        - name: Download Scene Builder RPM package
+          ansible.builtin.get_url:
+            url: "{{ scenebuilder_rpm_url }}"
+            dest: "{{ temp_rpm_dir.path }}/SceneBuilder-{{ scenebuilder_version }}.rpm"
+            mode: '0644'
+
+        - name: Install Scene Builder RPM package via dnf
+          ansible.builtin.dnf:
+            name: "{{ temp_rpm_dir.path }}/SceneBuilder-{{ scenebuilder_version }}.rpm"
+            state: present
+            disable_gpg_check: true
+
+      always:
+        - name: Clean up temporary download directory
+          ansible.builtin.file:
+            path: "{{ temp_rpm_dir.path }}"
+            state: absent
+          when: temp_rpm_dir.path is defined
+
+    # ----------------------------------------------------
+    # 3. ALPINE LINUX / FALLBACK INSTALLATION (FLATPAK)
+    # ----------------------------------------------------
+    - name: Install Scene Builder on Alpine Linux (via Flatpak)
+      when: ansible_facts['os_family'] == 'Alpine'
+      block:
+        - name: Ensure flatpak is installed
+          community.general.apk:
+            name: flatpak
+            state: present
+
+        - name: Add Flathub repository
+          community.general.flatpak_remote:
+            name: flathub
+            state: present
+            flatpakrepo_url: https://dl.flathub.org/repo/flathub.flatpakrepo
+
+        - name: Install Scene Builder Flatpak
+          community.general.flatpak:
+            name: com.gluonhq.SceneBuilder
+            state: present
+            remote: flathub
+
+    # ----------------------------------------------------
+    # 4. VERIFICATION
+    # ----------------------------------------------------
+    - name: Verify Scene Builder installation (Native)
+      ansible.builtin.command:
+        cmd: which SceneBuilder
+      register: scenebuilder_path
+      changed_when: false
+      failed_when: false
+      when: ansible_facts['os_family'] != 'Alpine'
+
+    - name: Show installed Scene Builder path
+      ansible.builtin.debug:
+        msg: "Scene Builder is successfully installed at: {{ scenebuilder_path.stdout }}"
+      when:
+        - ansible_facts['os_family'] != 'Alpine'
+        - scenebuilder_path.rc == 0

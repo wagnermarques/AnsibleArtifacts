@@ -1,0 +1,50 @@
+#+TITLE: Java Development: Gluon Scene Builder Installation & IDE Integration
+#+AUTHOR: Gemini CLI
+#+DATE: [2026-06-30 Tue]
+
+* Introduction
+This document provides instructions for installing and integrating *Gluon Scene Builder* into your JavaFX development workflow.
+
+The setup is managed by the playbook: [[file:../playbooks/devmachine-java-install-scenebuilder.yml][playbooks/devmachine-java-install-scenebuilder.yml]].
+
+* Why Gluon Scene Builder?
+Oracle transitioned JavaFX Scene Builder to the open-source OpenJFX project and stopped distributing pre-compiled binaries. *Gluon* maintains the active open-source repository and provides ready-to-run installation packages for modern JDKs (like Java 17 and Java 21). Therefore, the Gluon version is the recommended and industry-standard version to use.
+
+* Running the Ansible Playbook
+To install Scene Builder, navigate to the project root and run:
+
+#+begin_src bash
+ansible-playbook playbooks/devmachine-java-install-scenebuilder.yml --ask-become-pass
+#+end_src
+
+** Variable Overrides
+By default, the playbook installs version =21.0.0=. You can override this:
+#+begin_src bash
+ansible-playbook playbooks/devmachine-java-install-scenebuilder.yml -e "scenebuilder_version=26.0.0" --ask-become-pass
+#+end_src
+
+* Installation Paths
+Knowing the installation path is necessary for IDE integration:
+- *Debian / Ubuntu / Fedora / RedHat*:
+  - Binary executable: =/usr/bin/SceneBuilder= (symlink pointing to =/opt/SceneBuilder/bin/SceneBuilder=).
+- *Alpine Linux* (installed via Flatpak):
+  - Binary executable: =/var/lib/flatpak/exports/bin/com.gluonhq.SceneBuilder=
+
+* IDE Integration
+
+** 1. IntelliJ IDEA
+IntelliJ IDEA lets you open FXML files directly in an embedded Scene Builder tab or via a right-click external action.
+1. Open *Settings* (Ctrl+Alt+S / Cmd+,).
+2. Navigate to *Languages & Frameworks* -> *JavaFX*.
+3. In the *Path to SceneBuilder* field, enter:
+   - =/usr/bin/SceneBuilder= (on Ubuntu/Debian/Fedora)
+   - =/var/lib/flatpak/exports/bin/com.gluonhq.SceneBuilder= (on Alpine)
+4. Click *Apply* and *OK*.
+5. Right-click any =.fxml= file in your project tree and select *Open in SceneBuilder*, or select the *Scene Builder* tab at the bottom of the editor pane when viewing FXML.
+
+** 2. Eclipse
+1. Open *Preferences* (Window -> Preferences).
+2. Navigate to *JavaFX*.
+3. In the *SceneBuilder executable* field, enter the full path to the executable (e.g. =/usr/bin/SceneBuilder=).
+4. Click *Apply and Close*.
+5. Right-click your =.fxml= file and choose *Open with SceneBuilder*.

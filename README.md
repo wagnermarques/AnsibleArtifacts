@@ -34,6 +34,13 @@ Installs `mitmproxy` (including `mitmproxy`, `mitmdump`, and `mitmweb`) and `tcp
 ansible-playbook playbooks/infranetworkmachine-setup.yml --ask-become-pass
 ```
 
+### 4. Install Gluon Scene Builder
+Installs the official JavaFX UI design tool (Gluon Scene Builder 21.0.0) portably on Debian/Ubuntu (via `.deb`), Fedora/RedHat (via `.rpm`), and Alpine Linux (via Flatpak).
+
+```bash
+ansible-playbook playbooks/devmachine-java-install-scenebuilder.yml --ask-become-pass
+```
+
 
 ## AI Agents & Documentation
 
