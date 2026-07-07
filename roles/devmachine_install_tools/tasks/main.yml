@@ -1,0 +1,94 @@
+---
+- name: Ensure AppImages base directory exists
+  file:
+    path: "{{ appimages_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+
+- name: Ensure Bruno directory exists
+  file:
+    path: "{{ bruno_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_bruno | bool
+
+- name: Ensure Warp directory exists
+  file:
+    path: "{{ warp_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_warp | bool
+
+- name: Ensure Obsidian directory exists
+  file:
+    path: "{{ obsidian_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_obsidian | bool
+
+- name: Ensure Neovim directory exists
+  file:
+    path: "{{ nvim_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_nvim | bool
+
+- name: Download Bruno AppImage
+  get_url:
+    url: "{{ bruno_url }}"
+    dest: "{{ bruno_dir }}/bruno.AppImage"
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_bruno | bool
+
+- name: Download Warp AppImage
+  get_url:
+    url: "{{ warp_url }}"
+    dest: "{{ warp_dir }}/warp.AppImage"
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_warp | bool
+
+- name: Download Obsidian AppImage
+  get_url:
+    url: "{{ obsidian_url }}"
+    dest: "{{ obsidian_dir }}/obsidian.AppImage"
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_obsidian | bool
+
+- name: Download Neovim AppImage
+  get_url:
+    url: "{{ nvim_url }}"
+    dest: "{{ nvim_dir }}/nvim.AppImage"
+    mode: '0755'
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_nvim | bool
+
+- name: Create shell integration for Custom Tools PATH and aliases
+  template:
+    src: bashrc_custom_tools.j2
+    dest: "~/.bashrc_custom_tools"
+    mode: '0644'
+  become: no
+
+- name: Source Custom Tools in .bashrc
+  lineinfile:
+    path: "~/.bashrc"
+    line: "source ~/.bashrc_custom_tools"
+    state: present
+  become: no

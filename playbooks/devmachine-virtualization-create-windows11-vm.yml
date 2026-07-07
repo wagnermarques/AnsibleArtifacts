@@ -1,0 +1,260 @@
+---
+- name: Create Windows 11 VM on libvirt
+  hosts: devmachines_workstations
+  gather_facts: true
+  become: true
+  vars:
+    vm_name: "windows11"
+    windows_iso_path: "/home/wgn/VIRT/pt-br_windows_11_consumer_editions_version_25h2_x64_dvd_d4d3cf4d.iso"
+    vm_memory_mb: 8192
+    vm_vcpus: 4
+    vm_disk_size_gb: 80
+    vm_disk_dir: "/var/lib/libvirt/images"
+    vm_disk_path: "{{ vm_disk_dir }}/{{ vm_name }}.qcow2"
+    libvirt_uri: "qemu:///system"
+    libvirt_network: "default"
+    vm_os_variant: "win11"
+    vm_video_model: "vga"
+    vm_enable_autostart: true
+    libvirt_cli_env:
+      LANG: C
+      LC_ALL: C
+
+  roles:
+    - virtualization
+
+  pre_tasks:
+    - name: Install Windows 11 libvirt prerequisites on Fedora
+      dnf:
+        name:
+          - edk2-ovmf
+          - swtpm
+          - swtpm-tools
+        state: present
+      when: ansible_facts['distribution'] == "Fedora"
+
+    - name: Ensure Windows ISO exists
+      stat:
+        path: "{{ windows_iso_path }}"
+      register: windows_iso_stat
+
+    - name: Fail if Windows ISO is missing
+      fail:
+        msg: "Windows ISO not found at {{ windows_iso_path }}"
+      when: not windows_iso_stat.stat.exists
+
+    - name: Check if default libvirt network exists
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - net-info
+          - "{{ libvirt_network }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: libvirt_network_info
+      changed_when: false
+
+    - name: Start default libvirt network when inactive
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - net-start
+          - "{{ libvirt_network }}"
+      environment: "{{ libvirt_cli_env }}"
+      when: not (libvirt_network_info.stdout | regex_search('(?im)^active:\\s+yes$'))
+      changed_when: true
+
+    - name: Enable autostart for default libvirt network
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - net-autostart
+          - "{{ libvirt_network }}"
+      environment: "{{ libvirt_cli_env }}"
+      when: not (libvirt_network_info.stdout | regex_search('(?im)^autostart:\\s+yes$'))
+      changed_when: true
+
+    - name: Check if VM already exists
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - dominfo
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: windows_vm_info
+      failed_when: false
+      changed_when: false
+
+    - name: Read current VM XML when it already exists
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - dumpxml
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: windows_vm_xml
+      when: windows_vm_info.rc == 0
+      changed_when: false
+
+    - name: Read current VM power state when it already exists
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - domstate
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: windows_vm_state
+      when: windows_vm_info.rc == 0
+      changed_when: false
+
+  tasks:
+    - name: Ensure libvirt disk directory exists
+      file:
+        path: "{{ vm_disk_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Shut down existing VM before fixing UEFI-incompatible video model
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - shutdown
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      when:
+        - windows_vm_info.rc == 0
+        - (windows_vm_xml.stdout | default('')) is regex_search("<model type='qxl'")
+        - (windows_vm_state.stdout | default('')) is regex_search("running|paused|in shutdown")
+      changed_when: true
+
+    - name: Wait for existing VM to stop after shutdown request
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - domstate
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: windows_vm_state_after_shutdown
+      when:
+        - windows_vm_info.rc == 0
+        - (windows_vm_xml.stdout | default('')) is regex_search("<model type='qxl'")
+        - (windows_vm_state.stdout | default('')) is regex_search("running|paused|in shutdown")
+      changed_when: false
+      until: windows_vm_state_after_shutdown.stdout is regex_search("shut off")
+      retries: 12
+      delay: 5
+      failed_when: false
+
+    - name: Force stop existing VM when it does not shut down in time
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - destroy
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      when:
+        - windows_vm_info.rc == 0
+        - (windows_vm_xml.stdout | default('')) is regex_search("<model type='qxl'")
+        - (windows_vm_state.stdout | default('')) is regex_search("running|paused|in shutdown")
+        - windows_vm_state_after_shutdown is defined
+        - not ((windows_vm_state_after_shutdown.stdout | default('')) is regex_search("shut off"))
+      changed_when: true
+
+    - name: Replace QXL video with UEFI-compatible VGA on existing VM
+      command:
+        argv:
+          - virt-xml
+          - --connect
+          - "{{ libvirt_uri }}"
+          - "{{ vm_name }}"
+          - --edit
+          - all
+          - --video
+          - "model.type={{ vm_video_model }}"
+      environment: "{{ libvirt_cli_env }}"
+      when:
+        - windows_vm_info.rc == 0
+        - (windows_vm_xml.stdout | default('')) is regex_search("<model type='qxl'")
+      changed_when: true
+
+    - name: Create Windows 11 VM from ISO
+      command:
+        argv:
+          - virt-install
+          - --connect
+          - "{{ libvirt_uri }}"
+          - --name
+          - "{{ vm_name }}"
+          - --memory
+          - "{{ vm_memory_mb | string }}"
+          - --vcpus
+          - "{{ vm_vcpus | string }}"
+          - --cpu
+          - host-passthrough
+          - --os-variant
+          - "{{ vm_os_variant }}"
+          - --disk
+          - "path={{ vm_disk_path }},size={{ vm_disk_size_gb }},format=qcow2,bus=sata"
+          - --cdrom
+          - "{{ windows_iso_path }}"
+          - --network
+          - "network={{ libvirt_network }},model=e1000e"
+          - --graphics
+          - spice
+          - --video
+          - "{{ vm_video_model }}"
+          - --sound
+          - ich9
+          - --tpm
+          - backend.type=emulator,backend.version=2.0,model=tpm-crb
+          - --boot
+          - cdrom,hd,menu=on,uefi,firmware.feature0.name=secure-boot,firmware.feature0.enabled=yes,firmware.feature1.name=enrolled-keys,firmware.feature1.enabled=yes
+          - --noautoconsole
+      environment: "{{ libvirt_cli_env }}"
+      when: windows_vm_info.rc != 0
+      changed_when: true
+
+    - name: Start existing VM after applying the video fix
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - start
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      when:
+        - windows_vm_info.rc == 0
+        - (windows_vm_xml.stdout | default('')) is regex_search("<model type='qxl'")
+      changed_when: true
+
+    - name: Enable VM autostart
+      command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - autostart
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      when:
+        - vm_enable_autostart | bool
+        - windows_vm_info.rc != 0 or not (windows_vm_info.stdout | regex_search('(?im)^autostart:\\s+enable$'))
+      changed_when: true

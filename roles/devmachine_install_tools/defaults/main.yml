@@ -1,0 +1,28 @@
+---
+# Base directory configuration (consistent with devmachine_ides)
+tools_owner: "{{ ansible_facts['user_id'] }}"
+tools_basedir: "/home/wgn/WORKING"
+progsativos_dir: "{{ tools_basedir }}/Progsativos"
+appimages_dir: "{{ progsativos_dir }}/appimages"
+
+# Tool directories
+bruno_dir: "{{ appimages_dir }}/bruno"
+warp_dir: "{{ appimages_dir }}/warp"
+obsidian_dir: "{{ appimages_dir }}/obsidian"
+nvim_dir: "{{ appimages_dir }}/nvim"
+
+# Tool versions
+bruno_version: "3.5.1"
+obsidian_version: "1.6.7"
+
+# Download URLs
+bruno_url: "https://github.com/usebruno/bruno/releases/download/v{{ bruno_version }}/bruno_{{ bruno_version }}_x86_64_linux.AppImage"
+warp_url: "https://app.warp.dev/download?package=appimage"
+obsidian_url: "https://github.com/obsidianmd/obsidian-releases/releases/download/v{{ obsidian_version }}/Obsidian-{{ obsidian_version }}.AppImage"
+nvim_url: "https://github.com/neovim/neovim/releases/download/stable/nvim-linux-x86_64.appimage"
+
+# Installation flags
+install_bruno: true
+install_warp: true
+install_obsidian: true
+install_nvim: true

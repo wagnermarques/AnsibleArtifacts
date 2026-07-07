@@ -10,4 +10,5 @@
     - devmachine_install_dev_langs
     - devmachine_install_ai_tools
     - devmachine_ides
+    - devmachine_install_tools
     - devmachine_dotfiles

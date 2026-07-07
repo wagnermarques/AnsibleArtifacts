@@ -1,0 +1,17 @@
+# Custom Tools Path and Aliases Configuration
+{% if install_bruno | bool %}
+export PATH="$PATH:{{ bruno_dir }}"
+alias fzl-bruno-start='nohup {{ bruno_dir }}/bruno.AppImage < /dev/null > /dev/null 2>&1 &'
+{% endif %}
+{% if install_warp | bool %}
+export PATH="$PATH:{{ warp_dir }}"
+alias fzl-warp-start='nohup {{ warp_dir }}/warp.AppImage < /dev/null > /dev/null 2>&1 &'
+{% endif %}
+{% if install_obsidian | bool %}
+export PATH="$PATH:{{ obsidian_dir }}"
+alias fzl-obsidian-start='nohup {{ obsidian_dir }}/obsidian.AppImage < /dev/null > /dev/null 2>&1 &'
+{% endif %}
+{% if install_nvim | bool %}
+export PATH="$PATH:{{ nvim_dir }}"
+alias fzl-nvim-start='nvim'
+{% endif %}

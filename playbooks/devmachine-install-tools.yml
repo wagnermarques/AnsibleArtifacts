@@ -1,0 +1,5 @@
+---
+- name: Install Development AppImage Tools
+  hosts: devmachines_workstations
+  roles:
+    - devmachine_install_tools
