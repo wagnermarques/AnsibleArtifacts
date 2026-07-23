@@ -48,6 +48,13 @@ Creates a local Windows 11 virtual machine on a Fedora workstation using libvirt
 ansible-playbook playbooks/devmachine-virtualization-create-windows11-vm.yml -K
 ```
 
+### 6. Configure Fedora Desktop Security Setup
+Configures security settings on Fedora Desktop systems, including substituting `/etc/security/pwquality.conf` with custom settings from `conf-files/fedora/pwquality.conf`, enabling `firewalld`, setting SELinux to enforcing, and hardening SSH daemon policies.
+
+```bash
+ansible-playbook playbooks/desktop-fedora-security-setup.yml --ask-become-pass
+```
+
 
 ## AI Agents & Documentation
 
