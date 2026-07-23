@@ -1,0 +1,64 @@
+---
+- name: Configure Security Settings on Fedora Desktop Machine
+  hosts: devmachines_workstations:localhost
+  become: true
+
+  tasks:
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    # 1. Substitute /etc/security/pwquality.conf
+    - name: Substitute /etc/security/pwquality.conf with custom config
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../conf-files/fedora/pwquality.conf"
+        dest: /etc/security/pwquality.conf
+        owner: root
+        group: root
+        mode: '0644'
+        backup: true
+
+    # 2. Firewall Security (firewalld)
+    - name: Ensure firewalld package is installed
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld service is enabled and started
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+        state: started
+
+    # 3. SELinux Security Policy
+    - name: Ensure SELinux is set to enforcing mode
+      ansible.posix.selinux:
+        policy: targeted
+        state: enforcing
+      ignore_errors: true
+
+    # 4. System Crypto Policies
+    - name: Set system-wide crypto policy to DEFAULT
+      ansible.builtin.command:
+        cmd: update-crypto-policies --set DEFAULT
+      changed_when: false
+
+    # 5. SSH Security Hardening
+    - name: Disable root login in SSH daemon configuration
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+        validate: 'sshd -t -f %s'
+      notify: Restart sshd
+      ignore_errors: true
+
+  handlers:
+    - name: Restart sshd
+      ansible.builtin.systemd:
+        name: sshd
+        state: restarted
+      ignore_errors: true
