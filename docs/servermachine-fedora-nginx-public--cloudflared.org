@@ -1,0 +1,90 @@
+#+TITLE: Exposing Local Containerized Nginx (fzl-nginx) Publicly via Cloudflare Tunnel
+#+AUTHOR: Gemini CLI & wgn
+#+DATE: [2026-07-25 Sat]
+
+* Introduction
+This document provides documentation for the Ansible playbook that exposes an existing containerized Nginx instance (e.g., =fzl-nginx=) running on Fedora 44 to the public internet using a **Cloudflare Quick Tunnel** (=cloudflared=).
+
+The complete setup is managed by the playbook:
+[[file:../playbooks/servermachine-fedora-nginx-public--cloudflared.yml][playbooks/servermachine-fedora-nginx-public--cloudflared.yml]]
+
+* Architecture Overview
+#+BEGIN_EXAMPLE
+ [ Visitor on Internet ]
+           │ (HTTPS Traffic)
+           ▼
+ [ Cloudflare Edge Network ]
+           │ (Encrypted Outbound Tunnel - WebSockets/QUIC)
+           ▼
+ [ cloudflared daemon (Fedora 44) ]
+           │ (HTTP localhost:80)
+           ▼
+ [ Container: fzl-nginx (0.0.0.0:80->80/tcp) ]
+#+END_EXAMPLE
+
+** Advantages of this Strategy
+1. *Compatible with Existing Containers:* Leverages your existing =fzl-nginx= Docker container on port 80 without port conflicts or native systemd Nginx installations.
+2. *Zero Router Configuration:* No need to configure Port Forwarding (80/443) on your home Wi-Fi router.
+3. *CGNAT Bypass:* Works seamlessly behind home ISPs using Carrier-Grade NAT.
+4. *Public IP Masking:* Your home network's public IP address is hidden behind Cloudflare's edge proxy.
+5. *Automatic SSL/TLS:* Traffic between external users and Cloudflare is automatically encrypted with HTTPS.
+
+* What the Playbook Automates
+
+The playbook executes the following steps on your Fedora 44 host:
+
+1. *Container Verification:* Verifies that =http://localhost:80= is responding (served by =fzl-nginx= container).
+2. *Firewalld Configuration:* Opens the =http= service (port 80) in =firewalld=.
+3. *cloudflared Package Installation:* Downloads and installs the latest official =cloudflared= RPM package directly from Cloudflare's release repository.
+4. *Systemd Service Provisioning:* Creates a dedicated systemd service (=cloudflared-quicktunnel.service=) configured to start after Docker and route external traffic to =http://localhost:80=.
+5. *Service Activation:* Enables and starts the Cloudflare Tunnel service.
+
+* Running the Ansible Playbook
+
+To execute the playbook on your local Fedora 44 machine:
+
+#+BEGIN_SRC bash
+ansible-playbook playbooks/servermachine-fedora-nginx-public--cloudflared.yml --ask-become-pass
+#+END_SRC
+
+* Accessing Your Public Web Server
+
+Once the playbook finishes, Cloudflare dynamically generates a public =.trycloudflare.com= URL for your containerized server.
+
+** Step 1: Retrieve the Public URL
+Run the following command to extract the public URL from the systemd journal logs:
+
+#+BEGIN_SRC bash
+sudo journalctl -u cloudflared-quicktunnel.service | grep trycloudflare.com
+#+END_SRC
+
+** Step 2: Open in any Browser or Smartphone
+You will see an output similar to:
+#+BEGIN_EXAMPLE
+https://random-word-phrase.trycloudflare.com
+#+END_EXAMPLE
+
+Open that link on any device connected to cellular data or an external network to verify your containerized site is live!
+
+* Management & Troubleshooting
+
+** Checking Container & Tunnel Status
+- *fzl-nginx container status:*
+  #+BEGIN_SRC bash
+  docker ps --filter "name=fzl-nginx"
+  #+END_SRC
+
+- *Cloudflare Tunnel status:*
+  #+BEGIN_SRC bash
+  sudo systemctl status cloudflared-quicktunnel.service
+  #+END_SRC
+
+** Viewing Live Tunnel Logs
+To watch incoming web traffic and tunnel health in real-time:
+#+BEGIN_SRC bash
+sudo journalctl -u cloudflared-quicktunnel.service -f
+#+END_SRC
+
+#+BEGIN_NOTES
+This document was authored for the AnsibleArtifacts repository by Gemini CLI.
+#+END_NOTES

@@ -1,0 +1,80 @@
+---
+- name: Expose Containerized Nginx (fzl-nginx) Publicly via Cloudflare Tunnel on Fedora
+  hosts: localhost
+  connection: local
+  become: true
+
+  vars:
+    container_name: "fzl-nginx"
+    target_url: "http://localhost:80"
+    cloudflared_rpm_url: "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-x86_64.rpm"
+
+  tasks:
+    - name: 1. Verify local web server (fzl-nginx) accessibility on port 80
+      ansible.builtin.uri:
+        url: "{{ target_url }}"
+        status_code: [200, 301, 302, 403, 404]
+      register: web_check
+      failed_when: false
+
+    - name: 2. Warn if local Nginx container is not responding
+      ansible.builtin.debug:
+        msg: "WARNING: Local web server at {{ target_url }} did not respond. Ensure '{{ container_name }}' container is running."
+      when: web_check.status is not defined or web_check.status == -1
+
+    - name: 3. Allow HTTP service in firewalld
+      ansible.posix.firewalld:
+        service: http
+        permanent: true
+        state: enabled
+        immediate: true
+      ignore_errors: true
+
+    - name: 4. Install cloudflared daemon from official RPM
+      ansible.builtin.dnf:
+        name: "{{ cloudflared_rpm_url }}"
+        state: present
+        disable_gpg_check: true
+
+    - name: 5. Create systemd service for Cloudflare Quick Tunnel
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/cloudflared-quicktunnel.service
+        content: |
+          [Unit]
+          Description=Cloudflare Quick Tunnel for fzl-nginx Container
+          After=network.target docker.service
+          Wants=docker.service
+
+          [Service]
+          Type=simple
+          ExecStart=/usr/bin/cloudflared tunnel --url {{ target_url }}
+          Restart=always
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: 6. Reload systemd daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+
+    - name: 7. Enable and start Cloudflare Quick Tunnel service
+      ansible.builtin.systemd_service:
+        name: cloudflared-quicktunnel.service
+        state: restarted
+        enabled: true
+
+    - name: 8. Display instructions to retrieve public URL
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - " fzl-nginx Cloudflare Quick Tunnel deployed successfully!"
+          - "=========================================================="
+          - "To find your public https://...trycloudflare.com URL, run:"
+          - "  sudo journalctl -u cloudflared-quicktunnel.service | grep trycloudflare.com"
+          - "=========================================================="
