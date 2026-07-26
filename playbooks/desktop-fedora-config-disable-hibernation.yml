@@ -15,6 +15,11 @@
         - hybrid-sleep.target
       when: ansible_facts['os_family'] == "RedHat"
 
+    - name: Detect current desktop environment
+      become: no
+      set_fact:
+        current_desktop: "{{ lookup('env', 'XDG_CURRENT_DESKTOP') }}"
+
     - name: GNOME Desktop Always-On Settings
       # We use gsettings and explicitly point to the user's DBUS session
       # to avoid 'Broken pipe' or connection errors.
@@ -36,4 +41,32 @@
 
         - name: Disable screen lock when idle
           command: gsettings set org.gnome.desktop.screensaver lock-enabled false
-      when: ansible_facts['distribution'] == "Fedora"
+      when: ansible_facts['distribution'] == "Fedora" and current_desktop == "GNOME"
+
+    - name: XFCE Desktop Always-On Settings
+      # xfce4-power-manager and xfce4-screensaver use xfconf, not gsettings/dconf.
+      environment:
+        DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ lookup('pipe', 'id -u') }}/bus"
+      become: no
+      block:
+        - name: Disable DPMS (monitor turn off)
+          command: xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-enabled -n -t bool -s false
+
+        - name: Disable screen blanking timeout on AC
+          command: "xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-sleep -n -t uint -s 0"
+
+        - name: Disable screen off timeout on AC
+          command: "xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/dpms-on-ac-off -n -t uint -s 0"
+
+        - name: Disable automatic suspend on AC
+          command: xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/inactivity-on-ac -n -t bool -s false
+
+        - name: Disable automatic suspend on battery
+          command: xfconf-query -c xfce4-power-manager -p /xfce4-power-manager/inactivity-on-battery -n -t bool -s false
+
+        - name: Disable screen lock when idle
+          command: xfconf-query -c xfce4-screensaver -p /lock/enabled -n -t bool -s false
+
+        - name: Disable screensaver idle activation
+          command: xfconf-query -c xfce4-screensaver -p /saver/idle-activation/enabled -n -t bool -s false
+      when: ansible_facts['distribution'] == "Fedora" and current_desktop == "XFCE"
