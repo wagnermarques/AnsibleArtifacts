@@ -9,6 +9,9 @@ Welcome to the Documentation Index for the Ansible Artifacts workspace. Below yo
 ** [[file:infranetworkmachine-usage.org][Infrastructure Network Machine: Traffic Monitoring Guide (mitmproxy & tcpdump)]]
 Instructions for running the playbook to install =mitmproxy= and =tcpdump=, configuring variables, and using them to capture and debug HTTP/HTTPS and low-level TCP/IP traffic between web development services.
 
+** [[file:iamachine-usage.org][AI Machine Setup & Getting Started Guide (Kimi, Claude, Gemini, Copilot, Aider, etc.)]]
+Comprehensive getting started instructions for all AI CLI tools, SDKs, and agents (including Kimi Code, Claude Code, Gemini CLI, Copilot, Aider, Shell-GPT, Open Interpreter, and Ollama) installed by the =iamachine-setup.yml= playbook.
+
 ** [[file:local-ai-usage.org][Local AI Usage Guide]]
 A guide on running and integrating local AI models like Gemma 4 (12b) and Qwen 2.5 (7b) set up via Ollama and using them with installed coding assistants (Aider, Open Interpreter, Shell-GPT).
 

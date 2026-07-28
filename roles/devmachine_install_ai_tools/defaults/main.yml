@@ -27,8 +27,12 @@ ai_python_apps:
   - "open-interpreter"
   - "aider-install"
 
+# Kimi Code CLI configuration
+install_kimi_code: true
+
 # Ollama configuration
 install_ollama: true
 ollama_models:
   - "gemma4:12b"
   - "qwen2.5:7b"
+

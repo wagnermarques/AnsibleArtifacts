@@ -58,6 +58,13 @@
     owner: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
   become: yes
 
+- name: Install Kimi Code (Terminal AI assistant)
+  shell: curl -fsSL https://code.kimi.com/kimi-code/install.sh | KIMI_INSTALL_DIR=/usr/local bash
+  when: install_kimi_code | bool
+  args:
+    creates: /usr/local/bin/kimi
+  become: yes
+
 - name: Install Ollama (Local LLM runner)
   shell: curl -fsSL https://ollama.com/install.sh | sh
   when: install_ollama | bool
@@ -71,3 +78,4 @@
   when: install_ollama | bool
   register: ollama_pull
   changed_when: "'pulling' in ollama_pull.stdout"
+

@@ -58,7 +58,9 @@ ansible-playbook playbooks/desktop-fedora-security-setup.yml --ask-become-pass
 
 ## AI Agents & Documentation
 
-The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. Below are the links to their official documentation and repositories:
+The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. For detailed getting started instructions for each tool, see [docs/iamachine-usage.org](file:///home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/docs/iamachine-usage.org).
+
+Below are the links to their official documentation and repositories:
 
 | Agent | Category | Documentation / Link |
 | :--- | :--- | :--- |
@@ -66,11 +68,13 @@ The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. B
 | **Gemini CLI** | NPM | [GitHub Repo](https://github.com/google/gemini-cli) |
 | **Gemini CLI MCP**| NPM | [MCP Servers Info](https://modelcontextprotocol.io) |
 | **GitHub Copilot** | NPM | [Official Docs](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line) |
+| **Kimi Code** | Script / CLI | [Kimi Code Docs](https://code.kimi.com) |
 | **OpenClaude** | NPM | [GitHub Repo](https://github.com/Gitlawb/openclaude) |
 | **v0 CLI** | NPM | [Vercel v0](https://v0.dev) |
 | **Aider** | Python | [Official Site](https://aider.chat) |
 | **Shell-GPT** | Python | [GitHub Repo](https://github.com/TheR1D/shell_gpt) |
 | **Open Interpreter**| Python | [Official Docs](https://docs.openinterpreter.com) |
+
 
 ### 2. Deploy ProjCatracas VM
 This provides a clean environment with only the essentials and Docker. 

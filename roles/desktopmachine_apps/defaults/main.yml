@@ -2,6 +2,29 @@
 # Configuration for user applications
 user_apps_install_dir: "{{ lookup('env', 'HOME') }}/Apps"
 
+# MTP (Media Transfer Protocol) configuration for smartphone & camera file transfers
+install_mtp: true
+
+mtp_packages_fedora:
+  - libmtp
+  - libmtp-examples
+  - gvfs-mtp
+  - jmtpfs
+  - kio-extras
+  - android-file-transfer
+
+mtp_packages_debian:
+  - libmtp-runtime
+  - mtp-tools
+  - gvfs-backends
+  - jmtpfs
+  - kio-extras
+
+mtp_packages_alpine:
+  - libmtp
+  - gvfs
+  - simple-mtpfs
+
 # Telegram configuration
 install_telegram: true
 telegram_download_url: "https://telegram.org/dl/desktop/linux"
@@ -21,3 +44,4 @@ user_packages_debian:
   - chromium-browser
   - epiphany-browser
   - firefox-esr
+

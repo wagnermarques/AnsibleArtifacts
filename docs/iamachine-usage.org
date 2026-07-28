@@ -1,0 +1,202 @@
+#+TITLE: AI Machine (IAMachine) - Getting Started Guide
+#+AUTHOR: Gemini CLI
+#+DATE: [2026-07-28 Tue]
+
+* Introduction
+This document provides getting started instructions for all AI CLI tools, SDKs, and agents installed by the =playbooks/iamachine-setup.yml= playbook (via the =devmachine_install_ai_tools= Ansible role).
+
+* Running the Setup Playbook
+To provision or update the AI tools on your system, execute:
+
+#+begin_src bash
+ansible-playbook playbooks/iamachine-setup.yml --ask-become-pass
+#+end_src
+
+This playbook installs global NPM packages, Python pipx isolated applications, system-wide binary utilities (Kimi Code, Ollama), and configures MCP server settings for Gemini CLI.
+
+* Getting Started with Installed AI CLI Tools
+
+** 1. Kimi Code (=kimi=)
+Kimi Code is a terminal-native programming assistant designed for Linux and macOS.
+
+*** First Run & Authentication
+Launch Kimi Code for the first time by running:
+#+begin_src bash
+kimi
+#+end_src
+Follow the on-screen prompt to authenticate with your Moonshot / Kimi account.
+
+*** Common Usage Examples
+- *Check installed version:*
+  #+begin_src bash
+  kimi --version
+  #+end_src
+- *Start interactive session in a project repository:*
+  #+begin_src bash
+  cd /path/to/your/project
+  kimi
+  #+end_src
+- *Direct prompt execution:*
+  #+begin_src bash
+  kimi "Explain how the main loop in main.py works and suggest optimizations"
+  #+end_src
+
+** 2. Claude Code (=claude=)
+Claude Code is Anthropic's official command-line agent for pair programming, file editing, and automated codebase navigation.
+
+*** Setup & Authentication
+Set your Anthropic API key in your environment or let the CLI prompt you on first run:
+#+begin_src bash
+export ANTHROPIC_API_KEY="your-api-key-here"
+#+end_src
+
+*** Common Usage Examples
+- *Interactive mode:*
+  #+begin_src bash
+  cd /path/to/your/project
+  claude
+  #+end_src
+- *Run a single non-interactive task:*
+  #+begin_src bash
+  claude -p "Find all unhandled exceptions in the src/ directory"
+  #+end_src
+
+** 3. Gemini CLI (=gemini=)
+Google's official command-line tool for Gemini models with Model Context Protocol (MCP) server integration.
+
+*** Setup & Authentication
+Set your Gemini API key:
+#+begin_src bash
+export GEMINI_API_KEY="your-gemini-api-key"
+#+end_src
+
+*** MCP Servers Configuration
+The playbook automatically deploys MCP extensions configuration to =~/.gemini/settings.json=, enabling GitHub, Google Maps, Brave Search, Fetch, and Sequential Thinking servers.
+(Ensure your API keys for GitHub and Google Maps are specified in =vars/vault.yml=).
+
+*** Common Usage Examples
+- *Ask a question about your project:*
+  #+begin_src bash
+  gemini "Analyze the structure of this repository and summarize key entry points"
+  #+end_src
+
+** 4. GitHub Copilot CLI (=copilot=)
+Command-line assistant for GitHub Copilot.
+
+*** First Run & Authentication
+Authenticate your GitHub account:
+#+begin_src bash
+copilot auth
+#+end_src
+
+*** Common Usage Examples
+- *Get shell command assistance:*
+  #+begin_src bash
+  copilot suggest "find all files modified in the last 24 hours"
+  #+end_src
+- *Explain a command:*
+  #+begin_src bash
+  copilot explain "rsync -avz -e ssh ./src user@remote:/var/www"
+  #+end_src
+
+** 5. OpenClaude (=openclaude=)
+An open-source alternative interface for Claude CLI workflows in the terminal.
+
+*** Usage
+#+begin_src bash
+openclaude --help
+#+end_src
+
+** 6. Vercel v0 CLI (=v0=)
+Command-line interface for Vercel's v0 generative UI tool.
+
+*** Common Usage Examples
+- *Generate UI components from terminal:*
+  #+begin_src bash
+  v0 "create a glassmorphic dashboard sidebar component in React and Tailwind"
+  #+end_src
+
+** 7. Aider (=aider=)
+Aider is a git-integrated pair programming CLI tool installed in an isolated Python environment via =pipx=.
+
+*** Common Usage Examples
+- *Start Aider with Anthropic Claude:*
+  #+begin_src bash
+  export ANTHROPIC_API_KEY="your-key"
+  aider
+  #+end_src
+- *Start Aider with local Ollama model:*
+  #+begin_src bash
+  aider --model ollama/qwen2.5:7b
+  #+end_src
+- *Add specific files to Aider session:*
+  #+begin_src bash
+  aider main.py utils.py
+  #+end_src
+
+** 8. Shell-GPT (=sgpt=)
+Shell-GPT is a command-line productivity tool powered by AI.
+
+*** Common Usage Examples
+- *Ask general questions:*
+  #+begin_src bash
+  sgpt "What is the difference between rebase and merge in git?"
+  #+end_src
+- *Generate and execute shell commands:*
+  #+begin_src bash
+  sgpt --shell "compress all .log files in /var/log into a tar.gz"
+  #+end_src
+- *Generate code snippets:*
+  #+begin_src bash
+  sgpt --code "python function to calculate Fibonacci series using memoization"
+  #+end_src
+
+** 9. Open Interpreter (=interpreter=)
+Open Interpreter allows LLMs to run code (Python, JavaScript, Shell) locally on your computer under user supervision.
+
+*** Common Usage Examples
+- *Start interactive session:*
+  #+begin_src bash
+  interpreter
+  #+end_src
+- *Run using local Ollama model (offline mode):*
+  #+begin_src bash
+  interpreter --local --model qwen2.5:7b
+  #+end_src
+
+** 10. Ollama Local LLM Runner (=ollama=)
+Ollama runs local LLMs directly on your GPU/CPU without needing cloud APIs.
+
+*** Pre-pulled Models
+The playbook automatically installs and pulls:
+- =gemma4:12b= (Google's Gemma model)
+- =qwen2.5:7b= (Alibaba's Qwen model)
+
+*** Common Usage Examples
+- *Chat with Gemma 4:*
+  #+begin_src bash
+  ollama run gemma4:12b
+  #+end_src
+- *Chat with Qwen 2.5:*
+  #+begin_src bash
+  ollama run qwen2.5:7b
+  #+end_src
+- *List installed local models:*
+  #+begin_src bash
+  ollama list
+  #+end_src
+
+* Summary Table of Executables & Setup
+
+| Tool | Executable | Installation Method | Auth / Config Required |
+| :--- | :--- | :--- | :--- |
+| **Kimi Code** | =kimi= | Official Shell Script (=/usr/local/bin/kimi=) | Moonshot Account Login |
+| **Claude Code** | =claude= | Global NPM Package | =ANTHROPIC_API_KEY= |
+| **Gemini CLI** | =gemini= | Global NPM Package | =GEMINI_API_KEY= / MCP config |
+| **GitHub Copilot** | =copilot= | Global NPM Package | =copilot auth= |
+| **OpenClaude** | =openclaude= | Global NPM Package | Anthropic API Key |
+| **v0 CLI** | =v0= | Global NPM Package | Vercel Account |
+| **Aider** | =aider= | Isolated Python (=pipx=) | API Key or Local Ollama |
+| **Shell-GPT** | =sgpt= | Isolated Python (=pipx=) | =OPENAI_API_KEY= or Local API |
+| **Open Interpreter**| =interpreter= | Isolated Python (=pipx=) | API Key or =--local= mode |
+| **Ollama** | =ollama= | Official Installer (=/usr/local/bin/ollama=) | None (Local execution) |

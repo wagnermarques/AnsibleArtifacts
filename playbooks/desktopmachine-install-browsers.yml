@@ -18,17 +18,16 @@
     # 2. FEDORA CONFIGURATIONS & INSTALLATIONS
     # ----------------------------------------------------
     - name: Configure and install third-party browsers on Fedora
-      when: ansible_os_family == "RedHat" or ansible_distribution == "Fedora"
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
       block:
-        - name: Enable Google Chrome repository (Fedora native third-party repo)
-          ansible.builtin.dnf:
-            name: fedora-workstation-repositories
-            state: present
-
-        - name: Enable google-chrome dnf repo config
-          ansible.builtin.command:
-            cmd: dnf config-manager --set-enabled google-chrome
-          changed_when: false
+        - name: Enable Google Chrome repository (Fedora)
+          ansible.builtin.yum_repository:
+            name: google-chrome
+            description: google-chrome
+            baseurl: https://dl.google.com/linux/chrome/rpm/stable/x86_64
+            gpgkey: https://dl.google.com/linux/linux_signing_key.pub
+            gpgcheck: true
+            enabled: true
 
         - name: Add Brave Browser repository (Fedora)
           ansible.builtin.get_url:
@@ -44,19 +43,28 @@
             gpgkey: https://rpm.opera.com/rpmrepo.key
             gpgcheck: true
 
-        - name: Install Chrome, Brave, and Opera on Fedora
+        - name: Add Microsoft Edge repository (Fedora)
+          ansible.builtin.yum_repository:
+            name: microsoft-edge
+            description: Microsoft Edge
+            baseurl: https://packages.microsoft.com/yumrepos/edge
+            gpgkey: https://packages.microsoft.com/keys/microsoft.asc
+            gpgcheck: true
+
+        - name: Install Chrome, Brave, Opera, and Edge on Fedora
           ansible.builtin.dnf:
             name:
               - google-chrome-stable
               - brave-browser
               - opera-stable
+              - microsoft-edge-stable
             state: present
 
     # ----------------------------------------------------
     # 3. DEBIAN / UBUNTU CONFIGURATIONS & INSTALLATIONS
     # ----------------------------------------------------
     - name: Configure and install third-party browsers on Debian/Ubuntu
-      when: ansible_os_family == "Debian"
+      when: ansible_facts['os_family'] == "Debian"
       block:
         - name: Ensure prerequisites for custom apt repos are installed
           ansible.builtin.apt:
@@ -106,12 +114,26 @@
             state: present
             filename: opera-stable
 
-        - name: Install Chrome, Brave, and Opera on Debian/Ubuntu
+        # Microsoft Edge setup
+        - name: Add Microsoft Edge GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://packages.microsoft.com/keys/microsoft.asc
+            dest: /etc/apt/keyrings/microsoft-edge.asc
+            mode: '0644'
+
+        - name: Add Microsoft Edge repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft-edge.asc] https://packages.microsoft.com/repos/edge stable main"
+            state: present
+            filename: microsoft-edge
+
+        - name: Install Chrome, Brave, Opera, and Edge on Debian/Ubuntu
           ansible.builtin.apt:
             name:
               - google-chrome-stable
               - brave-browser
               - opera-stable
+              - microsoft-edge-stable
             state: present
             update_cache: yes
 
@@ -119,14 +141,14 @@
     # 4. ALPINE LINUX NOTEWORTHY DETAILS
     # ----------------------------------------------------
     - name: Notify/Install missing browsers on Alpine
-      when: ansible_os_family == "Alpine"
+      when: ansible_facts['os_family'] == "Alpine"
       block:
         - name: Update Alpine repository index
           community.general.apk:
             update_cache: yes
 
         # Note: Chromium is used on Alpine as proprietary binaries like official Google Chrome, 
-        # Brave, and Opera do not offer native glibc-static/musl compiler versions for pure apk architectures.
+        # Brave, Opera, and Microsoft Edge do not offer native glibc-static/musl compiler versions for pure apk architectures.
         - name: Install alternative Chromium engine on Alpine
           community.general.apk:
             name:
@@ -135,4 +157,4 @@
 
         - name: Display warning about proprietary browsers on Alpine
           ansible.builtin.debug:
-            msg: "Notice: Google Chrome, Brave, and Opera do not natively support Alpine (musl libc). Installed Open-Source 'Chromium' as the structural alternative."
+            msg: "Notice: Google Chrome, Brave, Opera, and Microsoft Edge do not natively support Alpine (musl libc). Installed Open-Source 'Chromium' as the structural alternative."

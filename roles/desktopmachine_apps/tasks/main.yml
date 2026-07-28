@@ -45,7 +45,16 @@
   loop: "{{ (ansible_facts['os_family'] == 'Debian') | ternary(user_packages_debian, (ansible_facts['os_family'] == 'RedHat') | ternary(user_packages_fedora, [])) }}"
   become: yes
 
+- name: Install MTP (Media Transfer Protocol) packages for smartphone file transfer
+  package:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ (ansible_facts['os_family'] == 'Debian') | ternary(mtp_packages_debian, (ansible_facts['os_family'] == 'RedHat') | ternary(mtp_packages_fedora, (ansible_facts['os_family'] == 'Alpine') | ternary(mtp_packages_alpine, []))) }}"
+  become: yes
+  when: install_mtp | default(true) | bool
+
 - name: Install Telegram Desktop
+
   block:
     - name: Download Telegram Desktop
       get_url:
