@@ -103,6 +103,8 @@ This project implements a custom pattern for starting manually installed applica
 | **DataGrip** | `devmachine-setup.yml` | `fzl-datagrip-start` |
 | **Antigravity** | `devmachine-setup.yml` | `fzl-antigravity-start` |
 | **Cursor** | `devmachine-setup.yml` | `fzl-cursor-start` |
+| **Eclipse Modeling** | `devmachine-setup-ides.yml` | `fzl-eclipse-modeling-start` |
+
 
 ### How to use
 After running the corresponding playbook, source your shell configuration to activate the new commands:

@@ -14,6 +14,7 @@
     - "{{ datagrip_dir }}"
     - "{{ antigravity_dir }}"
     - "{{ cursor_dir }}"
+    - "{{ eclipse_modeling_dir }}"
   become: yes
 
 - name: Install Tools via Extraction (JetBrains)
@@ -31,6 +32,17 @@
     - { url: "{{ datagrip_url }}", dest: "{{ datagrip_dir }}" }
     - { url: "{{ antigravity_url }}", dest: "{{ antigravity_dir }}" }
   become: yes
+
+- name: Install Eclipse Modeling Tools
+  unarchive:
+    src: "{{ eclipse_modeling_url }}"
+    dest: "{{ eclipse_modeling_dir }}"
+    remote_src: yes
+    extra_opts: ["--strip-components=1"]
+    creates: "{{ eclipse_modeling_dir }}/eclipse"
+    owner: "{{ tools_owner }}"
+  become: yes
+  when: install_eclipse_modeling | default(true) | bool
 
 - name: Install VS Code
   unarchive:
@@ -73,6 +85,7 @@
       export PATH="$PATH:{{ datagrip_dir }}/bin"
       export PATH="$PATH:{{ antigravity_dir }}/bin"
       export PATH="$PATH:{{ cursor_dir }}"
+      export PATH="$PATH:{{ eclipse_modeling_dir }}"
 
       # FZL Start Aliases
       alias fzl-intellij-start='nohup {{ intellij_dir }}/bin/idea.sh > /dev/null 2>&1 &'
@@ -83,6 +96,8 @@
       alias fzl-datagrip-start='nohup {{ datagrip_dir }}/bin/datagrip.sh > /dev/null 2>&1 &'
       alias fzl-antigravity-start='nohup {{ antigravity_dir }}/bin/antigravity > /dev/null 2>&1 &'
       alias fzl-cursor-start='nohup {{ cursor_dir }}/cursor.AppImage > /dev/null 2>&1 &'
+      alias fzl-eclipse-modeling-start='nohup {{ eclipse_modeling_dir }}/eclipse > /dev/null 2>&1 &'
+
     mode: '0644'
   become: no
 

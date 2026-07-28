@@ -14,10 +14,14 @@ webstorm_dir: "{{ ides_base_dir }}/webstorm-ides/webstorm"
 vscode_dir: "{{ ides_base_dir }}/vscode"
 antigravity_dir: "{{ ides_base_dir }}/antigravity"
 cursor_dir: "{{ ides_base_dir }}/cursor"
+eclipse_modeling_dir: "{{ ides_base_dir }}/eclipse-modeling"
 
 # DB Tools Specific Paths
 dbeaver_dir: "{{ db_tools_base_dir }}/dbeaver"
 datagrip_dir: "{{ db_tools_base_dir }}/datagrip"
+
+# Feature Toggles
+install_eclipse_modeling: true
 
 # Download URLs
 intellij_url: "https://download.jetbrains.com/idea/ideaIC-2024.1.1.tar.gz"
@@ -28,3 +32,5 @@ dbeaver_url: "https://dbeaver.io/files/dbeaver-ce-latest-linux.gtk.x86_64.tar.gz
 datagrip_url: "https://download.jetbrains.com/datagrip/datagrip-2024.1.2.tar.gz"
 antigravity_url: "https://edgedl.me.gvt1.com/edgedl/release2/j0qc3/antigravity/stable/1.23.2-4781536860569600/linux-x64/Antigravity.tar.gz"
 cursor_url: "https://downloads.cursor.com/production/d5b2fc092e16007956c9e5047f76097b9e626cab/linux/x64/Cursor-3.5.17-x86_64.AppImage"
+eclipse_modeling_url: "https://download.eclipse.org/technology/epp/downloads/release/2026-03/R/eclipse-modeling-2026-03-R-linux-gtk-x86_64.tar.gz"
+
