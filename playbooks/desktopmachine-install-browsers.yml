@@ -7,12 +7,15 @@
     # ----------------------------------------------------
     # 1. PLATFORM INDEPENDENT / STANDARD REPO BROWSERS
     # ----------------------------------------------------
-    - name: Install Firefox and Epiphany (Web) via native package manager
+    - name: Install Firefox, Epiphany, Falkon, and Tor Browser via native package manager
       ansible.builtin.package:
         name:
           - firefox
           - epiphany
+          - falkon
+          - torbrowser-launcher
         state: present
+      ignore_errors: true
 
     # ----------------------------------------------------
     # 2. FEDORA CONFIGURATIONS & INSTALLATIONS
@@ -51,14 +54,32 @@
             gpgkey: https://packages.microsoft.com/keys/microsoft.asc
             gpgcheck: true
 
-        - name: Install Chrome, Brave, Opera, and Edge on Fedora
+        - name: Add Vivaldi repository (Fedora)
+          ansible.builtin.yum_repository:
+            name: vivaldi
+            description: Vivaldi Browser
+            baseurl: https://repo.vivaldi.com/archive/rpm/$basearch
+            gpgkey: https://repo.vivaldi.com/archive/linux_signing_key.pub
+            gpgcheck: true
+
+        - name: Add LibreWolf repository (Fedora)
+          ansible.builtin.get_url:
+            url: https://repo.librewolf.net/librewolf.repo
+            dest: /etc/yum.repos.d/librewolf.repo
+            mode: '0644'
+            force: yes
+
+        - name: Install Chrome, Brave, Opera, Edge, Vivaldi, and LibreWolf on Fedora
           ansible.builtin.dnf:
             name:
               - google-chrome-stable
               - brave-browser
               - opera-stable
               - microsoft-edge-stable
+              - vivaldi-stable
+              - librewolf
             state: present
+            update_cache: yes
 
     # ----------------------------------------------------
     # 3. DEBIAN / UBUNTU CONFIGURATIONS & INSTALLATIONS
@@ -127,18 +148,90 @@
             state: present
             filename: microsoft-edge
 
-        - name: Install Chrome, Brave, Opera, and Edge on Debian/Ubuntu
+        # Vivaldi setup
+        - name: Add Vivaldi GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://repo.vivaldi.com/archive/linux_signing_key.pub
+            dest: /etc/apt/keyrings/vivaldi.asc
+            mode: '0644'
+
+        - name: Add Vivaldi repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/vivaldi.asc] https://repo.vivaldi.com/archive/deb/ stable main"
+            state: present
+            filename: vivaldi
+
+        # LibreWolf setup
+        - name: Add LibreWolf GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://repo.librewolf.net/pubkey.gpg
+            dest: /etc/apt/keyrings/librewolf.gpg
+            mode: '0644'
+
+        - name: Add LibreWolf repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/librewolf.gpg] http://deb.librewolf.net {{ ansible_facts['distribution_release'] }} main"
+            state: present
+            filename: librewolf
+
+        - name: Install Chrome, Brave, Opera, Edge, Vivaldi, and LibreWolf on Debian/Ubuntu
           ansible.builtin.apt:
             name:
               - google-chrome-stable
               - brave-browser
               - opera-stable
               - microsoft-edge-stable
+              - vivaldi-stable
+              - librewolf
             state: present
             update_cache: yes
 
     # ----------------------------------------------------
-    # 4. ALPINE LINUX NOTEWORTHY DETAILS
+    # 4. ZEN BROWSER INSTALLATION (CROSS-PLATFORM)
+    # ----------------------------------------------------
+    - name: Install Zen Browser via release tarball
+      block:
+        - name: Create directory for Zen Browser
+          ansible.builtin.file:
+            path: /opt/zen-browser
+            state: directory
+            mode: '0755'
+
+        - name: Download and unarchive Zen Browser
+          ansible.builtin.unarchive:
+            src: https://github.com/zen-browser/desktop/releases/latest/download/zen.linux-x86_64.tar.xz
+            dest: /opt/zen-browser
+            remote_src: yes
+            extra_opts:
+              - --strip-components=1
+          ignore_errors: true
+
+        - name: Symlink Zen Browser executable
+          ansible.builtin.file:
+            src: /opt/zen-browser/zen
+            dest: /usr/local/bin/zen-browser
+            state: link
+          ignore_errors: true
+
+        - name: Create desktop shortcut for Zen Browser
+          ansible.builtin.copy:
+            dest: /usr/share/applications/zen-browser.desktop
+            mode: '0644'
+            content: |
+              [Desktop Entry]
+              Version=1.0
+              Name=Zen Browser
+              Comment=Experience tranquility while browsing the web without compromising privacy.
+              Exec=/usr/local/bin/zen-browser %u
+              Terminal=false
+              Type=Application
+              Icon=/opt/zen-browser/browser/chrome/icons/default/default128.png
+              Categories=Network;WebBrowser;
+              MimeType=text/html;text/xml;application/xhtml+xml;application/xml;application/vnd.mozilla.xul+xml;application/rss+xml;application/rdf+xml;x-scheme-handler/http;x-scheme-handler/https;
+          ignore_errors: true
+
+    # ----------------------------------------------------
+    # 5. ALPINE LINUX NOTEWORTHY DETAILS
     # ----------------------------------------------------
     - name: Notify/Install missing browsers on Alpine
       when: ansible_facts['os_family'] == "Alpine"
@@ -158,3 +251,4 @@
         - name: Display warning about proprietary browsers on Alpine
           ansible.builtin.debug:
             msg: "Notice: Google Chrome, Brave, Opera, and Microsoft Edge do not natively support Alpine (musl libc). Installed Open-Source 'Chromium' as the structural alternative."
+

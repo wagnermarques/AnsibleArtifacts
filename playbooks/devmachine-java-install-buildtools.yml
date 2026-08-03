@@ -1,0 +1,245 @@
+---
+- name: Install Java Build Tools (Gradle, Maven, Ant)
+  hosts: all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Installation method: 'package' (system package manager), 'binary' (tarball/zip release), or 'auto' (package with binary fallback)
+    buildtools_install_method: "auto"
+
+    # Default standalone binary versions (used when method is 'binary' or fallback)
+    maven_version: "3.9.9"
+    gradle_version: "8.12.1"
+    ant_version: "1.10.15"
+
+    # Target directory for binary installations
+    buildtools_install_dir: "/opt"
+
+    # Direct download URLs for standalone binary releases
+    maven_download_url: "https://archive.apache.org/dist/maven/maven-3/{{ maven_version }}/binaries/apache-maven-{{ maven_version }}-bin.tar.gz"
+    gradle_download_url: "https://services.gradle.org/distributions/gradle-{{ gradle_version }}-bin.zip"
+    ant_download_url: "https://archive.apache.org/dist/ant/binaries/apache-ant-{{ ant_version }}-bin.tar.gz"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. PREREQUISITES & PACKAGE MANAGER INSTALLATION
+    # ----------------------------------------------------
+    - name: Ensure unzip and tar are installed for archive extractions
+      ansible.builtin.package:
+        name:
+          - tar
+          - unzip
+        state: present
+      ignore_errors: true
+
+    - name: Install Java Build Tools via APT (Debian / Ubuntu)
+      when:
+        - buildtools_install_method in ['package', 'auto']
+        - ansible_facts['os_family'] == 'Debian'
+      ansible.builtin.apt:
+        name:
+          - maven
+          - ant
+          - gradle
+        state: present
+        update_cache: yes
+      ignore_errors: "{{ buildtools_install_method == 'auto' }}"
+
+    - name: Install Java Build Tools via DNF (Fedora / RedHat)
+      when:
+        - buildtools_install_method in ['package', 'auto']
+        - (ansible_facts['os_family'] == 'RedHat' or ansible_facts['distribution'] == 'Fedora')
+      ansible.builtin.dnf:
+        name:
+          - maven
+          - ant
+          - gradle
+        state: present
+      ignore_errors: "{{ buildtools_install_method == 'auto' }}"
+
+    - name: Install Java Build Tools via APK (Alpine Linux)
+      when:
+        - buildtools_install_method in ['package', 'auto']
+        - ansible_facts['os_family'] == 'Alpine'
+      community.general.apk:
+        name:
+          - maven
+          - apache-ant
+          - gradle
+        state: present
+        update_cache: yes
+      ignore_errors: "{{ buildtools_install_method == 'auto' }}"
+
+    - name: Install Java Build Tools via Pacman (Arch Linux)
+      when:
+        - buildtools_install_method in ['package', 'auto']
+        - ansible_facts['os_family'] == 'Archlinux'
+      community.general.pacman:
+        name:
+          - maven
+          - apache-ant
+          - gradle
+        state: present
+        update_cache: yes
+      ignore_errors: "{{ buildtools_install_method == 'auto' }}"
+
+    # ----------------------------------------------------
+    # 2. CHECK TOOL AVAILABILITY (FOR FALLBACK / BINARY)
+    # ----------------------------------------------------
+    - name: Check if Maven (mvn) is installed
+      ansible.builtin.command: which mvn
+      register: mvn_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if Gradle (gradle) is installed
+      ansible.builtin.command: which gradle
+      register: gradle_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check if Ant (ant) is installed
+      ansible.builtin.command: which ant
+      register: ant_check
+      changed_when: false
+      failed_when: false
+
+    # ----------------------------------------------------
+    # 3. STANDALONE BINARY INSTALLATION (FALLBACK / MANUAL)
+    # ----------------------------------------------------
+    - name: Ensure target installation directory exists
+      ansible.builtin.file:
+        path: "{{ buildtools_install_dir }}"
+        state: directory
+        mode: '0755'
+      when: buildtools_install_method == 'binary' or mvn_check.rc != 0 or gradle_check.rc != 0 or ant_check.rc != 0
+
+    # Apache Maven Binary Install
+    - name: Install Apache Maven from binary tarball
+      when: buildtools_install_method == 'binary' or mvn_check.rc != 0
+      block:
+        - name: Download and extract Apache Maven
+          ansible.builtin.unarchive:
+            src: "{{ maven_download_url }}"
+            dest: "{{ buildtools_install_dir }}"
+            remote_src: yes
+            creates: "{{ buildtools_install_dir }}/apache-maven-{{ maven_version }}"
+
+        - name: Create symlink for Maven directory
+          ansible.builtin.file:
+            src: "{{ buildtools_install_dir }}/apache-maven-{{ maven_version }}"
+            dest: "{{ buildtools_install_dir }}/maven"
+            state: link
+            force: yes
+
+        - name: Create symlink for mvn executable
+          ansible.builtin.file:
+            src: "{{ buildtools_install_dir }}/maven/bin/mvn"
+            dest: /usr/local/bin/mvn
+            state: link
+            force: yes
+
+    # Gradle Binary Install
+    - name: Install Gradle from binary zip
+      when: buildtools_install_method == 'binary' or gradle_check.rc != 0
+      block:
+        - name: Download and extract Gradle
+          ansible.builtin.unarchive:
+            src: "{{ gradle_download_url }}"
+            dest: "{{ buildtools_install_dir }}"
+            remote_src: yes
+            creates: "{{ buildtools_install_dir }}/gradle-{{ gradle_version }}"
+
+        - name: Create symlink for Gradle directory
+          ansible.builtin.file:
+            src: "{{ buildtools_install_dir }}/gradle-{{ gradle_version }}"
+            dest: "{{ buildtools_install_dir }}/gradle"
+            state: link
+            force: yes
+
+        - name: Create symlink for gradle executable
+          ansible.builtin.file:
+            src: "{{ buildtools_install_dir }}/gradle/bin/gradle"
+            dest: /usr/local/bin/gradle
+            state: link
+            force: yes
+
+    # Apache Ant Binary Install
+    - name: Install Apache Ant from binary tarball
+      when: buildtools_install_method == 'binary' or ant_check.rc != 0
+      block:
+        - name: Download and extract Apache Ant
+          ansible.builtin.unarchive:
+            src: "{{ ant_download_url }}"
+            dest: "{{ buildtools_install_dir }}"
+            remote_src: yes
+            creates: "{{ buildtools_install_dir }}/apache-ant-{{ ant_version }}"
+
+        - name: Create symlink for Ant directory
+          ansible.builtin.file:
+            src: "{{ buildtools_install_dir }}/apache-ant-{{ ant_version }}"
+            dest: "{{ buildtools_install_dir }}/ant"
+            state: link
+            force: yes
+
+        - name: Create symlink for ant executable
+          ansible.builtin.file:
+            src: "{{ buildtools_install_dir }}/ant/bin/ant"
+            dest: /usr/local/bin/ant
+            state: link
+            force: yes
+
+    # ----------------------------------------------------
+    # 4. ENVIRONMENT VARIABLES CONFIGURATION
+    # ----------------------------------------------------
+    - name: Configure Java Build Tools environment variables in /etc/profile.d
+      ansible.builtin.copy:
+        dest: /etc/profile.d/java_buildtools.sh
+        mode: '0644'
+        content: |
+          # Java Build Tools environment configuration
+          if [ -d "{{ buildtools_install_dir }}/maven" ]; then
+            export M2_HOME="{{ buildtools_install_dir }}/maven"
+            export MAVEN_HOME="{{ buildtools_install_dir }}/maven"
+          fi
+          if [ -d "{{ buildtools_install_dir }}/gradle" ]; then
+            export GRADLE_HOME="{{ buildtools_install_dir }}/gradle"
+          fi
+          if [ -d "{{ buildtools_install_dir }}/ant" ]; then
+            export ANT_HOME="{{ buildtools_install_dir }}/ant"
+          fi
+          export PATH="/usr/local/bin:$PATH"
+
+    # ----------------------------------------------------
+    # 5. VERIFICATION
+    # ----------------------------------------------------
+    - name: Verify Apache Maven installation
+      ansible.builtin.command: mvn -version
+      register: mvn_version_out
+      changed_when: false
+      failed_when: false
+
+    - name: Verify Gradle installation
+      ansible.builtin.command: gradle -version
+      register: gradle_version_out
+      changed_when: false
+      failed_when: false
+
+    - name: Verify Apache Ant installation
+      ansible.builtin.command: ant -version
+      register: ant_version_out
+      changed_when: false
+      failed_when: false
+
+    - name: Display Maven version output
+      ansible.builtin.debug:
+        msg: "{{ mvn_version_out.stdout_lines | default(['Maven not found']) }}"
+
+    - name: Display Gradle version output
+      ansible.builtin.debug:
+        msg: "{{ gradle_version_out.stdout_lines | default(['Gradle not found']) }}"
+
+    - name: Display Ant version output
+      ansible.builtin.debug:
+        msg: "{{ ant_version_out.stdout_lines | default(['Ant not found']) }}"

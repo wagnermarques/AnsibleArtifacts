@@ -41,14 +41,21 @@ Installs the official JavaFX UI design tool (Gluon Scene Builder 21.0.0) portabl
 ansible-playbook playbooks/devmachine-java-install-scenebuilder.yml --ask-become-pass
 ```
 
-### 5. Create a Windows 11 libvirt VM from ISO
+### 5. Install Java Build Tools (Gradle, Maven, Ant)
+Installs Java development build tools (**Gradle**, **Maven**, and **Ant**) portably across Linux distributions (Debian/Ubuntu, Fedora/RedHat, Alpine, Arch) with support for package managers and standalone binary fallback.
+
+```bash
+ansible-playbook playbooks/devmachine-java-install-buildtools.yml --ask-become-pass
+```
+
+### 6. Create a Windows 11 libvirt VM from ISO
 Creates a local Windows 11 virtual machine on a Fedora workstation using libvirt, UEFI, Secure Boot, and TPM 2.0. The playbook defaults to the ISO path `/home/wgn/VIRT/pt-br_windows_11_consumer_editions_version_25h2_x64_dvd_d4d3cf4d.iso`, and you can override the VM name or ISO path with `-e`.
 
 ```bash
 ansible-playbook playbooks/devmachine-virtualization-create-windows11-vm.yml -K
 ```
 
-### 6. Configure Fedora Desktop Security Setup
+### 7. Configure Fedora Desktop Security Setup
 Configures security settings on Fedora Desktop systems, including substituting `/etc/security/pwquality.conf` with custom settings from `conf-files/fedora/pwquality.conf`, enabling `firewalld`, setting SELinux to enforcing, and hardening SSH daemon policies.
 
 ```bash
