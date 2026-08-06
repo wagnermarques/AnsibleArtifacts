@@ -47,10 +47,12 @@ The Ansible setup also installed advanced AI agents that can be "pointed" to you
 
 ** Using with Aider
 Aider can use Ollama via its OpenAI-compatible API.
-#+begin_src bash
-# Use Qwen 2.5 for coding with Aider
-aider --model ollama/qwen2.5:7b
-#+end_src
+
+# Run fzl-aider with interactive model selection menu
+fzl-aider -s
+
+# Or specify a model directly
+fzl-aider --model ollama/qwen2.5:7b
 
 ** Using with Open Interpreter
 #+begin_src bash

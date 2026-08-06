@@ -62,6 +62,64 @@ Configures security settings on Fedora Desktop systems, including substituting `
 ansible-playbook playbooks/desktop-fedora-security-setup.yml --ask-become-pass
 ```
 
+### 8. Configure Xfce4 Touchpad (Tap-to-Click + Two-Finger Right-Click)
+Enables tap-to-click on the laptop touchpad and maps a two-finger tap to right-click, via a permanent `/etc/X11/xorg.conf.d/90-touchpad.conf` libinput config plus an immediate `xfconf-query` live setting.
+
+```bash
+ansible-playbook playbooks/desktop-fedora-postinstall-xfce4-touchpad-setup.yml --ask-become-pass
+```
+
+### 9. Enable RPM Fusion & Install Multimedia Codecs
+Enables the RPM Fusion Free and Nonfree repositories, swaps `ffmpeg-free` for full `ffmpeg`, updates the `multimedia` and `sound-and-video` groups, and installs GStreamer plugins plus Intel/AMD hardware video acceleration drivers.
+
+```bash
+ansible-playbook playbooks/desktop-fedora-postinstalation-multimedia-codecs-setup.yml --ask-become-pass
+```
+
+### 10. Centralized Language Servers Setup (LSP)
+Installs `@github/copilot-language-server`, `rust-analyzer` (Rust LSP), `typescript-language-server`, `vscode-langservers-extracted`, `yaml-language-server`, `bash-language-server`, `pyright`, `pylsp`, `gopls`, `clangd`, and other common LSPs globally in system `$PATH` so Emacs, VS Code, Theia, Neovim, and IntelliJ can use shared executables.
+
+```bash
+ansible-playbook playbooks/devmachine-lsp-setup.yml --ask-become-pass
+```
+
+#### Configuring VS Code / Theia to use Centralized LSPs
+Add the following options to your VS Code `settings.json` (`~/.config/Code/User/settings.json`):
+
+```json
+{
+  "rust-analyzer.server.path": "/usr/bin/rust-analyzer",
+  "clangd.path": "/usr/bin/clangd",
+  "go.alternateTools": {
+    "gopls": "/usr/local/bin/gopls"
+  },
+  "typescript.tsdk": "/usr/lib/node_modules/typescript/lib",
+  "python.languageServer": "Pyright"
+}
+```
+
+#### Configuring Emacs
+Emacs (`eglot` or `lsp-mode`) automatically finds these executables on your system `$PATH`. For GitHub Copilot in Emacs, run `M-x copilot-login` after starting `copilot-mode`.
+
+#### IDE & Language Server Documentation Links
+
+| Editor / Tool | Category | Documentation / Configuration Link |
+| :--- | :--- | :--- |
+| **VS Code** | IDE | [Language Server Protocol in VS Code](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide) |
+| **Eclipse Theia** | IDE | [Theia Framework LSP Integration](https://theia-ide.org/docs/) |
+| **Emacs (Eglot)** | IDE | [Emacs Eglot User Manual](https://www.gnu.org/software/emacs/manual/html_node/eglot/index.html) |
+| **Emacs (lsp-mode)** | IDE | [Emacs lsp-mode Documentation](https://emacs-lsp.github.io/lsp-mode/) |
+| **Neovim** | IDE | [Neovim nvim-lspconfig Documentation](https://neovim.io/doc/user/lsp.html) |
+| **IntelliJ IDEA** | IDE | [JetBrains LSP Plugin Docs](https://plugins.jetbrains.com/docs/intellij/language-server-protocol.html) |
+| **GitHub Copilot LS** | LSP | [Copilot Language Server Repo](https://github.com/github/copilot-language-server) |
+| **rust-analyzer** | LSP | [rust-analyzer User Manual](https://rust-analyzer.github.io/manual.html) |
+| **Pyright** | LSP | [Pyright Documentation](https://microsoft.github.io/pyright/#/) |
+| **gopls** | LSP | [gopls Documentation](https://github.com/golang/tools/blob/master/gopls/README.md) |
+| **clangd** | LSP | [clangd Documentation](https://clangd.llvm.org/) |
+
+
+
+
 
 ## AI Agents & Documentation
 

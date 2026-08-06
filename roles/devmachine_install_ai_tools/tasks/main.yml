@@ -38,16 +38,93 @@
     - "item != 'open-interpreter'"
     - "'git+' not in item or 'failed' in pipx_result.stderr"
 
-- name: Get the actual user home directory
+- name: Get the actual user and home directory
   set_fact:
+    real_user: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
     real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
+
+- name: Ensure .envs directory exists in user home
+  file:
+    path: "{{ real_user_home }}/.envs"
+    state: directory
+    mode: '0755'
+    owner: "{{ real_user }}"
+  when: install_aider_venv | bool
+  become: yes
+
+- name: Create isolated Python virtual environment for Aider (~/.envs/aider)
+  command: "python3 -m venv {{ real_user_home }}/.envs/aider"
+  args:
+    creates: "{{ real_user_home }}/.envs/aider/bin/activate"
+  when: install_aider_venv | bool
+  become: yes
+  become_user: "{{ real_user }}"
+
+- name: Upgrade pip, setuptools, and wheel in Aider virtual environment
+  pip:
+    name:
+      - pip
+      - setuptools
+      - wheel
+    state: latest
+    virtualenv: "{{ real_user_home }}/.envs/aider"
+  when: install_aider_venv | bool
+  become: yes
+  become_user: "{{ real_user }}"
+
+- name: Install aider-chat in isolated virtual environment
+  pip:
+    name: "git+https://github.com/Aider-AI/aider.git"
+    state: latest
+    virtualenv: "{{ real_user_home }}/.envs/aider"
+  when: install_aider_venv | bool
+  become: yes
+  become_user: "{{ real_user }}"
+
+- name: Create fzl-aider executable command wrapper in /usr/local/bin
+  template:
+    src: fzl-aider.j2
+    dest: /usr/local/bin/fzl-aider
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_aider_venv | bool
+  become: yes
+
+- name: Configure fzl-aider alias in ~/.bashrc_ai_tools
+  template:
+    src: bashrc_ai_tools.j2
+    dest: "{{ real_user_home }}/.bashrc_ai_tools"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: install_aider_venv | bool
+  become: yes
+
+- name: Create global Aider config ~/.aider.conf.yml with default local model
+  template:
+    src: aider.conf.yml.j2
+    dest: "{{ real_user_home }}/.aider.conf.yml"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: install_aider_venv | bool
+  become: yes
+
+- name: Source ~/.bashrc_ai_tools in user's ~/.bashrc
+  lineinfile:
+    path: "{{ real_user_home }}/.bashrc"
+    line: "source ~/.bashrc_ai_tools"
+    state: present
+    create: yes
+    owner: "{{ real_user }}"
+  when: install_aider_venv | bool
+  become: yes
 
 - name: Ensure .gemini directory exists in user home
   file:
     path: "{{ real_user_home }}/.gemini"
     state: directory
     mode: '0755'
-    owner: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
+    owner: "{{ real_user }}"
   become: yes
 
 - name: Configure Gemini CLI extensions (MCP)
@@ -55,7 +132,7 @@
     src: gemini_settings.json.j2
     dest: "{{ real_user_home }}/.gemini/settings.json"
     mode: '0644'
-    owner: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
+    owner: "{{ real_user }}"
   become: yes
 
 - name: Install Kimi Code (Terminal AI assistant)

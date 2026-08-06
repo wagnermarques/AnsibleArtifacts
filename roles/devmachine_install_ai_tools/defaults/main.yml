@@ -22,10 +22,12 @@ ai_python_libraries:
 
 # CLI Applications (installed via pipx for isolation)
 ai_python_apps:
-  - "git+https://github.com/paul-gauthier/aider.git"
   - "shell-gpt"
   - "open-interpreter"
-  - "aider-install"
+
+# Aider isolated virtualenv configuration (~/.envs/aider)
+install_aider_venv: true
+aider_default_model: "ollama/qwen3.6:latest"
 
 # Kimi Code CLI configuration
 install_kimi_code: true
@@ -33,6 +35,7 @@ install_kimi_code: true
 # Ollama configuration
 install_ollama: true
 ollama_models:
+  - "qwen3.6:latest"
   - "gemma4:12b"
   - "qwen2.5:7b"
 

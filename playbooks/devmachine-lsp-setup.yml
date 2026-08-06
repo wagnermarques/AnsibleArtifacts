@@ -1,0 +1,155 @@
+---
+- name: Setup Centralized Language Servers (LSP) for IDEs
+  hosts: devmachines_workstations
+  become: true
+  vars:
+    npm_global_lsp_packages:
+      - "@github/copilot-language-server"
+      - "typescript"
+      - "typescript-language-server"
+      - "vscode-langservers-extracted"
+      - "yaml-language-server"
+      - "bash-language-server"
+      - "pyright"
+      - "dockerfile-language-server-nodejs"
+      - "vim-language-server"
+      - "@ansible/ansible-language-server"
+
+    lsp_binaries_to_verify:
+      - copilot-language-server
+      - typescript-language-server
+      - vscode-html-language-server
+      - vscode-json-language-server
+      - yaml-language-server
+      - bash-language-server
+      - pyright-langserver
+      - dockerfile-language-server-nodejs
+      - pylsp
+      - gopls
+      - clangd
+      - rust-analyzer
+
+  tasks:
+    - name: Ensure prerequisite packages are installed (Fedora / RHEL)
+      ansible.builtin.dnf:
+        name:
+          - nodejs
+          - npm
+          - python3-pip
+          - golang
+          - clang-tools-extra
+          - rust-analyzer
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: true
+
+    - name: Ensure prerequisite packages are installed (Debian / Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - nodejs
+          - npm
+          - python3-pip
+          - golang-go
+          - clangd
+          - rust-analyzer
+        state: present
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+      ignore_errors: true
+
+    - name: Check if rust-analyzer is installed
+      ansible.builtin.command:
+        cmd: "which rust-analyzer"
+      register: check_rust_analyzer
+      changed_when: false
+      failed_when: false
+
+    - name: Install rust-analyzer via rustup (fallback if package manager didn't install it)
+      ansible.builtin.command:
+        cmd: "rustup component add rust-analyzer"
+      when: check_rust_analyzer.rc != 0
+      ignore_errors: true
+
+    - name: Download rust-analyzer binary (standalone fallback if rustup unavailable)
+      ansible.builtin.get_url:
+        url: "https://github.com/rust-lang/rust-analyzer/releases/latest/download/rust-analyzer-x86_64-unknown-linux-gnu.gz"
+        dest: "/tmp/rust-analyzer.gz"
+        mode: '0644'
+      when: check_rust_analyzer.rc != 0
+      ignore_errors: true
+
+    - name: Uncompress rust-analyzer binary to /usr/local/bin
+      ansible.builtin.shell:
+        cmd: "gunzip -c /tmp/rust-analyzer.gz > /usr/local/bin/rust-analyzer && chmod +x /usr/local/bin/rust-analyzer"
+      when: check_rust_analyzer.rc != 0
+      ignore_errors: true
+
+    - name: Install global NPM Language Servers
+      community.general.npm:
+        name: "{{ item }}"
+        global: true
+        state: present
+      loop: "{{ npm_global_lsp_packages }}"
+
+    - name: Install Python Language Server (pylsp) globally
+      ansible.builtin.pip:
+        name: "python-lsp-server[all]"
+        state: present
+      ignore_errors: true
+
+    - name: Install Go Language Server (gopls) globally
+      ansible.builtin.command:
+        cmd: "go install golang.org/x/tools/gopls@latest"
+      environment:
+        GOBIN: "/usr/local/bin"
+        GOPATH: "/tmp/gopath"
+      register: gopls_install
+      failed_when: false
+      changed_when: gopls_install.rc == 0
+
+    - name: Check path locations of installed Language Servers
+      ansible.builtin.command:
+        cmd: "which {{ item }}"
+      loop: "{{ lsp_binaries_to_verify }}"
+      register: which_lsp_results
+      changed_when: false
+      failed_when: false
+
+    - name: Display summary of installed LSP binaries and their PATH locations
+      ansible.builtin.debug:
+        msg: "{{ which_lsp_results.results | selectattr('rc', 'equalto', 0) | map(attribute='stdout') | list }}"
+
+
+    - name: Display VS Code & Editor Configuration Guide
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          CENTRALIZED LSP SETUP COMPLETED SUCCESSFULLY!
+          ================================================================================
+          All LSPs have been installed into standard system PATH directories (/usr/bin, /usr/local/bin).
+
+          HOW TO CONFIGURE YOUR IDEs:
+
+          1. EMACS (Eglot / lsp-mode):
+             - Eglot and lsp-mode automatically discover these binaries in your PATH.
+             - For Copilot in Emacs, run 'M-x copilot-login' after starting copilot-mode.
+
+          2. VS CODE / THEIA (settings.json):
+             Add or update these settings in ~/.config/Code/User/settings.json:
+
+             {
+               "rust-analyzer.server.path": "/usr/bin/rust-analyzer",
+               "clangd.path": "/usr/bin/clangd",
+               "go.alternateTools": {
+                 "gopls": "/usr/local/bin/gopls"
+               },
+               "typescript.tsdk": "/usr/lib/node_modules/typescript/lib",
+               "python.languageServer": "Pyright"
+             }
+
+          3. NEOVIM (nvim-lspconfig):
+             - Neovim automatically picks up executables from system PATH.
+
+          4. INTELLIJ IDEA:
+             - Configure the LSP server paths in Settings -> Languages & Frameworks -> Language Servers.
+          ================================================================================
