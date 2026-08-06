@@ -1,0 +1,99 @@
+---
+- name: Enable RPM Fusion Repositories and Install Multimedia Codecs on Fedora
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    - name: Enable RPM Fusion Free repository
+      ansible.builtin.dnf:
+        name: "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
+        state: present
+        disable_gpg_check: true
+
+    - name: Enable RPM Fusion Nonfree repository
+      ansible.builtin.dnf:
+        name: "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-{{ ansible_facts['distribution_major_version'] }}.noarch.rpm"
+        state: present
+        disable_gpg_check: true
+
+    # Fedora 41+ ships dnf5 (the "dnf" binary is a symlink to it), which replaced the
+    # dnf4 "groupupdate"/"swap -y ..." syntax with "group install"/"group upgrade" and
+    # requires global options (-y, --setopt, --exclude) to precede the subcommand.
+    # "group install" is used (not "upgrade") because it is idempotent whether or not
+    # the group was already marked installed -- e.g. "sound-and-video" isn't part of
+    # the default Xfce spin, so "group upgrade" fails with "No match for argument".
+    - name: Ensure the core group packages are present (pulls in RPM Fusion swaps)
+      ansible.builtin.command: dnf -y group install core
+      environment:
+        LC_ALL: C
+      register: groupinstall_core
+      changed_when: "'Nothing to do' not in groupinstall_core.stdout"
+
+    - name: Swap ffmpeg-free for full ffmpeg
+      ansible.builtin.command: dnf -y swap ffmpeg-free ffmpeg --allowerasing
+      environment:
+        LC_ALL: C
+      register: swap_ffmpeg
+      changed_when: "'Nothing to do' not in swap_ffmpeg.stdout"
+      failed_when:
+        - swap_ffmpeg.rc != 0
+        - "'Nothing to do' not in swap_ffmpeg.stdout"
+
+    - name: Ensure the multimedia group is installed with full-featured codecs
+      ansible.builtin.command: >
+        dnf -y --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+        group install multimedia
+      environment:
+        LC_ALL: C
+      register: groupinstall_multimedia
+      changed_when: "'Nothing to do' not in groupinstall_multimedia.stdout"
+
+    - name: Ensure the sound-and-video group is installed
+      ansible.builtin.command: dnf -y group install sound-and-video
+      environment:
+        LC_ALL: C
+      register: groupinstall_sound_video
+      changed_when: "'Nothing to do' not in groupinstall_sound_video.stdout"
+
+    - name: Install additional GStreamer plugins and codec libraries
+      ansible.builtin.dnf:
+        name:
+          - gstreamer1-plugins-base
+          - gstreamer1-plugins-good
+          - gstreamer1-plugins-good-extras
+          - gstreamer1-plugins-bad-free
+          - gstreamer1-plugins-bad-freeworld
+          - gstreamer1-plugins-ugly
+          - gstreamer1-libav
+          - lame
+        state: present
+
+    - name: Install hardware video acceleration drivers (Intel)
+      ansible.builtin.dnf:
+        name:
+          - intel-media-driver
+          - libva-intel-driver
+        state: present
+      when: "'GenuineIntel' in ansible_facts['processor']"
+
+    - name: Install hardware video acceleration drivers (AMD/Mesa)
+      ansible.builtin.dnf:
+        name:
+          - mesa-va-drivers-freeworld
+        state: present
+      when: "'AuthenticAMD' in ansible_facts['processor']"
+
+    - name: Show effective-changes notice
+      ansible.builtin.debug:
+        msg:
+          - "Repos and codec packages are active immediately (no logout/reboot needed) for apps you (re)launch from now on."
+          - "If an app was already running (e.g. a browser with a video open), restart it to pick up the new codecs/drivers."
+          - "A logout/login (or reboot) is the safest way to ensure hardware video acceleration (VA-API) is picked up cleanly, but it is not strictly mandatory."

@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+# Command wrapper for fzl-aider: runs aider within its dedicated virtual environment (~/.envs/aider)
+
+VENV_DIR="${HOME}/.envs/aider"
+if [ ! -d "$VENV_DIR" ]; then
+    VENV_DIR="{{ real_user_home }}/.envs/aider"
+fi
+
+if [ ! -f "${VENV_DIR}/bin/activate" ]; then
+    echo "Error: Virtual environment at ${VENV_DIR} not found." >&2
+    exit 1
+fi
+
+source "${VENV_DIR}/bin/activate"
+export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://localhost:11434}"
+
+DEFAULT_MODEL="{{ aider_default_model }}"
+DEFAULT_MODEL_NAME="${DEFAULT_MODEL#ollama/}"
+
+# Function to list available Ollama model tags
+list_ollama_models() {
+    if ! command -v ollama &>/dev/null; then
+        echo "Error: Ollama CLI is not installed or not in PATH." >&2
+        return 1
+    fi
+    ollama list 2>/dev/null | tail -n +2 | awk '{print $1}'
+}
+
+DO_SELECT=0
+DO_LIST=0
+ARGS=()
+
+for arg in "$@"; do
+    case "$arg" in
+        --select|-s|--choose)
+            DO_SELECT=1
+            ;;
+        --list-models|-l)
+            DO_LIST=1
+            ;;
+        *)
+            ARGS+=("$arg")
+            ;;
+    esac
+done
+
+if [ $DO_LIST -eq 1 ]; then
+    echo "Installed local Ollama models:"
+    if command -v ollama &>/dev/null; then
+        ollama list
+    else
+        echo "Ollama CLI not found."
+    fi
+    exit 0
+fi
+
+SELECTED_MODEL=""
+if [ $DO_SELECT -eq 1 ]; then
+{% raw %}
+    mapfile -t models < <(list_ollama_models)
+    num_models=${#models[@]}
+    if [ $num_models -eq 0 ]; then
+        echo "No local Ollama models found via 'ollama list'." >&2
+        echo "Using default model: $DEFAULT_MODEL" >&2
+        SELECTED_MODEL="$DEFAULT_MODEL"
+    else
+        default_idx=1
+        for i in "${!models[@]}"; do
+            if [ "${models[$i]}" == "$DEFAULT_MODEL_NAME" ]; then
+                default_idx=$((i+1))
+                break
+            fi
+        done
+
+        echo "Available local Ollama models:"
+        for i in "${!models[@]}"; do
+            printf "  %2d) %s\n" "$((i+1))" "${models[$i]}"
+        done
+        read -r -p "Select a model number [1-${num_models}] (default ${default_idx} - ${DEFAULT_MODEL_NAME}): " choice
+        choice=${choice:-$default_idx}
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "$num_models" ]; then
+            idx=$((choice-1))
+            SELECTED_MODEL="ollama/${models[$idx]}"
+            echo "Selected model: $SELECTED_MODEL"
+        else
+            echo "Invalid selection. Defaulting to ${DEFAULT_MODEL}."
+            SELECTED_MODEL="$DEFAULT_MODEL"
+        fi
+    fi
+{% endraw %}
+fi
+
+HAS_MODEL=0
+for arg in "${ARGS[@]}"; do
+    if [[ "$arg" == "--model" ]] || [[ "$arg" == --model=* ]]; then
+        HAS_MODEL=1
+        break
+    fi
+done
+
+if [ -n "$SELECTED_MODEL" ]; then
+    exec "${VENV_DIR}/bin/aider" --model "$SELECTED_MODEL" "${ARGS[@]}"
+elif [ $HAS_MODEL -eq 0 ]; then
+    exec "${VENV_DIR}/bin/aider" --model "$DEFAULT_MODEL" "${ARGS[@]}"
+else
+    exec "${VENV_DIR}/bin/aider" "${ARGS[@]}"
+fi
