@@ -1,0 +1,102 @@
+#+TITLE: Guia de Uso e Automação: MetaTrader 5 (MT5) no Fedora Linux (BTG Pactual)
+#+AUTHOR: Gemini CLI
+#+DATE: [2026-08-09 Sun]
+
+* Introdução
+Este documento fornece um guia completo de utilização e automação do *MetaTrader 5 (MT5)* no *Fedora Linux*, configurado para operar ativos da B3 (Ações, Mini-Índice WIN e Mini-Dólar WDO) via *BTG Pactual*.
+
+O MetaTrader 5 é a plataforma líder global para negociação algorítmica e robôs investidores. No Linux, o MT5 possui excelente compatibilidade via Wine e desempenho significativamente superior a plataformas emuladas.
+
+* Instalação via Playbook Ansible
+A instalação do ambiente Wine, dependências do Fedora, instalador oficial e atalhos de sistema é realizada de forma 100% automatizada pelo playbook do projeto.
+
+** Comando de Execução
+#+begin_src bash
+ansible-playbook playbooks/fin-trader-metatrader5.yml -K
+#+end_src
+
+** O que o Playbook configura
+1. Instala os pacotes do sistema: =wine=, =winetricks=, =cabextract=, =fontconfig=, =freetype=, =vulkan-loader= e dependências gráficas.
+2. Cria o prefixo Wine 64-bit em =~/.local/share/wineprefixes/metatrader5=.
+3. Configura fontes essenciais (=corefonts=) e ambiente Windows 10.
+4. Baixa e instala o executável oficial do MetaTrader 5.
+5. Gera o script executável =~/.local/bin/metatrader5= e o atalho no menu de aplicativos (=fin-trader-metatrader5.desktop=).
+
+* Como Conectar à sua Conta do BTG Pactual
+
+** Passo a Passo no MT5
+1. Inicie a aplicação via menu de aplicativos ou pelo terminal com =metatrader5=.
+2. No menu superior, acesse: *Arquivo -> Abrir uma Conta*.
+3. Na caixa de busca de corretoras, digite *BTG Pactual* e clique em *Encontrar sua empresa*.
+4. Selecione a opção *BTG Pactual Corretora de Câmbio, Títulos e Valores Mobiliários S.A.* e avance.
+5. Selecione a opção *Conectar a uma conta de negociação existente*:
+   - *Login*: Seu número de conta MT5 fornecido pelo BTG.
+   - *Senha*: Sua senha de negociação MT5 cadastrada no portal do BTG.
+   - *Servidor*: Selecione =BTGPactual-Live= (para conta real) ou =BTGPactual-Demo= (para simulador).
+6. Clique em *Concluir*.
+
+* Automação de Operações (Robôs / Expert Advisors - EAs)
+
+** 1. Instalação de Robôs (.ex5 / .mq5)
+Para instalar robôs ou indicadores customizados no MT5 rodando no Fedora:
+
+1. No MT5, vá em *Arquivo -> Abrir Pasta de Dados*.
+2. Navegue até o diretório =MQL5/Experts/= (para robôs) ou =MQL5/Indicators/= (para indicadores).
+3. Cole os arquivos do robô (=.ex5= ou =.mq5=) dentro dessa pasta.
+4. Volte ao MT5, clique com o botão direito na janela *Navegador -> Robôs* e selecione *Atualizar*.
+
+** 2. Testador de Estratégias (Backtesting Multi-Core no Linux)
+O MT5 possui o motor de backtest mais poderoso do mercado:
+- Pressione =Ctrl + R= para abrir o *Testador de Estratégias*.
+- Escolha o robô, o ativo (ex: =WINZ26= ou =WDOR26=) e o período.
+- Selecione a modelagem *Cada tick baseado em ticks reais*.
+- Ative a *Otimização Genética*: O MT5 utilizará todos os núcleos da sua CPU Fedora em paralelo para otimizar os parâmetros do robô.
+
+** 3. Automação via Python no Linux
+Você pode controlar ordens e receber dados de cotação do MT5 usando scripts em Python.
+
+#+begin_src bash
+# Instalação do módulo Python (caso utilize ambiente Windows/Wine ou servidor de sockets)
+pip install MetaTrader5
+#+end_src
+
+Exemplo básico em Python para checar a versão e conexão:
+#+begin_src python
+import MetaTrader5 as mt5
+
+if not mt5.initialize():
+    print("Falha ao inicializar o MetaTrader 5, erro:", mt5.last_error())
+else:
+    print("Versão do MT5:", mt5.version())
+    account_info = mt5.account_info()
+    if account_info:
+        print(f"Conta: {account_info.login} | Saldo: R$ {account_info.balance}")
+    mt5.shutdown()
+#+end_src
+
+* Estrutura de Arquivos e Diretórios no Linux
+
+- *Prefixo Wine*: =~/.local/share/wineprefixes/metatrader5=
+- *Pasta MQL5 do Usuário*: =~/.local/share/wineprefixes/metatrader5/drive_c/users/$USER/AppData/Roaming/MetaQuotes/Terminal/=&lt;ID_TERMINAL&gt;=/MQL5=
+- *Executável Launcher*: =~/.local/bin/metatrader5=
+- *Atalho de Área de Trabalho*: =~/.local/share/applications/fin-trader-metatrader5.desktop=
+
+* Solução de Problemas (Troubleshooting)
+
+** Ajuste de Escala / Fontes Pequenas (Monitores HiDPI / 4K)
+Caso a interface do MT5 apareça com fontes muito pequenas no seu monitor Fedora:
+#+begin_src bash
+WINEPREFIX="$HOME/.local/share/wineprefixes/metatrader5" winecfg
+#+end_src
+Na aba *Graphics* (Gráficos), ajuste a *Screen resolution* (DPI) de 96 para 120 ou 144 DPI e confirme.
+
+** Logs de Erro do Wine
+Para investigar eventuais problemas na execução do MT5 via terminal, ative o debug do Wine:
+#+begin_src bash
+WINEPREFIX="$HOME/.local/share/wineprefixes/metatrader5" WINEDEBUG="+err,+warn" wine "$HOME/.local/share/wineprefixes/metatrader5/drive_c/Program Files/MetaTrader 5/terminal64.exe"
+#+end_src
+
+* Referências
+- [[file:../playbooks/fin-trader-metatrader5.yml][Playbook Ansible fin-trader-metatrader5.yml]]
+- [[https://www.mql5.com][Documentação Oficial MQL5]]
+- [[https://www.btgpactual.com][BTG Pactual Investimentos]]

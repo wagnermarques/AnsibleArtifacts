@@ -117,6 +117,77 @@ Emacs (`eglot` or `lsp-mode`) automatically finds these executables on your syst
 | **gopls** | LSP | [gopls Documentation](https://github.com/golang/tools/blob/master/gopls/README.md) |
 | **clangd** | LSP | [clangd Documentation](https://clangd.llvm.org/) |
 
+### 11. Setup Fonts & Nerd Fonts for Fedora Desktop and Emacs Treemacs
+Installs common system fonts (`fira-code-fonts`, `jetbrains-mono-fonts`, `cascadia-fonts-all`, `liberation-fonts`, `google-noto-sans-fonts`, `google-noto-emoji-color-fonts`, `fontawesome-fonts`) and Nerd Fonts (`FiraCode`, `JetBrainsMono`, `CascadiaCode`, `NerdFontsSymbolsOnly`, `Hack`) plus `all-the-icons` for Emacs Treemacs.
+
+```bash
+ansible-playbook playbooks/desktop-fedora-postinstall-fonts-setup.yml --ask-become-pass
+```
+
+#### Configuring Emacs Treemacs with Nerd Icons
+To use Nerd Font icons in Emacs Treemacs, add to your `init.el` or `.emacs`:
+
+```elisp
+(use-package treemacs-nerd-icons
+  :ensure t
+  :config
+  (treemacs-load-theme "nerd-icons"))
+```
+
+### 12. Setup Docker & Docker Compose
+Installs Docker Engine (`docker-ce`), Docker CLI, containerd, `docker-buildx-plugin`, and `docker-compose-plugin` (`docker compose`), and adds your user to the `docker` group.
+
+```bash
+ansible-playbook playbooks/devmachine-docker-setup.yml --ask-become-pass
+```
+
+### 13. Classroom Tutorial & Screenshot Automation Suite (Linux Alternative to Folge)
+Installs `flameshot`, `ksnip`, `screenkey`, `gromit-mpx`, and an automated click-triggered screenshot capture utility (`fzl-auto-screenshot`) for generating step-by-step documentation.
+
+```bash
+ansible-playbook playbooks/classrooms-tools-folge-setup.yml --ask-become-pass
+```
+
+#### Guia de Uso: Captura Automática de Screenshots (`fzl-auto-screenshot`)
+
+O `fzl-auto-screenshot` é um utilitário de código aberto que captura screenshots automaticamente a cada clique do mouse (botão esquerdo), ideal para criar tutoriais passo a passo (ex: criação de projetos no Android Studio).
+
+##### Passo a passo para utilização:
+
+1. **Iniciar a captura**:
+   Abra o terminal e execute:
+   ```bash
+   fzl-auto-screenshot
+   ```
+   *(Você também pode iniciar pelo menu de aplicativos procurando por **"FZL Auto Screenshot Capture"**).*
+
+2. **Executar as ações do tutorial**:
+   - Abra a aplicação que deseja documentar (ex: Android Studio).
+   - Clique normalmente nos botões e menus do processo. A cada clique, o script salvará uma imagem (`step_001_...png`, `step_002_...png`).
+   - Todas as capturas são salvas na pasta: `~/Pictures/Tutorial_Screenshots/`.
+
+3. **Encerrar a captura**:
+   - No terminal onde o script foi iniciado, pressione `Ctrl + C`.
+
+4. **Ferramentas complementares**:
+   - **`flameshot gui`**: Para adicionar setas, textos, números e desfoque nas imagens.
+   - **`screenkey`**: Para exibir atalhos de teclado e cliques em tempo real sobre a tela.
+   - **`gromit-mpx`**: Pressione `F9` para desenhar diretamente sobre a tela durante apresentações ou videoaulas.
+
+### 14. MetaTrader 5 (MT5) Trading Platform Setup for Fedora Linux
+Installs MetaTrader 5 via Wine 64-bit with all required system dependencies, creates a desktop launcher, and provides full compatibility for algorithmic trading and BTG Pactual B3 broker integration.
+
+```bash
+ansible-playbook playbooks/fin-trader-metatrader5.yml --ask-become-pass
+```
+
+For detailed setup instructions, broker connection steps, and Python/EA automation guides, see [docs/fin-trader-metatrader5-usage.org](file:///home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/docs/fin-trader-metatrader5-usage.org).
+
+
+
+
+
+
 
 
 

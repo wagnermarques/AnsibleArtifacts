@@ -23,3 +23,7 @@ Documentation on playbooks designed for managing cloud infrastructure on Microso
 
 ** [[file:fix_windows_network.org][Windows 11 vs Docker Network Fix]]
 A technical guide explaining and resolving network routing/internet connectivity conflicts between Libvirt (Virt-manager VMs) and Docker on Fedora host machines.
+
+** [[file:fin-trader-metatrader5-usage.org][MetaTrader 5 (MT5) Setup & Trading Automation Guide (BTG Pactual / Fedora Linux)]]
+A comprehensive guide for installing MetaTrader 5 on Fedora Linux via Wine, connecting to BTG Pactual brokers, and running automated Expert Advisors (EAs) and Python scripts.
+

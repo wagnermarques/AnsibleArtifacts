@@ -1,0 +1,132 @@
+---
+- name: Setup Classroom Tutorial & Screenshot Automation Suite (Linux Alternative to Folge)
+  hosts: devmachines_workstations
+  become: true
+
+  tasks:
+    - name: Display Folge Linux Availability Note
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          NOTE: 'Folge' is a Windows/macOS-only proprietary app with no native Linux build.
+          This playbook installs the Linux Classroom Tutorial Suite:
+            1. Flameshot - Quick screen capture & in-app step annotations (arrows/blur)
+            2. Ksnip - Advanced step numbering and tutorial annotations
+            3. Screenkey - Live on-screen keypress & mouse click visualizer
+            4. Gromit-MPX - On-screen live drawing tool during tutorials
+            5. fzl-auto-screenshot - CLI tool for automatic screenshot on every click!
+          ================================================================================
+
+    - name: Install Tutorial Suite packages (Fedora / RHEL)
+      ansible.builtin.dnf:
+        name:
+          - flameshot
+          - ksnip
+          - screenkey
+          - gromit-mpx
+          - python3-pip
+          - python3-pillow
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: true
+
+    - name: Install Tutorial Suite packages (Debian / Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - flameshot
+          - ksnip
+          - screenkey
+          - gromit-mpx
+          - python3-pip
+          - python3-pil
+        state: present
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+      ignore_errors: true
+
+    - name: Install pynput Python library for click listening
+      ansible.builtin.pip:
+        name: pynput
+        state: present
+      ignore_errors: true
+
+
+    - name: Install fzl-auto-screenshot script into /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-auto-screenshot"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env python3
+          """
+          FZL Automatic Click Screenshot Tool (Folge alternative for Linux)
+          Captures a screenshot automatically on every left mouse click into ~/Pictures/Tutorial_Screenshots/
+          """
+          import os
+          import sys
+          from datetime import datetime
+          try:
+              from pynput import mouse
+              from PIL import ImageGrab
+          except ImportError:
+              print("Error: Missing required Python packages (pynput, PIL).")
+              print("Install via system package manager or: pip install pynput pillow")
+              sys.exit(1)
+
+          save_dir = os.path.expanduser("~/Pictures/Tutorial_Screenshots")
+          os.makedirs(save_dir, exist_ok=True)
+          step_count = 0
+
+          def on_click(x, y, button, pressed):
+              global step_count
+              if not pressed and button == mouse.Button.left:
+                  step_count += 1
+                  timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                  filename = os.path.join(save_dir, f"step_{step_count:03d}_{timestamp}.png")
+                  try:
+                      img = ImageGrab.grab()
+                      img.save(filename)
+                      print(f"[Step {step_count}] Saved screenshot: {filename} (Click at {x}, {y})")
+                  except Exception as e:
+                      print(f"Failed to capture screenshot: {e}")
+
+          print("=========================================================================")
+          print("FZL AUTO-SCREENSHOT CAPTURE ACTIVE (Folge Linux Alternative)")
+          print(f"Saving step-by-step screenshots to: {save_dir}")
+          print("Click anywhere in your apps (e.g. Android Studio) to capture steps.")
+          print("Press Ctrl+C in this terminal to STOP recording.")
+          print("=========================================================================")
+
+          try:
+              with mouse.Listener(on_click=on_click) as listener:
+                  listener.join()
+          except KeyboardInterrupt:
+              print(f"\nAuto-capture stopped. Total steps captured: {step_count}")
+
+    - name: Create Desktop Launcher for fzl-auto-screenshot
+      ansible.builtin.copy:
+        dest: "/usr/share/applications/fzl-auto-screenshot.desktop"
+        mode: '0644'
+        content: |
+          [Desktop Entry]
+          Name=FZL Auto Screenshot Capture
+          Comment=Automatic click-triggered screenshot recorder for tutorials
+          Exec=gnome-terminal -- /usr/local/bin/fzl-auto-screenshot
+          Icon=camera-photo
+          Terminal=false
+          Type=Application
+          Categories=Development;Utility;Documentation;
+
+    - name: Display Completion Summary & Instructions
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          CLASSROOM TUTORIAL SUITE SETUP COMPLETED SUCCESSFULLY!
+          ================================================================================
+          Installed Tools:
+            - Flameshot: Run 'flameshot gui' for fast step capture and callouts.
+            - Ksnip: Run 'ksnip' for step numbering & advanced annotations.
+            - Screenkey: Run 'screenkey' to show keypresses and mouse clicks on screen.
+            - Gromit-MPX: Run 'gromit-mpx' (Press F9) to draw live annotations on screen.
+            - fzl-auto-screenshot: Type 'fzl-auto-screenshot' in terminal to start
+              automatic click-triggered step recording into ~/Pictures/Tutorial_Screenshots/.
+          ================================================================================

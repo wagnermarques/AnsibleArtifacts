@@ -1,0 +1,39 @@
+---
+- name: Install Docker Engine and Docker Compose
+  hosts: devmachines_workstations
+  become: true
+  gather_facts: true
+
+  roles:
+    - docker
+
+  tasks:
+    - name: Verify Docker installation
+      ansible.builtin.command:
+        cmd: "docker --version"
+      register: docker_version_output
+      changed_when: false
+      failed_when: false
+
+    - name: Verify Docker Compose installation
+      ansible.builtin.command:
+        cmd: "docker compose version"
+      register: compose_version_output
+      changed_when: false
+      failed_when: false
+
+    - name: Display Docker & Docker Compose installation summary
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          DOCKER & DOCKER COMPOSE SETUP COMPLETED SUCCESSFULLY!
+          ================================================================================
+          Engine Version:  {{ docker_version_output.stdout | default('Not found') }}
+          Compose Version: {{ compose_version_output.stdout | default('Not found') }}
+
+          USER GROUP INSTRUCTIONS:
+          Your user has been added to the 'docker' group.
+          To run docker commands without sudo in your current session, run:
+            newgrp docker
+          (or log out and log back in to refresh group memberships).
+          ================================================================================

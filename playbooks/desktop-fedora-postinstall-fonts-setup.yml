@@ -1,0 +1,151 @@
+---
+- name: Setup System Fonts & Nerd Fonts for Fedora Desktop and Emacs Treemacs
+  hosts: devmachines_workstations
+  become: false
+  vars:
+    nerd_fonts_version: "v3.2.1"
+    nerd_fonts_to_install:
+      - FiraCode
+      - JetBrainsMono
+      - CascadiaCode
+      - NerdFontsSymbolsOnly
+      - Hack
+    
+    fedora_font_packages:
+      - fira-code-fonts
+      - jetbrains-mono-fonts
+      - cascadia-fonts-all
+      - liberation-fonts
+      - google-noto-sans-fonts
+      - google-noto-serif-fonts
+      - google-noto-emoji-color-fonts
+      - fontawesome-fonts
+      - dejavu-sans-fonts
+      - rsms-inter-fonts
+
+
+  tasks:
+    - name: Ensure DNF font packages are installed (Fedora / RHEL)
+      ansible.builtin.dnf:
+        name: "{{ fedora_font_packages }}"
+        state: present
+      become: true
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: true
+
+    - name: Ensure APT font packages are installed (Debian / Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - fonts-firacode
+          - fonts-jetbrains-mono
+          - fonts-cascadia-code
+          - fonts-liberation
+          - fonts-noto-core
+          - fonts-noto-color-emoji
+          - fonts-font-awesome
+          - fonts-dejavu
+        state: present
+        update_cache: yes
+      become: true
+      when: ansible_facts['os_family'] == "Debian"
+      ignore_errors: true
+
+    - name: Ensure user local font directory exists (~/.local/share/fonts)
+      ansible.builtin.file:
+        path: "{{ ansible_facts['env']['HOME'] }}/.local/share/fonts"
+        state: directory
+        mode: '0755'
+
+    - name: Ensure unzip is installed
+      ansible.builtin.package:
+        name: unzip
+        state: present
+      become: true
+      ignore_errors: true
+
+    - name: Create temporary directory for Nerd Fonts download
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: nerd_fonts
+      register: font_temp_dir
+
+    - name: Download Nerd Fonts archives
+      ansible.builtin.get_url:
+        url: "https://github.com/ryanoasis/nerd-fonts/releases/download/{{ nerd_fonts_version }}/{{ item }}.zip"
+        dest: "{{ font_temp_dir.path }}/{{ item }}.zip"
+        mode: '0644'
+      loop: "{{ nerd_fonts_to_install }}"
+      ignore_errors: true
+
+    - name: Unarchive downloaded Nerd Fonts into ~/.local/share/fonts
+      ansible.builtin.unarchive:
+        src: "{{ font_temp_dir.path }}/{{ item }}.zip"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/fonts"
+        remote_src: yes
+      loop: "{{ nerd_fonts_to_install }}"
+      ignore_errors: true
+
+    - name: Download all-the-icons font files for Emacs
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/domtronn/all-the-icons.el/master/fonts/{{ item }}"
+        dest: "{{ ansible_facts['env']['HOME'] }}/.local/share/fonts/{{ item }}"
+        mode: '0644'
+      loop:
+        - all-the-icons.ttf
+        - file-icons.ttf
+        - fontawesome.ttf
+        - material-design-icons.ttf
+        - octicons.ttf
+        - weathericons.ttf
+      ignore_errors: true
+
+    - name: Cleanup temporary directory
+      ansible.builtin.file:
+        path: "{{ font_temp_dir.path }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Update system font cache
+      ansible.builtin.command:
+        cmd: "fc-cache -f -v"
+      changed_when: true
+
+    - name: Display Emacs Treemacs & Font Configuration Instructions
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          FONTS & NERD FONTS INSTALLATION COMPLETED SUCCESSFULLY!
+          ================================================================================
+          The following font families were installed in system RPMs and ~/.local/share/fonts:
+            - FiraCode Nerd Font
+            - JetBrainsMono Nerd Font
+            - CascadiaCode (CaskaydiaCove) Nerd Font
+            - Symbols Nerd Font (NerdFontsSymbolsOnly)
+            - Hack Nerd Font
+            - all-the-icons (Octicons, Material Icons, FontAwesome, File Icons, Weather Icons)
+
+          HOW TO CONFIGURE EMACS & TREEMACS:
+
+          1. TREEMACS WITH NERD ICONS:
+             Install the package 'treemacs-nerd-icons' in Emacs:
+               (use-package treemacs-nerd-icons
+                 :ensure t
+                 :config
+                 (treemacs-load-theme "nerd-icons"))
+
+          2. TREEMACS WITH ALL-THE-ICONS:
+             Install the package 'treemacs-all-the-icons' in Emacs:
+               (use-package treemacs-all-the-icons
+                 :ensure t
+                 :config
+                 (treemacs-load-theme "all-the-icons"))
+
+          3. SETTING DEFAULT EDITOR FONT IN EMACS:
+             Add one of the following lines to your ~/.emacs or init.el:
+               (set-frame-font "FiraCode Nerd Font-11" nil t)
+               ;; OR
+               (set-frame-font "JetBrainsMono Nerd Font-11" nil t)
+
+          4. VERIFYING INSTALLED FONTS IN TERMINAL:
+             Run 'fc-list : family | grep -i "Nerd"' to verify installed Nerd Fonts.
+          ================================================================================

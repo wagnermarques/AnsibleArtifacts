@@ -1,0 +1,191 @@
+---
+- name: Setup MetaTrader 5 (MT5) via Wine on Fedora Linux
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    # Identifica o usuário não-root real (ex: wgn) para instalar os arquivos no home correto
+    target_user: "{{ ansible_env.SUDO_USER | default(ansible_env.USER | default(ansible_user_id)) }}"
+    target_user_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_user_dir }}"
+    wine_prefix_dir: "{{ target_user_home }}/.local/share/wineprefixes/metatrader5"
+    bin_dir: "{{ target_user_home }}/.local/bin"
+    desktop_entry_dir: "{{ target_user_home }}/.local/share/applications"
+    downloads_dir: "{{ target_user_home }}/Downloads"
+    mt5_installer_url: "https://download.mql5.com/cdn/web/metaquotes.software.corp/mt5/mt5setup.exe"
+    mt5_installer_path: "{{ target_user_home }}/Downloads/mt5setup.exe"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. VERIFICAÇÃO DO SISTEMA OPERACIONAL
+    # ----------------------------------------------------
+    - name: Verificar se o sistema é Fedora / RedHat
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+        fail_msg: "Este playbook foi otimizado para Fedora / RHEL. Seu SO é {{ ansible_facts['distribution'] }}."
+
+    # ----------------------------------------------------
+    # 2. INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA COMO ROOT
+    # ----------------------------------------------------
+    - name: Instalar Wine, Winetricks e pacotes gráficos no Fedora
+      ansible.builtin.dnf:
+        name:
+          - wine
+          - winetricks
+          - cabextract
+          - zenity
+          - p7zip
+          - p7zip-plugins
+          - freetype
+          - fontconfig
+          - gnutls
+          - wget
+          - curl
+          - flatpak
+          - mesa-dri-drivers
+          - vulkan-loader
+        state: present
+      become: true
+
+    # ----------------------------------------------------
+    # 3. PREPARAÇÃO DO AMBIENTE E PASTA DO USUÁRIO
+    # ----------------------------------------------------
+    - name: Garantir que os diretórios de usuário existem no home do usuário
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0755'
+      loop:
+        - "{{ bin_dir }}"
+        - "{{ desktop_entry_dir }}"
+        - "{{ downloads_dir }}"
+        - "{{ wine_prefix_dir }}"
+      become: true
+
+    - name: Inicializar Prefixo Wine 64-bit para MetaTrader 5 como usuário regular
+      ansible.builtin.command:
+        cmd: wineboot --init
+      environment:
+        WINEPREFIX: "{{ wine_prefix_dir }}"
+        WINEARCH: "win64"
+        DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"
+      become: true
+      become_user: "{{ target_user }}"
+      args:
+        creates: "{{ wine_prefix_dir }}/system.reg"
+
+    - name: Configurar Wine para Windows 10 e instalar fontes essenciais
+      ansible.builtin.command:
+        cmd: "winetricks -q {{ item }}"
+      environment:
+        WINEPREFIX: "{{ wine_prefix_dir }}"
+        DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"
+      become: true
+      become_user: "{{ target_user }}"
+      loop:
+        - win10
+        - corefonts
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 4. DOWNLOAD E INSTALAÇÃO DO METATRADER 5
+    # ----------------------------------------------------
+    - name: Baixar o instalador oficial do MetaTrader 5 (mt5setup.exe)
+      ansible.builtin.get_url:
+        url: "{{ mt5_installer_url }}"
+        dest: "{{ mt5_installer_path }}"
+        mode: '0755'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        force: no
+      become: true
+
+    - name: Executar o instalador do MetaTrader 5 via Wine
+      ansible.builtin.command:
+        cmd: "wine {{ mt5_installer_path }}"
+      environment:
+        WINEPREFIX: "{{ wine_prefix_dir }}"
+        WINEARCH: "win64"
+        WINEDEBUG: "-all"
+        DISPLAY: "{{ ansible_env.DISPLAY | default(':0') }}"
+      become: true
+      become_user: "{{ target_user }}"
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 5. CRIAÇÃO DE ATALHOS E LAUNCHERS NO FEDORA
+    # ----------------------------------------------------
+    - name: Criar script executável de inicialização do MetaTrader 5
+      ansible.builtin.copy:
+        dest: "{{ bin_dir }}/metatrader5"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # Launcher para MetaTrader 5 no Fedora Linux via Wine
+          export WINEPREFIX="{{ wine_prefix_dir }}"
+          export WINEARCH="win64"
+          export WINEDEBUG="-all"
+          export STAGING_SHARED_MEMORY=1
+          export MESA_GL_THREAD=true
+
+          # Busca o executável terminal64.exe do MT5 dentro do prefixo Wine
+          MT5_EXE=$(find "{{ wine_prefix_dir }}/drive_c" -iname "terminal64.exe" 2>/dev/null | head -n 1)
+
+          if [ -n "$MT5_EXE" ]; then
+              echo "Iniciando MetaTrader 5..."
+              wine "$MT5_EXE" "$@"
+          else
+              echo "Executável 'terminal64.exe' do MT5 não encontrado em {{ wine_prefix_dir }}."
+              echo "Executando o instalador..."
+              wine "{{ mt5_installer_path }}"
+          fi
+      become: true
+
+    - name: Criar atalho Desktop (.desktop) para o MetaTrader 5
+      ansible.builtin.copy:
+        dest: "{{ desktop_entry_dir }}/fin-trader-metatrader5.desktop"
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=MetaTrader 5
+          GenericName=Algorithmic Trading Platform
+          Comment=Plataforma MetaTrader 5 para B3 e BTG Pactual via Wine
+          Exec={{ bin_dir }}/metatrader5
+          Terminal=false
+          Categories=Office;Finance;Network;Development;
+          StartupNotify=true
+      become: true
+
+    # ----------------------------------------------------
+    # 6. MENSAGEM FINAL
+    # ----------------------------------------------------
+    - name: Exibir instruções finais do MetaTrader 5
+      ansible.builtin.debug:
+        msg:
+          - "========================================================================"
+          - "  INSTALAÇÃO E CONFIGURAÇÃO DO METATRADER 5 CONCLUÍDA COM SUCESSO!"
+          - "========================================================================"
+          - "  Instalado no usuário: {{ target_user }}"
+          - "  Pasta Home: {{ target_user_home }}"
+          - ""
+          - "1. COMO INICIAR O METATRADER 5:"
+          - "   - Procure por 'MetaTrader 5' no menu de aplicativos do Fedora."
+          - "   - Ou execute no terminal: metatrader5 (ou ~/.local/bin/metatrader5)"
+          - ""
+          - "2. COMO CONECTAR À SUA CONTA DO BTG PACTUAL:"
+          - "   - No MT5, vá em Arquivo -> Abrir uma Conta."
+          - "   - Busque pela corretora 'BTG Pactual'."
+          - "   - Selecione o servidor da sua conta (ex: BTGPactual-Live ou BTGPactual-Demo)."
+          - ""
+          - "3. DOCUMENTAÇÃO ADICIONAL:"
+          - "   - Consulte docs/fin-trader-metatrader5-usage.org"
+          - "========================================================================"
