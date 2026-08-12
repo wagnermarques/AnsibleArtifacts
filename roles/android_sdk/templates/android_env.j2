@@ -6,5 +6,7 @@ export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin"
 export PATH="$PATH:$ANDROID_HOME/platform-tools"
 export PATH="$PATH:$ANDROID_HOME/emulator"
 
-# Alias for starting Android Studio
-alias fzl-android-studio-start='nohup {{ android_studio_dir }}/bin/studio.sh > /dev/null 2>&1 &'
+# Alias for starting Android Studio and viewing logs
+alias fzl-android-studio-start='mkdir -p ~/.cache/android-studio && nohup {{ android_studio_dir }}/bin/studio.sh > ~/.cache/android-studio/studio.log 2>&1 &'
+alias fzl-android-studio-logs='tail -f ~/.cache/android-studio/studio.log'
+

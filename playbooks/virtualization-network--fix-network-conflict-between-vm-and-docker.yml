@@ -1,0 +1,56 @@
+---
+- name: Fix Network Conflict between VM (Virt-manager) and Docker
+  hosts: devmachines_workstations
+  become: yes
+  tasks:
+    # --- Firewalld configuration (Fedora / RedHat) ---
+    - name: Ensure masquerade is enabled in firewalld libvirt zone
+      ansible.posix.firewalld:
+        zone: libvirt
+        masquerade: yes
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: yes
+
+    - name: Enable forward on firewalld libvirt zone
+      command: firewall-cmd --zone=libvirt --add-forward --permanent
+      register: firewall_forward_cmd
+      changed_when: "'ALREADY_ENABLED' not in firewall_forward_cmd.stderr"
+      failed_when: false
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: Reload firewalld if forward rule was added
+      command: firewall-cmd --reload
+      when:
+        - ansible_facts['os_family'] == "RedHat"
+        - firewall_forward_cmd is changed
+
+    # --- Docker network coexistence via DOCKER-USER chain ---
+    - name: Check if DOCKER-USER iptables chain exists
+      command: iptables -L DOCKER-USER -n
+      register: docker_user_chain_check
+      changed_when: false
+      failed_when: false
+
+    - name: Allow Libvirt incoming traffic in DOCKER-USER chain
+      iptables:
+        chain: DOCKER-USER
+        in_interface: virbr0
+        jump: ACCEPT
+        action: insert
+        rule_num: 1
+        state: present
+      when: docker_user_chain_check.rc == 0
+
+    - name: Allow Libvirt outgoing traffic in DOCKER-USER chain
+      iptables:
+        chain: DOCKER-USER
+        out_interface: virbr0
+        jump: ACCEPT
+        action: insert
+        rule_num: 1
+        state: present
+      when: docker_user_chain_check.rc == 0
+

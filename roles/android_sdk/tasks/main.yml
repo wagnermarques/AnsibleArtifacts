@@ -66,3 +66,14 @@
   loop: "{{ android_sdk_packages }}"
   changed_when: true
   register: sdkmanager_install
+
+- name: Ensure recursive ownership of Android SDK and Studio directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ android_tools_owner }}"
+    group: "{{ android_tools_owner }}"
+    recurse: yes
+  loop:
+    - "{{ android_sdk_dir }}"
+    - "{{ android_studio_dir }}"
+

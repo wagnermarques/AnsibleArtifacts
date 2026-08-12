@@ -20,7 +20,7 @@
 
 - name: Add ~/.local/bin to PATH in .bashrc
   ansible.builtin.lineinfile:
-    path: "{{ ansible_env.HOME }}/.bashrc"
+    path: "{{ android_cli_user_home }}/.bashrc"
     line: 'export PATH="$HOME/.local/bin:$PATH"'
     regexp: '^\s*export PATH="\$HOME/\.local/bin:\$PATH"'
     state: present

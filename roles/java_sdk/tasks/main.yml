@@ -4,8 +4,8 @@
     path: "{{ progsativos_dir }}"
     state: directory
     mode: '0755'
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
+    owner: "{{ java_target_user }}"
+    group: "{{ java_target_user }}"
   become: yes
 
 - name: Ensure Java parent installation directory exists
@@ -13,8 +13,8 @@
     path: "{{ java_install_parent_dir }}"
     state: directory
     mode: '0755'
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
+    owner: "{{ java_target_user }}"
+    group: "{{ java_target_user }}"
   become: yes
 
 - name: Download and extract Temurin JDK
@@ -23,8 +23,8 @@
     dest: "{{ java_install_parent_dir }}"
     remote_src: yes
     creates: "{{ java_install_dir }}"
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
+    owner: "{{ java_target_user }}"
+    group: "{{ java_target_user }}"
 
 - name: Set facts for Java binaries
   ansible.builtin.set_fact:
@@ -32,25 +32,25 @@
     javac_bin: "{{ java_install_dir }}/bin/javac"
     jar_bin: "{{ java_install_dir }}/bin/jar"
 
-- name: Register binaries with update-alternatives
-  ansible.builtin.command:
-    command: "update-alternatives --install /usr/bin/{{ item.name }} {{ item.name }} {{ item.path }} 100"
-  loop:
-    - { name: 'java', path: "{{ java_bin }}" }
-    - { name: 'javac', path: "{{ javac_bin }}" }
-    - { name: 'jar', path: "{{ jar_bin }}" }
+- name: Register and select java alternative
+  community.general.alternatives:
+    name: java
+    link: /usr/bin/java
+    path: "{{ java_bin }}"
+    priority: 100
   become: yes
-  changed_when: false
 
-- name: Set default alternatives
-  ansible.builtin.command:
-    command: "update-alternatives --set {{ item.name }} {{ item.path }}"
-  loop:
-    - { name: 'java', path: "{{ java_bin }}" }
-    - { name: 'javac', path: "{{ javac_bin }}" }
-    - { name: 'jar', path: "{{ jar_bin }}" }
+- name: Register and select javac alternative (with jar follower)
+  community.general.alternatives:
+    name: javac
+    link: /usr/bin/javac
+    path: "{{ javac_bin }}"
+    priority: 100
+    subcommands:
+      - name: jar
+        link: /usr/bin/jar
+        path: "{{ jar_bin }}"
   become: yes
-  changed_when: false
 
 - name: Configure JAVA_HOME environment variable
   ansible.builtin.template:
@@ -58,3 +58,4 @@
     dest: /etc/profile.d/java.sh
     mode: '0644'
   become: yes
+

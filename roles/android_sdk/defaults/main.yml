@@ -17,6 +17,9 @@ android_cmdline_tools_url: "https://dl.google.com/android/repository/commandline
 android_sdk_packages:
   - "platform-tools"
   - "platforms;android-34"
+  - "platforms;android-36"
   - "build-tools;34.0.0"
   - "emulator"
   - "system-images;android-34;google_apis;x86_64"
+  - "system-images;android-36;google_apis_playstore;x86_64"
+

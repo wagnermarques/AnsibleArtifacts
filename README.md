@@ -52,7 +52,14 @@ ansible-playbook playbooks/devmachine-java-install-buildtools.yml --ask-become-p
 Creates a local Windows 11 virtual machine on a Fedora workstation using libvirt, UEFI, Secure Boot, and TPM 2.0. The playbook defaults to the ISO path `/home/wgn/VIRT/pt-br_windows_11_consumer_editions_version_25h2_x64_dvd_d4d3cf4d.iso`, and you can override the VM name or ISO path with `-e`.
 
 ```bash
-ansible-playbook playbooks/devmachine-virtualization-create-windows11-vm.yml -K
+ansible-playbook playbooks/virtualization-vm-create-win11.yml -K
+```
+
+### 7. Create Fedora Minimal UI VM for Financial Apps & Web Banks (Warsaw)
+Creates a lightweight Fedora virtual machine (LXQt / minimal UI) dedicated to Brazilian internet banking and financial applications requiring Warsaw (TOPAZ / Diebold Nixdorf), SmartCard token daemons (`pcscd`), Google Chrome, Brave, Firefox, and financial tools.
+
+```bash
+ansible-playbook playbooks/virtualization-vm-create-fedora-mingui--fin.yml -K
 ```
 
 ### 7. Configure Fedora Desktop Security Setup

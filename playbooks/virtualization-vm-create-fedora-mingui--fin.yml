@@ -1,0 +1,317 @@
+---
+- name: Create Fedora Minimal UI VM for Financial Apps & Web Banks (libvirt KVM)
+  hosts: devmachines_workstations
+  gather_facts: true
+  become: true
+  vars:
+    vm_name: "fedora-mingui-fin"
+    fedora_iso_path_default: "{{ playbook_dir }}/../isos/Fedora-LXQt-Live-44-1.7.x86_64.iso"
+    fedora_iso_path: "{{ fedora_iso_path_override | default(fedora_iso_path_default) }}"
+    vm_memory_mb: 4096
+    vm_vcpus: 2
+    vm_disk_size_gb: 30
+    vm_disk_dir: "/var/lib/libvirt/images"
+    vm_disk_path: "{{ vm_disk_dir }}/{{ vm_name }}.qcow2"
+    libvirt_uri: "qemu:///system"
+    libvirt_network: "default"
+    vm_os_variant: "fedora-unknown"
+    vm_video_model: "virtio"
+    vm_enable_autostart: true
+    libvirt_cli_env:
+      LANG: C
+      LC_ALL: C
+
+  roles:
+    - virtualization
+
+  pre_tasks:
+    - name: Install libvirt & virt-install prerequisites on Fedora
+      ansible.builtin.dnf:
+        name:
+          - edk2-ovmf
+          - virt-install
+          - libvirt-daemon-kvm
+          - qemu-kvm
+        state: present
+      when: ansible_facts['distribution'] == "Fedora"
+
+    - name: Check primary Fedora ISO path
+      ansible.builtin.stat:
+        path: "{{ fedora_iso_path }}"
+      register: fedora_iso_stat
+
+    - name: Check alternative workspace ISO path if primary path is missing
+      ansible.builtin.stat:
+        path: "/home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/isos/Fedora-LXQt-Live-44-1.7.x86_64.iso"
+      register: fedora_iso_alt_stat
+      when: not fedora_iso_stat.stat.exists
+
+    - name: Set resolved Fedora ISO path
+      ansible.builtin.set_fact:
+        resolved_fedora_iso_path: "{{ fedora_iso_alt_stat.stat.path if (fedora_iso_stat.stat is not defined or not fedora_iso_stat.stat.exists) and (fedora_iso_alt_stat.stat is defined and fedora_iso_alt_stat.stat.exists) else fedora_iso_path }}"
+
+    - name: Fail if Fedora ISO is missing
+      ansible.builtin.fail:
+        msg: "Fedora LXQt Live ISO not found at {{ fedora_iso_path }}. Please place the ISO in the isos/ folder or set -e fedora_iso_path_override=/path/to/fedora.iso"
+      when:
+        - not fedora_iso_stat.stat.exists
+        - fedora_iso_alt_stat.stat is not defined or not fedora_iso_alt_stat.stat.exists
+
+    - name: Check if default libvirt network exists
+      ansible.builtin.command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - net-info
+          - "{{ libvirt_network }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: libvirt_network_info
+      changed_when: false
+
+    - name: Start default libvirt network when inactive
+      ansible.builtin.command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - net-start
+          - "{{ libvirt_network }}"
+      environment: "{{ libvirt_cli_env }}"
+      when: not (libvirt_network_info.stdout | regex_search('(?im)^active:\\s+yes$'))
+      changed_when: true
+
+    - name: Enable autostart for default libvirt network
+      ansible.builtin.command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - net-autostart
+          - "{{ libvirt_network }}"
+      environment: "{{ libvirt_cli_env }}"
+      when: not (libvirt_network_info.stdout | regex_search('(?im)^autostart:\\s+yes$'))
+      changed_when: true
+
+    - name: Check if VM already exists
+      ansible.builtin.command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - dominfo
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      register: fedora_vm_info
+      failed_when: false
+      changed_when: false
+
+  tasks:
+    - name: Ensure libvirt disk directory exists
+      ansible.builtin.file:
+        path: "{{ vm_disk_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Stage Fedora ISO in libvirt storage directory for hypervisor read access
+      ansible.builtin.copy:
+        src: "{{ resolved_fedora_iso_path }}"
+        dest: "{{ vm_disk_dir }}/{{ resolved_fedora_iso_path | basename }}"
+        mode: "0644"
+        remote_src: true
+
+    - name: Set staged ISO path
+      ansible.builtin.set_fact:
+        staged_fedora_iso_path: "{{ vm_disk_dir }}/{{ resolved_fedora_iso_path | basename }}"
+
+    - name: Create Fedora Minimal UI Financial VM from ISO via virt-install
+      ansible.builtin.command:
+        argv:
+          - virt-install
+          - --connect
+          - "{{ libvirt_uri }}"
+          - --name
+          - "{{ vm_name }}"
+          - --memory
+          - "{{ vm_memory_mb | string }}"
+          - --vcpus
+          - "{{ vm_vcpus | string }}"
+          - --cpu
+          - host-passthrough
+          - --os-variant
+          - "{{ vm_os_variant }}"
+          - --disk
+          - "path={{ vm_disk_path }},size={{ vm_disk_size_gb }},format=qcow2,bus=virtio"
+          - --cdrom
+          - "{{ staged_fedora_iso_path }}"
+          - --network
+          - "network={{ libvirt_network }},model=virtio"
+          - --graphics
+          - spice
+          - --video
+          - "{{ vm_video_model }}"
+          - --channel
+          - spicevmc,target_type=virtio,name=com.redhat.spice.0
+          - --channel
+          - unix,target_type=virtio,name=org.qemu.guest_agent.0
+          - --sound
+          - ich9
+          - --boot
+          - uefi
+          - --noautoconsole
+      environment: "{{ libvirt_cli_env }}"
+      when: fedora_vm_info.rc != 0
+      changed_when: true
+
+    - name: Enable VM autostart
+      ansible.builtin.command:
+        argv:
+          - virsh
+          - --connect
+          - "{{ libvirt_uri }}"
+          - autostart
+          - "{{ vm_name }}"
+      environment: "{{ libvirt_cli_env }}"
+      when:
+        - vm_enable_autostart | bool
+        - fedora_vm_info.rc != 0 or not (fedora_vm_info.stdout | regex_search('(?im)^autostart:\\s+enable$'))
+      changed_when: true
+
+    - name: Display VM creation success summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "Fedora Minimal UI Financial VM successfully created!"
+          - "VM Name: {{ vm_name }}"
+          - "RAM: {{ vm_memory_mb }} MB | vCPUs: {{ vm_vcpus }}"
+          - "Disk: {{ vm_disk_path }} ({{ vm_disk_size_gb }} GB)"
+          - "ISO: {{ staged_fedora_iso_path }}"
+          - "To open the graphical console run:"
+          - "  virt-viewer --connect {{ libvirt_uri }} {{ vm_name }}"
+          - "  or open virt-manager"
+          - "=========================================================="
+
+
+- name: Configure Guest OS for Financial Applications, Web Banks & Warsaw Security Client
+  hosts: fedora_fin_vms, localhost
+  gather_facts: true
+  become: true
+  vars:
+    configure_guest_financial_env: "{{ install_guest_financial_env | default(false) }}"
+    warsaw_rpm_url: "https://cloud.topaz.com.br/installer/warsaw_setup_64.rpm"
+
+  tasks:
+    - name: Configure Financial & Banking Environment block
+      when: configure_guest_financial_env | bool or (ansible_facts['distribution'] == 'Fedora' and (ansible_facts['hostname'] == 'fedora-mingui-fin' or configure_guest_financial_env | bool))
+      block:
+        - name: Enable Google Chrome repository
+          ansible.builtin.yum_repository:
+            name: google-chrome
+            description: Google Chrome for Web Banking
+            baseurl: https://dl.google.com/linux/chrome/rpm/stable/x86_64
+            gpgkey: https://dl.google.com/linux/linux_signing_key.pub
+            gpgcheck: true
+            enabled: true
+
+        - name: Add Brave Browser repository
+          ansible.builtin.get_url:
+            url: https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+            dest: /etc/yum.repos.d/brave-browser.repo
+            mode: "0644"
+
+        - name: Install Google Chrome, Brave, and Firefox
+          ansible.builtin.dnf:
+            name:
+              - google-chrome-stable
+              - brave-browser
+              - firefox
+            state: present
+            update_cache: yes
+
+        - name: Install Warsaw & SmartCard dependencies
+          ansible.builtin.dnf:
+            name:
+              - nss-tools
+              - pcsc-lite
+              - pcsc-lite-libs
+              - pcsc-lite-ccid
+              - python3-psutil
+              - openssl
+              - libcurl
+              - gtk3
+              - evince
+              - qpdfview
+              - gnucash
+              - spice-vdagent
+              - qemu-guest-agent
+            state: present
+
+        - name: Enable and start SmartCard daemon (pcscd)
+          ansible.builtin.service:
+            name: pcscd
+            state: started
+            enabled: yes
+
+        - name: Enable and start QEMU Guest Agent & SPICE VDAgent
+          ansible.builtin.service:
+            name: "{{ item }}"
+            state: started
+            enabled: yes
+          loop:
+            - qemu-guest-agent
+            - spice-vdagent
+          ignore_errors: true
+
+        - name: Download Warsaw TOPAZ Installer RPM
+          ansible.builtin.get_url:
+            url: "{{ warsaw_rpm_url }}"
+            dest: /tmp/warsaw_setup_64.rpm
+            mode: "0644"
+
+        - name: Install Warsaw RPM package
+          ansible.builtin.dnf:
+            name: /tmp/warsaw_setup_64.rpm
+            state: present
+            disable_gpg_check: yes
+
+        - name: Enable and start Warsaw service
+          ansible.builtin.service:
+            name: warsaw
+            state: started
+            enabled: yes
+          ignore_errors: true
+
+        - name: Create FZL Warsaw status check utility script
+          ansible.builtin.copy:
+            dest: /usr/local/bin/fzl-warsaw-status
+            mode: "0755"
+            content: |
+              #!/usr/bin/env bash
+              echo "=== FZL Warsaw & Banking Security Status ==="
+              echo "[1] Checking warsaw.service state:"
+              systemctl status warsaw.service --no-pager || true
+              echo ""
+              echo "[2] Checking active warsaw processes:"
+              ps aux | grep -i warsaw | grep -v grep || echo "No active Warsaw process found."
+              echo ""
+              echo "[3] Checking Warsaw local listening sockets (127.0.0.1):"
+              ss -tulpn | grep -i warsaw || netstat -tulpn 2>/dev/null | grep -i warsaw || echo "No active Warsaw socket bound."
+              echo ""
+              echo "[4] Smart card (pcscd) status:"
+              systemctl status pcscd.service --no-pager || true
+              echo "==========================================="
+
+        - name: Create Desktop Launcher for FZL Warsaw Status
+          ansible.builtin.copy:
+            dest: /usr/share/applications/fzl-warsaw-status.desktop
+            mode: "0644"
+            content: |
+              [Desktop Entry]
+              Version=1.0
+              Type=Application
+              Name=FZL Warsaw Banking Status Check
+              Comment=Check Warsaw Diebold Nixdorf banking daemon status
+              Exec=gnome-terminal -- /usr/local/bin/fzl-warsaw-status
+              Icon=security-high
+              Terminal=true
+              Categories=System;Security;Utility;

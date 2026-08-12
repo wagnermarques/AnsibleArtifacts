@@ -1,18 +1,26 @@
 ---
-- name: Install virtualization packages (Fedora)
+- name: Install virtualization packages (Fedora / RedHat)
   dnf:
     name: "{{ virtualization_packages_fedora }}"
     state: present
   become: yes
-  when: ansible_facts['distribution'] == "Fedora"
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Install virtualization packages (Debian / Ubuntu)
+  apt:
+    name: "{{ virtualization_packages_debian }}"
+    state: present
+    update_cache: yes
+  become: yes
+  when: ansible_facts['os_family'] == "Debian"
 
 - name: Start and enable libvirtd service
-  systemd:
+  service:
     name: libvirtd
     state: started
     enabled: yes
   become: yes
-  when: ansible_facts['distribution'] == "Fedora"
+  when: ansible_facts['os_family'] in ['RedHat', 'Debian']
 
 - name: Add user to libvirt group
   user:
@@ -20,99 +28,62 @@
     groups: libvirt
     append: yes
   become: yes
-  when: ansible_facts['distribution'] == "Fedora"
+  when: ansible_facts['os_family'] in ['RedHat', 'Debian']
 
-- name: Allow Libvirt traffic through iptables (Fix Docker conflict)
+# --- Firewalld configuration (Fedora / RedHat) ---
+- name: Ensure masquerade is enabled in firewalld libvirt zone
+  ansible.posix.firewalld:
+    zone: libvirt
+    masquerade: yes
+    permanent: yes
+    state: enabled
+    immediate: yes
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+  ignore_errors: yes
+
+- name: Enable forward on firewalld libvirt zone
+  command: firewall-cmd --zone=libvirt --add-forward --permanent
+  register: firewall_forward_cmd
+  changed_when: "'ALREADY_ENABLED' not in firewall_forward_cmd.stderr"
+  failed_when: false
+  become: yes
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Reload firewalld if forward rule was added
+  command: firewall-cmd --reload
+  become: yes
+  when:
+    - ansible_facts['os_family'] == "RedHat"
+    - firewall_forward_cmd is changed
+
+# --- Docker network coexistence ---
+- name: Check if DOCKER-USER iptables chain exists
+  command: iptables -L DOCKER-USER -n
+  register: docker_user_chain_check
+  changed_when: false
+  failed_when: false
+  become: yes
+
+- name: Allow Libvirt incoming traffic in DOCKER-USER chain (Fix Docker conflict)
   iptables:
-    chain: FORWARD
+    chain: DOCKER-USER
     in_interface: virbr0
     jump: ACCEPT
     action: insert
     rule_num: 1
     state: present
   become: yes
-  when: ansible_facts['distribution'] == "Fedora"
+  when: docker_user_chain_check.rc == 0
 
-- name: Allow Libvirt traffic outgoing through iptables (Fix Docker conflict)
+- name: Allow Libvirt outgoing traffic in DOCKER-USER chain (Fix Docker conflict)
   iptables:
-    chain: FORWARD
+    chain: DOCKER-USER
     out_interface: virbr0
     jump: ACCEPT
     action: insert
     rule_num: 1
     state: present
   become: yes
-  when: ansible_facts['distribution'] == "Fedora"
+  when: docker_user_chain_check.rc == 0
 
-- name: Enable NAT for Libvirt (Fix Docker conflict)
-  iptables:
-    table: nat
-    chain: POSTROUTING
-    source: 192.168.122.0/24
-    destination: "! 192.168.122.0/24"
-    jump: MASQUERADE
-    action: insert
-    rule_num: 1
-    state: present
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-
-- name: Allow Libvirt DHCP traffic (Fix Docker conflict)
-  iptables:
-    chain: INPUT
-    in_interface: virbr0
-    protocol: udp
-    destination_port: 67
-    jump: ACCEPT
-    action: insert
-    rule_num: 1
-    state: present
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-
-- name: Allow Libvirt DNS traffic (UDP)
-  iptables:
-    chain: INPUT
-    in_interface: virbr0
-    protocol: udp
-    destination_port: 53
-    jump: ACCEPT
-    action: insert
-    rule_num: 1
-    state: present
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-
-- name: Allow Libvirt DNS traffic (TCP)
-  iptables:
-    chain: INPUT
-    in_interface: virbr0
-    protocol: tcp
-    destination_port: 53
-    jump: ACCEPT
-    action: insert
-    rule_num: 1
-    state: present
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-
-- name: Ensure iptables-services is installed (to persist rules)
-  dnf:
-    name: iptables-services
-    state: present
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-
-- name: Ensure iptables rules persist
-  service:
-    name: iptables
-    state: started
-    enabled: yes
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-
-- name: Save iptables rules
-  shell: iptables-save > /etc/sysconfig/iptables
-  become: yes
-  when: ansible_facts['distribution'] == "Fedora"
-  changed_when: true

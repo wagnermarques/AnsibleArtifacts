@@ -9,4 +9,15 @@ virtualization_packages_fedora:
   - bridge-utils
   - libvirt-devel
   - guestfs-tools
-  - iptables-services
+
+virtualization_packages_debian:
+  - qemu-system-x86
+  - qemu-utils
+  - libvirt-daemon-system
+  - libvirt-clients
+  - virt-manager
+  - virt-viewer
+  - virtinst
+  - bridge-utils
+  - libguestfs-tools
+
