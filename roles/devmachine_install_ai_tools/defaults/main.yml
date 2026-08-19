@@ -6,6 +6,7 @@ ai_npm_packages:
   - "@gitlawb/openclaude"
   - "@github/copilot"
   - "v0"
+  - "opencode-ai"
 
 # MCP Server Packages for Gemini CLI
 mcp_npm_packages:
@@ -25,9 +26,31 @@ ai_python_apps:
   - "shell-gpt"
   - "open-interpreter"
 
-# Aider isolated virtualenv configuration (~/.envs/aider)
+# Shared AI Environment defaults
+ollama_api_base: "http://localhost:11434"
+
+# Aider configuration (~/.envs/aider and ~/.aider.conf.yml)
 install_aider_venv: true
 aider_default_model: "ollama/qwen3.6:latest"
+aider_auto_commits: false
+aider_dirty_commits: false
+
+# OpenCode configuration (~/.config/opencode/opencode.json)
+configure_opencode: true
+opencode_default_model: "openrouter/anthropic/claude-3.5-sonnet"
+opencode_theme: "auto"
+
+# Claude Code configuration (~/.claude/config.json / ~/.claude.json)
+configure_claude_code: true
+claude_code_auto_updater_status: "enabled"
+
+# Shell-GPT configuration (~/.config/shell_gpt/.sgptrc)
+configure_shell_gpt: true
+sgpt_default_model: "gpt-4o"
+sgpt_openai_api_host: "https://api.openai.com/v1"
+
+# Universal Agents Guidelines (~/.agents/AGENTS.md and project templates)
+deploy_universal_agents_md: true
 
 # Kimi Code CLI configuration
 install_kimi_code: true

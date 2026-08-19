@@ -17,14 +17,39 @@
     group: "{{ java_target_user }}"
   become: yes
 
-- name: Download and extract Temurin JDK
+- name: Check if Temurin JDK is already installed
+  ansible.builtin.stat:
+    path: "{{ java_install_dir }}"
+  register: java_jdk_dir
+
+- name: Download Temurin JDK tarball
+  ansible.builtin.get_url:
+    url: "{{ java_download_url }}"
+    dest: "/tmp/{{ java_tarball_filename }}"
+    mode: '0644'
+    timeout: 300
+  register: java_download
+  until: java_download is succeeded
+  retries: 3
+  delay: 5
+  when: not java_jdk_dir.stat.exists
+
+- name: Extract Temurin JDK
   ansible.builtin.unarchive:
-    src: "{{ java_download_url }}"
+    src: "/tmp/{{ java_tarball_filename }}"
     dest: "{{ java_install_parent_dir }}"
     remote_src: yes
     creates: "{{ java_install_dir }}"
     owner: "{{ java_target_user }}"
     group: "{{ java_target_user }}"
+  when: not java_jdk_dir.stat.exists
+
+- name: Clean up Temurin JDK tarball
+  ansible.builtin.file:
+    path: "/tmp/{{ java_tarball_filename }}"
+    state: absent
+  when: not java_jdk_dir.stat.exists
+
 
 - name: Set facts for Java binaries
   ansible.builtin.set_fact:

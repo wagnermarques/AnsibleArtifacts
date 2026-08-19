@@ -31,11 +31,12 @@
         - "{{ plantuml_dir }}"
       become: yes
 
-    - name: Install system dependencies (Graphviz for PlantUML)
+    - name: Install system dependencies (Graphviz for PlantUML, WebKitGTK for Papyrus)
       package:
-        name: graphviz
+        name: "{{ ['graphviz', 'libwebkit2gtk-4.0-37', 'libwebkit2gtk-4.1-0'] if ansible_facts['os_family'] == 'Debian' else ['graphviz', 'webkit2gtk4.1'] }}"
         state: present
       become: yes
+      ignore_errors: yes
 
     # 1. StarUML Installation (Local Extraction)
     - name: Download StarUML (.deb)
@@ -70,8 +71,36 @@
         dest: "{{ papyrus_dir }}"
         remote_src: yes
         extra_opts: ["--strip-components=1"]
-        creates: "{{ papyrus_dir }}/papyrus"
+        creates: "{{ papyrus_dir }}/papyrus-desktop"
         owner: "{{ tools_owner }}"
+      become: yes
+
+    - name: Create papyrus binary symlink
+      file:
+        src: "{{ papyrus_dir }}/papyrus-desktop"
+        dest: "{{ papyrus_dir }}/papyrus"
+        state: link
+        owner: "{{ tools_owner }}"
+      become: yes
+
+    - name: Create papyrus.ini symlink
+      file:
+        src: "{{ papyrus_dir }}/papyrus-desktop.ini"
+        dest: "{{ papyrus_dir }}/papyrus.ini"
+        state: link
+        owner: "{{ tools_owner }}"
+      become: yes
+
+    - name: Configure WebKit and SWT options in papyrus-desktop.ini to prevent GTK3 WebKit2 deadlock freeze
+      lineinfile:
+        path: "{{ papyrus_dir }}/papyrus-desktop.ini"
+        insertafter: "^-vmargs"
+        line: "{{ item }}"
+        state: present
+        owner: "{{ tools_owner }}"
+      loop:
+        - "-Dorg.eclipse.swt.browser.DefaultType=webkit"
+        - "-Dorg.eclipse.swt.browser.UseWebKitGTK=true"
       become: yes
 
     # 3. PlantUML JAR Installation
@@ -83,19 +112,42 @@
         owner: "{{ tools_owner }}"
       become: yes
 
+    - name: Create fzl-papyrus-logs executable command script in /usr/local/bin
+      copy:
+        dest: "/usr/local/bin/fzl-papyrus-logs"
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          mkdir -p "$HOME/.cache/papyrus"
+          touch "$HOME/.cache/papyrus/papyrus.log"
+          exec tail -f "$HOME/.cache/papyrus/papyrus.log"
+        mode: '0755'
+      become: yes
+
+    - name: Create fzl-papirus-logs executable command symlink in /usr/local/bin
+      file:
+        src: "/usr/local/bin/fzl-papyrus-logs"
+        dest: "/usr/local/bin/fzl-papirus-logs"
+        state: link
+      become: yes
+
     # 4. Shell Integration and Aliases
     - name: Add UML Tools to ~/.bashrc_dev_tools
       blockinfile:
         path: "~/.bashrc_dev_tools"
         marker: "# {mark} UML TOOLS ALIASES"
         block: |
-          # UML Tools PATH
+          # UML Tools PATH & Environment
           export PATH="$PATH:{{ staruml_dir }}/opt/StarUML"
           export PATH="$PATH:{{ papyrus_dir }}"
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
 
           # FZL Start Aliases
           alias fzl-staruml-start='nohup {{ staruml_dir }}/opt/StarUML/staruml > /dev/null 2>&1 &'
-          alias fzl-papyrus-start='nohup {{ papyrus_dir }}/papyrus > /dev/null 2>&1 &'
+          alias fzl-papyrus-start='mkdir -p ~/.cache/papyrus && nohup env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop > ~/.cache/papyrus/papyrus.log 2>&1 &'
+          alias fzl-papirus-start='mkdir -p ~/.cache/papyrus && nohup env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop > ~/.cache/papyrus/papyrus.log 2>&1 &'
+          alias fzl-papyrus-logs='mkdir -p ~/.cache/papyrus && touch ~/.cache/papyrus/papyrus.log && tail -f ~/.cache/papyrus/papyrus.log'
+          alias fzl-papirus-logs='mkdir -p ~/.cache/papyrus && touch ~/.cache/papyrus/papyrus.log && tail -f ~/.cache/papyrus/papyrus.log'
           alias fzl-plantuml-start='nohup java -jar {{ plantuml_dir }}/plantuml.jar -gui > /dev/null 2>&1 &'
         create: yes
         mode: '0644'

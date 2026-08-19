@@ -1,2 +1,7 @@
 # Global Aider configuration managed by Ansible devmachine_install_ai_tools role
-model: {{ aider_default_model }}
+model: {{ aider_default_model | default('ollama/qwen3.6:latest') }}
+auto-commits: {{ aider_auto_commits | default(false) | bool | lower }}
+dirty-commits: {{ aider_dirty_commits | default(false) | bool | lower }}
+check-update: false
+attribute-author: true
+attribute-committer: true

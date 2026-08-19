@@ -91,22 +91,26 @@
   when: install_aider_venv | bool
   become: yes
 
-- name: Configure fzl-aider alias in ~/.bashrc_ai_tools
+- name: Ensure agent configuration directories exist in user home
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ real_user }}"
+  loop:
+    - "{{ real_user_home }}/.gemini"
+    - "{{ real_user_home }}/.claude"
+    - "{{ real_user_home }}/.config/opencode"
+    - "{{ real_user_home }}/.config/shell_gpt"
+    - "{{ real_user_home }}/.config/agents"
+  become: yes
+
+- name: Configure Tier 1 shared AI environment in ~/.bashrc_ai_tools
   template:
     src: bashrc_ai_tools.j2
     dest: "{{ real_user_home }}/.bashrc_ai_tools"
     mode: '0644'
     owner: "{{ real_user }}"
-  when: install_aider_venv | bool
-  become: yes
-
-- name: Create global Aider config ~/.aider.conf.yml with default local model
-  template:
-    src: aider.conf.yml.j2
-    dest: "{{ real_user_home }}/.aider.conf.yml"
-    mode: '0644'
-    owner: "{{ real_user }}"
-  when: install_aider_venv | bool
   become: yes
 
 - name: Source ~/.bashrc_ai_tools in user's ~/.bashrc
@@ -116,24 +120,61 @@
     state: present
     create: yes
     owner: "{{ real_user }}"
+  become: yes
+
+- name: Configure Tier 2 Universal Agent guidelines (~/.config/agents/AGENTS.md)
+  template:
+    src: AGENTS.md.j2
+    dest: "{{ real_user_home }}/.config/agents/AGENTS.md"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: deploy_universal_agents_md | bool
+  become: yes
+
+- name: Create global Aider config ~/.aider.conf.yml
+  template:
+    src: aider.conf.yml.j2
+    dest: "{{ real_user_home }}/.aider.conf.yml"
+    mode: '0644'
+    owner: "{{ real_user }}"
   when: install_aider_venv | bool
   become: yes
 
-- name: Ensure .gemini directory exists in user home
-  file:
-    path: "{{ real_user_home }}/.gemini"
-    state: directory
-    mode: '0755'
-    owner: "{{ real_user }}"
-  become: yes
-
-- name: Configure Gemini CLI extensions (MCP)
+- name: Configure Gemini CLI / MCP extensions (~/.gemini/settings.json)
   template:
     src: gemini_settings.json.j2
     dest: "{{ real_user_home }}/.gemini/settings.json"
     mode: '0644'
     owner: "{{ real_user }}"
   become: yes
+
+- name: Configure OpenCode settings (~/.config/opencode/opencode.json)
+  template:
+    src: opencode.json.j2
+    dest: "{{ real_user_home }}/.config/opencode/opencode.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_opencode | bool
+  become: yes
+
+- name: Configure Claude Code settings (~/.claude.json)
+  template:
+    src: claude_config.json.j2
+    dest: "{{ real_user_home }}/.claude.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_claude_code | bool
+  become: yes
+
+- name: Configure Shell-GPT settings (~/.config/shell_gpt/.sgptrc)
+  template:
+    src: sgptrc.j2
+    dest: "{{ real_user_home }}/.config/shell_gpt/.sgptrc"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_shell_gpt | bool
+  become: yes
+
 
 - name: Install Kimi Code (Terminal AI assistant)
   shell: curl -fsSL https://code.kimi.com/kimi-code/install.sh | KIMI_INSTALL_DIR=/usr/local bash

@@ -107,7 +107,25 @@ An open-source alternative interface for Claude CLI workflows in the terminal.
 openclaude --help
 #+end_src
 
-** 6. Vercel v0 CLI (=v0=)
+** 6. OpenCode AI Agent (=opencode=)
+OpenCode is an open-source AI coding agent and terminal TUI interface designed to navigate, understand, and edit codebases.
+
+*** Common Usage Examples
+- *Start interactive OpenCode TUI in project repository:*
+  #+begin_src bash
+  cd /path/to/your/project
+  opencode
+  #+end_src
+- *Login / Authenticate providers:*
+  #+begin_src bash
+  opencode auth login
+  #+end_src
+- *Configure providers and model settings:*
+  Connect providers (OpenAI, Anthropic, OpenRouter, Ollama) directly in the TUI using `/connect`.
+- *Initialize repository context (creates AGENTS.md):*
+  Run `/init` within the OpenCode session.
+
+** 7. Vercel v0 CLI (=v0=)
 Command-line interface for Vercel's v0 generative UI tool.
 
 *** Common Usage Examples
@@ -116,7 +134,7 @@ Command-line interface for Vercel's v0 generative UI tool.
   v0 "create a glassmorphic dashboard sidebar component in React and Tailwind"
   #+end_src
 
-** 7. Aider (=fzl-aider= / =aider=)
+** 8. Aider (=fzl-aider= / =aider=)
 Aider is a git-integrated pair programming CLI tool installed in an isolated Python virtual environment (~/.envs/aider). A convenient wrapper/alias command =fzl-aider= is provided to automatically activate the environment and launch Aider.
 
 *** Common Usage Examples
@@ -146,7 +164,7 @@ Aider is a git-integrated pair programming CLI tool installed in an isolated Pyt
   fzl-aider main.py utils.py
   #+end_src
 
-** 8. Shell-GPT (=sgpt=)
+** 9. Shell-GPT (=sgpt=)
 Shell-GPT is a command-line productivity tool powered by AI.
 
 *** Common Usage Examples
@@ -163,7 +181,7 @@ Shell-GPT is a command-line productivity tool powered by AI.
   sgpt --code "python function to calculate Fibonacci series using memoization"
   #+end_src
 
-** 9. Open Interpreter (=interpreter=)
+** 10. Open Interpreter (=interpreter=)
 Open Interpreter allows LLMs to run code (Python, JavaScript, Shell) locally on your computer under user supervision.
 
 *** Common Usage Examples
@@ -176,7 +194,7 @@ Open Interpreter allows LLMs to run code (Python, JavaScript, Shell) locally on 
   interpreter --local --model qwen2.5:7b
   #+end_src
 
-** 10. Ollama Local LLM Runner (=ollama=)
+** 11. Ollama Local LLM Runner (=ollama=)
 Ollama runs local LLMs directly on your GPU/CPU without needing cloud APIs.
 
 *** Pre-pulled Models
@@ -207,6 +225,7 @@ The playbook automatically installs and pulls:
 | **Gemini CLI** | =gemini= | Global NPM Package | =GEMINI_API_KEY= / MCP config |
 | **GitHub Copilot** | =copilot= | Global NPM Package | =copilot auth= |
 | **OpenClaude** | =openclaude= | Global NPM Package | Anthropic API Key |
+| **OpenCode** | =opencode= | Global NPM Package (=opencode-ai=) | Provider Auth / API Keys |
 | **v0 CLI** | =v0= | Global NPM Package | Vercel Account |
 | **Aider** | =fzl-aider= / =aider= | Isolated Venv (=~/.envs/aider=) | API Key or Local Ollama |
 | **Shell-GPT** | =sgpt= | Isolated Python (=pipx=) | =OPENAI_API_KEY= or Local API |

@@ -1,3 +1,25 @@
-# AI Tools Environment & Command Aliases
-export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://localhost:11434}"
+# ==============================================================================
+# AI Tools Shared Environment & Command Aliases (Tier 1 Authentication)
+# Managed by Ansible devmachine_install_ai_tools role
+# ==============================================================================
+
+export OLLAMA_API_BASE="${OLLAMA_API_BASE:-{{ ollama_api_base | default('http://localhost:11434') }}}"
+
+{% if openrouter_api_key is defined and openrouter_api_key and openrouter_api_key != 'your_openrouter_api_key_here' %}
+export OPENROUTER_API_KEY="{{ openrouter_api_key }}"
+{% endif %}
+{% if anthropic_api_key is defined and anthropic_api_key and anthropic_api_key != 'your_anthropic_api_key_here' %}
+export ANTHROPIC_API_KEY="{{ anthropic_api_key }}"
+{% endif %}
+{% if gemini_api_key is defined and gemini_api_key and gemini_api_key != 'your_gemini_api_key_here' %}
+export GEMINI_API_KEY="{{ gemini_api_key }}"
+{% endif %}
+{% if openai_api_key is defined and openai_api_key and openai_api_key != 'your_openai_api_key_here' %}
+export OPENAI_API_KEY="{{ openai_api_key }}"
+{% endif %}
+{% if github_mcp_token is defined and github_mcp_token and github_mcp_token != 'your_github_pat_here' %}
+export GITHUB_TOKEN="{{ github_mcp_token }}"
+{% endif %}
+
+# Command Aliases
 alias fzl-aider='source ~/.envs/aider/bin/activate && aider'

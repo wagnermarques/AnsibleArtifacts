@@ -213,6 +213,7 @@ Below are the links to their official documentation and repositories:
 | **GitHub Copilot** | NPM | [Official Docs](https://docs.github.com/en/copilot/using-github-copilot/using-github-copilot-in-the-command-line) |
 | **Kimi Code** | Script / CLI | [Kimi Code Docs](https://code.kimi.com) |
 | **OpenClaude** | NPM | [GitHub Repo](https://github.com/Gitlawb/openclaude) |
+| **OpenCode** | NPM | [Official Site](https://opencode.ai) |
 | **v0 CLI** | NPM | [Vercel v0](https://v0.dev) |
 | **Aider** | Python | [Official Site](https://aider.chat) |
 | **Shell-GPT** | Python | [GitHub Repo](https://github.com/TheR1D/shell_gpt) |

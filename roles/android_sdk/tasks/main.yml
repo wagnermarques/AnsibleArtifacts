@@ -10,14 +10,82 @@
     - "{{ android_sdk_dir }}"
     - "{{ android_sdk_dir }}/cmdline-tools"
 
-- name: Install Android Studio
-  ansible.builtin.unarchive:
-    src: "{{ android_studio_url }}"
-    dest: "{{ android_studio_dir }}"
-    remote_src: yes
-    extra_opts: ["--strip-components=1"]
-    creates: "{{ android_studio_dir }}/bin"
-    owner: "{{ android_tools_owner }}"
+- name: Resolve latest Android Studio URL if set to auto or latest
+  block:
+    - name: Fetch Android Studio download page
+      ansible.builtin.uri:
+        url: "https://developer.android.com/studio"
+        return_content: yes
+      register: android_studio_page
+      ignore_errors: true
+
+    - name: Extract latest Linux download URL
+      ansible.builtin.set_fact:
+        android_studio_scraped_url: "{{ android_studio_page.content | regex_search('https://[^\"]+linux\\.tar\\.gz') }}"
+      when:
+        - android_studio_page is succeeded
+        - android_studio_page.content is defined
+  when: android_studio_url == 'auto' or android_studio_version == 'latest'
+
+- name: Determine effective Android Studio download URL
+  ansible.builtin.set_fact:
+    android_studio_effective_url: "{{ android_studio_scraped_url | default(android_studio_fallback_url) if (android_studio_url == 'auto' or android_studio_version == 'latest') else android_studio_url }}"
+
+- name: Determine tarball filename from URL
+  ansible.builtin.set_fact:
+    android_studio_tarball_filename: "{{ android_studio_effective_url | basename }}"
+
+- name: Check currently installed Android Studio version tracking file
+  ansible.builtin.slurp:
+    src: "{{ android_studio_dir }}/.installed_url"
+  register: installed_studio_url_file
+  ignore_errors: true
+
+- name: Set facts for Android Studio installation state
+  ansible.builtin.set_fact:
+    installed_studio_url: "{{ installed_studio_url_file.content | b64decode | trim if (installed_studio_url_file.content is defined and installed_studio_url_file.content) else '' }}"
+
+- name: Download and Install Android Studio
+  block:
+    - name: Download Android Studio tarball
+      ansible.builtin.get_url:
+        url: "{{ android_studio_effective_url }}"
+        dest: "/tmp/{{ android_studio_tarball_filename }}"
+        mode: '0644'
+        timeout: 600
+      register: studio_download
+      until: studio_download is succeeded
+      retries: 3
+      delay: 5
+
+    - name: Ensure target Android Studio installation directory exists
+      ansible.builtin.file:
+        path: "{{ android_studio_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ android_tools_owner }}"
+
+    - name: Extract Android Studio tarball
+      ansible.builtin.unarchive:
+        src: "/tmp/{{ android_studio_tarball_filename }}"
+        dest: "{{ android_studio_dir }}"
+        remote_src: yes
+        extra_opts: ["--strip-components=1"]
+        owner: "{{ android_tools_owner }}"
+
+    - name: Record installed Android Studio URL
+      ansible.builtin.copy:
+        content: "{{ android_studio_effective_url }}"
+        dest: "{{ android_studio_dir }}/.installed_url"
+        mode: '0644'
+        owner: "{{ android_tools_owner }}"
+
+    - name: Clean up Android Studio tarball
+      ansible.builtin.file:
+        path: "/tmp/{{ android_studio_tarball_filename }}"
+        state: absent
+  when: installed_studio_url != android_studio_effective_url
+
 
 - name: Check if Android Command Line Tools are already installed
   ansible.builtin.stat:
@@ -26,18 +94,35 @@
 
 - name: Install Android Command Line Tools
   block:
-    - name: Download and extract Command Line Tools
+    - name: Download Command Line Tools zip
+      ansible.builtin.get_url:
+        url: "{{ android_cmdline_tools_url }}"
+        dest: "/tmp/commandlinetools-linux-{{ android_cmdline_tools_version }}_latest.zip"
+        mode: '0644'
+        timeout: 300
+      register: cmdline_download
+      until: cmdline_download is succeeded
+      retries: 3
+      delay: 5
+
+    - name: Extract Command Line Tools
       ansible.builtin.unarchive:
-        src: "{{ android_cmdline_tools_url }}"
+        src: "/tmp/commandlinetools-linux-{{ android_cmdline_tools_version }}_latest.zip"
         dest: "{{ android_sdk_dir }}/cmdline-tools"
         remote_src: yes
-    
+
+    - name: Clean up Command Line Tools zip
+      ansible.builtin.file:
+        path: "/tmp/commandlinetools-linux-{{ android_cmdline_tools_version }}_latest.zip"
+        state: absent
+
     - name: Move to 'latest' directory structure
       ansible.builtin.command:
         cmd: "mv {{ android_sdk_dir }}/cmdline-tools/cmdline-tools {{ android_sdk_dir }}/cmdline-tools/latest"
       args:
         creates: "{{ android_sdk_dir }}/cmdline-tools/latest"
   when: not sdkmanager_bin.stat.exists
+
 
 - name: Create Android Environment Configuration
   ansible.builtin.template:

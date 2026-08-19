@@ -1,0 +1,126 @@
+---
+- name: Install Eclipse Papyrus UML Modeling IDE
+  hosts: devmachines_workstations, localhost
+  gather_facts: yes
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_user_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['env']['HOME'] }}"
+    tools_basedir: "{{ target_user_home }}/WORKING"
+    ides_base_dir: "{{ tools_basedir }}/Progsativos/ides"
+    papyrus_dir: "{{ ides_base_dir }}/papyrus"
+    papyrus_version: "2025-06"
+    papyrus_release: "7.1.0"
+    papyrus_url: "https://download.eclipse.org/modeling/mdt/papyrus/papyrus-desktop/rcp/{{ papyrus_version }}/{{ papyrus_release }}/papyrus-desktop-{{ papyrus_version }}-{{ papyrus_release }}-linux.gtk.x86_64.tar.gz"
+
+  tasks:
+    - name: Ensure target directory exists
+      ansible.builtin.file:
+        path: "{{ papyrus_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ target_user }}"
+      become: yes
+
+    - name: Install system dependencies (Java JRE & WebKitGTK)
+      ansible.builtin.package:
+        name: "{{ ['default-jre', 'libwebkit2gtk-4.0-37', 'libwebkit2gtk-4.1-0'] if ansible_facts['os_family'] == 'Debian' else ['java-latest-openjdk', 'webkit2gtk4.1'] }}"
+        state: present
+      become: yes
+      ignore_errors: yes
+
+    - name: Download and extract Eclipse Papyrus UML
+      ansible.builtin.unarchive:
+        src: "{{ papyrus_url }}"
+        dest: "{{ papyrus_dir }}"
+        remote_src: yes
+        extra_opts: ["--strip-components=1"]
+        creates: "{{ papyrus_dir }}/papyrus-desktop"
+        owner: "{{ target_user }}"
+      become: yes
+
+    - name: Create papyrus binary symlink
+      ansible.builtin.file:
+        src: "{{ papyrus_dir }}/papyrus-desktop"
+        dest: "{{ papyrus_dir }}/papyrus"
+        state: link
+        owner: "{{ target_user }}"
+      become: yes
+
+    - name: Create papyrus.ini symlink
+      ansible.builtin.file:
+        src: "{{ papyrus_dir }}/papyrus-desktop.ini"
+        dest: "{{ papyrus_dir }}/papyrus.ini"
+        state: link
+        owner: "{{ target_user }}"
+      become: yes
+
+    - name: Configure WebKit and SWT options in papyrus-desktop.ini to prevent GTK3 WebKit2 deadlock freeze
+      ansible.builtin.lineinfile:
+        path: "{{ papyrus_dir }}/papyrus-desktop.ini"
+        insertafter: "^-vmargs"
+        line: "{{ item }}"
+        state: present
+        owner: "{{ target_user }}"
+      loop:
+        - "-Dorg.eclipse.swt.browser.DefaultType=webkit"
+        - "-Dorg.eclipse.swt.browser.UseWebKitGTK=true"
+      become: yes
+
+    - name: Create Desktop Entry for Eclipse Papyrus UML
+      ansible.builtin.copy:
+        dest: "/usr/share/applications/papyrus.desktop"
+        content: |
+          [Desktop Entry]
+          Name=Eclipse Papyrus UML
+          Comment=Eclipse Papyrus UML Modeling Tool
+          Exec=env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop
+          Icon={{ papyrus_dir }}/icon.xpm
+          Terminal=false
+          Type=Application
+          Categories=Development;Building;GUIDesigner;
+        mode: '0644'
+      become: yes
+
+    - name: Create fzl-papyrus-logs executable command script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-papyrus-logs"
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          mkdir -p "$HOME/.cache/papyrus"
+          touch "$HOME/.cache/papyrus/papyrus.log"
+          exec tail -f "$HOME/.cache/papyrus/papyrus.log"
+        mode: '0755'
+      become: yes
+
+    - name: Create fzl-papirus-logs executable command symlink in /usr/local/bin
+      ansible.builtin.file:
+        src: "/usr/local/bin/fzl-papyrus-logs"
+        dest: "/usr/local/bin/fzl-papirus-logs"
+        state: link
+      become: yes
+
+    - name: Add UML Papyrus aliases to ~/.bashrc_dev_tools
+      ansible.builtin.blockinfile:
+        path: "{{ target_user_home }}/.bashrc_dev_tools"
+        marker: "# {mark} UML PAPYRUS ALIASES"
+        block: |
+          # Papyrus UML PATH, Environment & Aliases
+          export PATH="$PATH:{{ papyrus_dir }}"
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          alias fzl-papyrus-start='mkdir -p ~/.cache/papyrus && nohup env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop > ~/.cache/papyrus/papyrus.log 2>&1 &'
+          alias fzl-papirus-start='mkdir -p ~/.cache/papyrus && nohup env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop > ~/.cache/papyrus/papyrus.log 2>&1 &'
+          alias fzl-papyrus-logs='mkdir -p ~/.cache/papyrus && touch ~/.cache/papyrus/papyrus.log && tail -f ~/.cache/papyrus/papyrus.log'
+          alias fzl-papirus-logs='mkdir -p ~/.cache/papyrus && touch ~/.cache/papyrus/papyrus.log && tail -f ~/.cache/papyrus/papyrus.log'
+        create: yes
+        mode: '0644'
+        owner: "{{ target_user }}"
+      become: yes
+
+    - name: Ensure ~/.bashrc sources ~/.bashrc_dev_tools
+      ansible.builtin.lineinfile:
+        path: "{{ target_user_home }}/.bashrc"
+        line: "source ~/.bashrc_dev_tools"
+        state: present
+        owner: "{{ target_user }}"
+      become: yes

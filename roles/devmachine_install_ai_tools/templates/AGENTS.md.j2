@@ -1,0 +1,16 @@
+# AI Agent Guidelines & Context (AGENTS.md)
+
+## System Overview
+- **OS**: Linux (Fedora / RHEL / Ubuntu)
+- **Tooling**: Git, Ansible, Bash, Python (pipx/venv), Node.js (npm).
+
+## General Development Guidelines
+1. **Idempotency**: All automation tasks and playbooks must be idempotent.
+2. **Security & Secrets**: Never hardcode API keys, passwords, or tokens in git tracked files. Store secrets in Ansible Vault (`vars/vault.yml`) or local `.env` files.
+3. **Coding Standards**: Use standard linting and formatting tools. Maintain clean directory layouts.
+4. **Testing**: Validate syntax with `ansible-playbook --syntax-check` before running playbooks.
+
+## Common Agent Conventions
+- **Claude Code**: Respect `.claude/` local permissions.
+- **OpenCode**: Refer to `AGENTS.md` and repository guidelines.
+- **Aider**: Always work on git-tracked repositories and follow clean commit patterns.
