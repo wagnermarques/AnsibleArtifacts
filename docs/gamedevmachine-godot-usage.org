@@ -1,0 +1,80 @@
+#+TITLE: Godot Engine Game Development Setup & Usage Guide
+#+AUTHOR: FzlSoft / AnsibleArtifacts
+#+DATE: [2026-08-27 Thu]
+
+* Overview
+
+This guide explains how to install, configure, and use the *Godot Engine* (Godot 4.x) game development environment provisioned via the Ansible playbook =playbooks/gamedevmachine-godot-install.yml=.
+
+Godot is an advanced, feature-packed, multi-platform 2D and 3D open-source game engine with a dedicated visual IDE, GDScript support, scene tree hierarchy, and cross-platform export capabilities.
+
+* Installation
+
+Run the playbook to install Godot Engine on local or remote devmachine workstations:
+
+#+begin_src bash
+ansible-playbook -i inventory/hosts.ini playbooks/gamedevmachine-godot-install.yml --ask-become-pass
+#+end_src
+
+To target only localhost:
+
+#+begin_src bash
+ansible-playbook -i inventory/hosts.ini playbooks/gamedevmachine-godot-install.yml -l localhost --ask-become-pass
+#+end_src
+
+* Layout & Installation Paths
+
+The playbook installs Godot following the standard =AnsibleArtifacts= directory conventions:
+
+| Component | Path |
+|---|---|
+| *Base Directory* | =~/WORKING/Progsativos/gamedev/godot= |
+| *Executable Binary* | =~/WORKING/Progsativos/gamedev/godot/Godot_v4.4-stable_linux.x86_64= |
+| *User Bin Symlink* | =~/WORKING/Progsativos/gamedev/godot/bin/godot= |
+| *System Symlink* | =/usr/local/bin/godot= |
+| *FZL Background Launcher* | =/usr/local/bin/fzl-godot-start= |
+| *FZL Foreground Launcher* | =/usr/local/bin/fzl-godot= |
+| *FZL Live Log Viewer* | =/usr/local/bin/fzl-godot-logs= |
+| *Log File* | =~/.cache/godot/godot.log= |
+| *Desktop Entry* | =/usr/share/applications/godot.desktop= |
+| *Export Templates* | =~/.local/share/godot/export_templates/4.4.stable/= |
+
+* Usage & Commands
+
+** Launching Godot
+
+1. *Desktop Application Menu*:
+   Open your desktop application launcher (GNOME, XFCE, KDE, etc.) and search for *Godot Engine*.
+
+2. *FZL Background Command*:
+   #+begin_src bash
+   fzl-godot-start
+   #+end_src
+   Launches the editor detached in the background, logging output directly to =~/.cache/godot/godot.log=.
+
+3. *Watching Logs*:
+   #+begin_src bash
+   fzl-godot-logs
+   #+end_src
+
+4. *CLI / Headless / Project Launcher*:
+   #+begin_src bash
+   # Open a specific project directory
+   godot --path /path/to/my_game_project
+
+   # Open project editor directly
+   godot -e --path /path/to/my_game_project
+
+   # Export project in headless mode
+   godot --headless --export-release "Linux/X11" /path/to/output/game.x86_64
+   #+end_src
+
+* Export Templates
+
+The playbook automatically downloads and extracts official export templates to:
+=~/.local/share/godot/export_templates/4.4.stable/=
+
+This enables instant exporting to:
+- Linux / X11 / Wayland
+- Windows (x86_64 / ARM64)
+- macOS / iOS / Android / Web (HTML5/WebAssembly)

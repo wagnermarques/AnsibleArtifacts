@@ -1,0 +1,383 @@
+---
+- name: Setup Godot Engine Game Development Environment
+  hosts: devmachines_workstations, localhost, all
+  become: true
+  gather_facts: true
+
+  vars:
+    # Target non-root user detection for proper home directory placement
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_user_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['env']['HOME'] }}"
+
+    # Directory structure in accordance with AnsibleArtifacts conventions
+    tools_basedir: "{{ target_user_home }}/WORKING"
+    progsativos_dir: "{{ tools_basedir }}/Progsativos"
+    gamedev_base_dir: "{{ progsativos_dir }}/gamedev"
+    godot_dir: "{{ gamedev_base_dir }}/godot"
+    godot_bin_dir: "{{ godot_dir }}/bin"
+    godot_icons_dir: "{{ godot_dir }}/icons"
+    godot_log_dir: "{{ target_user_home }}/.cache/godot"
+
+    # Godot Engine Version & Settings
+    godot_version: "4.4"
+    godot_release_tag: "{{ godot_version }}-stable"
+    godot_archive_name: "Godot_v{{ godot_release_tag }}_linux.x86_64.zip"
+    godot_binary_name: "Godot_v{{ godot_release_tag }}_linux.x86_64"
+    godot_download_url: "https://github.com/godotengine/godot/releases/download/{{ godot_release_tag }}/{{ godot_archive_name }}"
+    godot_icon_url: "https://raw.githubusercontent.com/godotengine/godot/{{ godot_release_tag }}/icon.svg"
+
+    # Export templates (enabled by default for complete game development workflow)
+    install_export_templates: true
+    godot_templates_archive: "Godot_v{{ godot_release_tag }}_export_templates.tpz"
+    godot_templates_url: "https://github.com/godotengine/godot/releases/download/{{ godot_release_tag }}/{{ godot_templates_archive }}"
+    godot_templates_dir: "{{ target_user_home }}/.local/share/godot/export_templates/{{ godot_version }}.stable"
+    godot_legacy_templates_dir: "{{ target_user_home }}/.local/share/godot/templates/{{ godot_version }}.stable"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. SYSTEM DEPENDENCIES
+    # ----------------------------------------------------
+    - name: Install Godot graphic & audio dependencies (Fedora / RHEL)
+      ansible.builtin.dnf:
+        name:
+          - unzip
+          - wget
+          - curl
+          - vulkan-loader
+          - mesa-dri-drivers
+          - alsa-lib
+          - pulseaudio-libs
+          - libX11
+          - libXcursor
+          - libXinerama
+          - libXext
+          - libXrandr
+          - libXi
+          - libglvnd-glx
+          - fontconfig
+          - freetype
+          - dbus-libs
+        state: present
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+      ignore_errors: true
+
+    - name: Install Godot graphic & audio dependencies (Debian / Ubuntu)
+      ansible.builtin.apt:
+        name:
+          - unzip
+          - wget
+          - curl
+          - libvulkan1
+          - mesa-vulkan-drivers
+          - libasound2
+          - libpulse0
+          - libx11-6
+          - libxcursor1
+          - libxinerama1
+          - libxext6
+          - libxrandr2
+          - libxi6
+          - libgl1
+          - libfontconfig1
+          - libfreetype6
+          - libdbus-1-3
+        state: present
+        update_cache: yes
+      when: ansible_facts['os_family'] == "Debian"
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 2. TARGET DIRECTORIES PREPARATION
+    # ----------------------------------------------------
+    - name: Ensure target base directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+        mode: '0755'
+      loop:
+        - "{{ progsativos_dir }}"
+        - "{{ gamedev_base_dir }}"
+        - "{{ godot_dir }}"
+        - "{{ godot_bin_dir }}"
+        - "{{ godot_icons_dir }}"
+        - "{{ godot_log_dir }}"
+        - "/usr/local/bin"
+        - "/usr/share/applications"
+        - "/usr/share/icons/hicolor/scalable/apps"
+
+    # ----------------------------------------------------
+    # 3. DOWNLOAD & INSTALL GODOT ENGINE BINARY
+    # ----------------------------------------------------
+    - name: Download and Extract Godot Engine Binary
+      block:
+        - name: Create temporary directory for Godot download
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: _godot_setup
+          register: temp_godot_dir
+
+        - name: Download Godot Engine Linux x86_64 archive
+          ansible.builtin.get_url:
+            url: "{{ godot_download_url }}"
+            dest: "{{ temp_godot_dir.path }}/{{ godot_archive_name }}"
+            mode: '0644'
+
+        - name: Extract Godot Engine archive to target directory
+          ansible.builtin.unarchive:
+            src: "{{ temp_godot_dir.path }}/{{ godot_archive_name }}"
+            dest: "{{ godot_dir }}"
+            remote_src: yes
+            creates: "{{ godot_dir }}/{{ godot_binary_name }}"
+            owner: "{{ target_user }}"
+            group: "{{ target_user }}"
+
+      always:
+        - name: Clean up temporary Godot download directory
+          ansible.builtin.file:
+            path: "{{ temp_godot_dir.path }}"
+            state: absent
+          when: temp_godot_dir.path is defined
+
+    - name: Ensure Godot binary has execution permissions
+      ansible.builtin.file:
+        path: "{{ godot_dir }}/{{ godot_binary_name }}"
+        mode: '0755'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    - name: Create Godot internal binary symlink in user bin dir
+      ansible.builtin.file:
+        src: "{{ godot_dir }}/{{ godot_binary_name }}"
+        dest: "{{ godot_bin_dir }}/godot"
+        state: link
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    - name: Create Godot system-wide symlink in /usr/local/bin
+      ansible.builtin.file:
+        src: "{{ godot_dir }}/{{ godot_binary_name }}"
+        dest: "/usr/local/bin/godot"
+        state: link
+
+    # ----------------------------------------------------
+    # 4. DOWNLOAD & INSTALL GODOT ICON
+    # ----------------------------------------------------
+    - name: Download Godot official icon SVG
+      ansible.builtin.get_url:
+        url: "{{ godot_icon_url }}"
+        dest: "{{ godot_icons_dir }}/godot.svg"
+        mode: '0644'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+      ignore_errors: true
+
+    - name: Install Godot system icon in /usr/share/icons
+      ansible.builtin.copy:
+        src: "{{ godot_icons_dir }}/godot.svg"
+        dest: "/usr/share/icons/hicolor/scalable/apps/godot.svg"
+        remote_src: yes
+        mode: '0644'
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 5. GODOT EXPORT TEMPLATES
+    # ----------------------------------------------------
+    - name: Check if Godot Export Templates are already installed
+      ansible.builtin.stat:
+        path: "{{ godot_templates_dir }}/version.txt"
+      register: godot_templates_installed
+
+    - name: Install Godot Export Templates
+      when:
+        - install_export_templates | bool
+        - not godot_templates_installed.stat.exists
+      block:
+        - name: Create Godot export templates directory structure
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: "{{ target_user }}"
+            group: "{{ target_user }}"
+            mode: '0755'
+          loop:
+            - "{{ target_user_home }}/.local/share/godot"
+            - "{{ target_user_home }}/.local/share/godot/export_templates"
+            - "{{ target_user_home }}/.local/share/godot/templates"
+            - "{{ godot_templates_dir }}"
+
+        - name: Create temporary directory for export templates download
+          ansible.builtin.tempfile:
+            state: directory
+            suffix: _godot_templates
+          register: temp_templates_dir
+
+        - name: Download Godot Export Templates tpz archive
+          ansible.builtin.get_url:
+            url: "{{ godot_templates_url }}"
+            dest: "{{ temp_templates_dir.path }}/export_templates.zip"
+            mode: '0644'
+
+        - name: Extract Export Templates archive in temporary directory
+          ansible.builtin.unarchive:
+            src: "{{ temp_templates_dir.path }}/export_templates.zip"
+            dest: "{{ temp_templates_dir.path }}"
+            remote_src: yes
+
+        - name: Copy extracted templates to Godot export templates directory
+          ansible.builtin.copy:
+            src: "{{ temp_templates_dir.path }}/templates/"
+            dest: "{{ godot_templates_dir }}/"
+            remote_src: yes
+            owner: "{{ target_user }}"
+            group: "{{ target_user }}"
+            mode: preserve
+
+      always:
+        - name: Clean up temporary export templates directory
+          ansible.builtin.file:
+            path: "{{ temp_templates_dir.path }}"
+            state: absent
+          when: temp_templates_dir.path is defined
+
+    - name: Symlink export templates to legacy templates directory for compatibility
+      when: install_export_templates | bool
+      ansible.builtin.file:
+        src: "{{ godot_templates_dir }}"
+        dest: "{{ godot_legacy_templates_dir }}"
+        state: link
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    # ----------------------------------------------------
+    # 6. FZL LAUNCH SCRIPTS (RULE 2: FZL APP PATTERN)
+    # ----------------------------------------------------
+    - name: Create fzl-godot-start background launcher script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-godot-start"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Godot Engine Background Launcher
+          mkdir -p "$HOME/.cache/godot"
+          nohup /usr/local/bin/godot "$@" > "$HOME/.cache/godot/godot.log" 2>&1 &
+
+    - name: Create fzl-godot foreground launcher script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-godot"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Godot Engine Foreground Launcher
+          exec /usr/local/bin/godot "$@"
+
+    - name: Create fzl-godot-logs log viewer script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-godot-logs"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Godot Engine Live Logs Streamer
+          mkdir -p "$HOME/.cache/godot"
+          touch "$HOME/.cache/godot/godot.log"
+          exec tail -f "$HOME/.cache/godot/godot.log"
+
+    # ----------------------------------------------------
+    # 7. DESKTOP ENTRIES
+    # ----------------------------------------------------
+    - name: Create Desktop Entry for Godot Engine
+      ansible.builtin.copy:
+        dest: "/usr/share/applications/godot.desktop"
+        mode: '0644'
+        content: |
+          [Desktop Entry]
+          Name=Godot Engine
+          GenericName=Libre Game Engine
+          Comment=Multi-platform 2D and 3D Game Engine and Editor
+          Exec=/usr/local/bin/godot %F
+          Icon=godot
+          Terminal=false
+          Type=Application
+          Categories=Development;IDE;GameDevelopment;GUIDesigner;
+          MimeType=application/x-godot-project;
+          StartupNotify=true
+
+    - name: Create FZL Launcher Desktop Entry
+      ansible.builtin.copy:
+        dest: "/usr/share/applications/fzl-godot.desktop"
+        mode: '0644'
+        content: |
+          [Desktop Entry]
+          Name=FZL Godot Engine
+          GenericName=Game Engine (FZL Launcher)
+          Comment=Launch Godot Engine with FZL background process and logging
+          Exec=/usr/local/bin/fzl-godot-start %F
+          Icon=godot
+          Terminal=false
+          Type=Application
+          Categories=Development;IDE;GameDevelopment;
+          MimeType=application/x-godot-project;
+          StartupNotify=true
+
+    # ----------------------------------------------------
+    # 8. SHELL INTEGRATION & ALIASES
+    # ----------------------------------------------------
+    - name: Add Godot aliases and PATH to ~/.bashrc_dev_tools
+      ansible.builtin.blockinfile:
+        path: "{{ target_user_home }}/.bashrc_dev_tools"
+        marker: "# {mark} GODOT GAME DEV ALIASES"
+        block: |
+          # Godot Engine PATH & Environment
+          export PATH="$PATH:{{ godot_bin_dir }}"
+
+          # FZL Godot Aliases
+          alias fzl-godot-start='mkdir -p ~/.cache/godot && nohup /usr/local/bin/godot > ~/.cache/godot/godot.log 2>&1 &'
+          alias fzl-godot='/usr/local/bin/godot'
+          alias fzl-godot-logs='mkdir -p ~/.cache/godot && touch ~/.cache/godot/godot.log && tail -f ~/.cache/godot/godot.log'
+          alias godot='/usr/local/bin/godot'
+        create: yes
+        mode: '0644'
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    - name: Ensure ~/.bashrc sources ~/.bashrc_dev_tools
+      ansible.builtin.lineinfile:
+        path: "{{ target_user_home }}/.bashrc"
+        line: "source ~/.bashrc_dev_tools"
+        state: present
+        owner: "{{ target_user }}"
+        group: "{{ target_user }}"
+
+    # ----------------------------------------------------
+    # 9. VERIFICATION & SUMMARY
+    # ----------------------------------------------------
+    - name: Verify Godot binary installation
+      ansible.builtin.command:
+        cmd: /usr/local/bin/godot --version
+      register: godot_version_output
+      changed_when: false
+      failed_when: false
+
+    - name: Display Godot Engine Installation Summary
+      ansible.builtin.debug:
+        msg: |
+          ================================================================================
+          GODOT ENGINE SETUP COMPLETED SUCCESSFULLY!
+          ================================================================================
+          Version Installed: {{ godot_version_output.stdout | default(godot_version) }}
+          Install Directory: {{ godot_dir }}
+          Binary Path:       {{ godot_dir }}/{{ godot_binary_name }}
+          Global Symlink:    /usr/local/bin/godot
+          Export Templates:  {{ godot_templates_dir }}
+          
+          FZL Launch Commands:
+            - fzl-godot-start : Start Godot in the background with logging to ~/.cache/godot/godot.log
+            - fzl-godot       : Run Godot directly in foreground
+            - fzl-godot-logs  : Watch live Godot application logs
+            - godot           : Standard CLI / headless command
+          
+          Desktop Integration:
+            - Desktop Entry created in /usr/share/applications/godot.desktop
+            - Available in application menu under Development / Game Development
+          ================================================================================

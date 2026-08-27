@@ -190,6 +190,13 @@ ansible-playbook playbooks/fin-trader-metatrader5.yml --ask-become-pass
 
 For detailed setup instructions, broker connection steps, and Python/EA automation guides, see [docs/fin-trader-metatrader5-usage.org](file:///home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/docs/fin-trader-metatrader5-usage.org).
 
+### 15. Install AnyDesk Remote Desktop
+Installs the official AnyDesk client across Fedora/RedHat and Debian/Ubuntu distributions via their official package repositories, sets up systemd service management, and registers `fzl-anydesk-start` background and `fzl-anydesk` foreground launcher commands.
+
+```bash
+ansible-playbook playbooks/install-anydesk.yml --ask-become-pass
+```
+
 
 
 
@@ -248,6 +255,7 @@ This project implements a custom pattern for starting manually installed applica
 | **Antigravity** | `devmachine-setup.yml` | `fzl-antigravity-start` |
 | **Cursor** | `devmachine-setup.yml` | `fzl-cursor-start` |
 | **Eclipse Modeling** | `devmachine-setup-ides.yml` | `fzl-eclipse-modeling-start` |
+| **AnyDesk** | `install-anydesk.yml` | `fzl-anydesk-start` |
 
 
 ### How to use

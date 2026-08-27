@@ -1,0 +1,142 @@
+---
+- name: Install AnyDesk Remote Desktop
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    anydesk_service_enabled: true
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. FEDORA / RHEL / CENTOS (RPM REPOSITORY)
+    # ----------------------------------------------------
+    - name: Configure and install AnyDesk on Fedora / RHEL / CentOS
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+      block:
+        - name: Import AnyDesk RPM GPG key
+          ansible.builtin.rpm_key:
+            key: https://keys.anydesk.com/repos/RPM-GPG-KEY
+            state: present
+          ignore_errors: true
+
+        - name: Add AnyDesk RPM repository
+          ansible.builtin.yum_repository:
+            name: anydesk
+            description: AnyDesk Linux - stable
+            baseurl: "{{ 'http://rpm.anydesk.com/fedora/$basearch/' if ansible_facts['distribution'] == 'Fedora' else 'http://rpm.anydesk.com/centos/$basearch/' }}"
+            gpgkey: https://keys.anydesk.com/repos/RPM-GPG-KEY
+            gpgcheck: true
+            repo_gpgcheck: false
+            enabled: true
+
+        - name: Install AnyDesk package (RPM)
+          ansible.builtin.dnf:
+            name:
+              - anydesk
+            state: present
+            update_cache: yes
+
+    # ----------------------------------------------------
+    # 2. DEBIAN / UBUNTU (APT REPOSITORY)
+    # ----------------------------------------------------
+    - name: Configure and install AnyDesk on Debian / Ubuntu
+      when: ansible_facts['os_family'] == "Debian"
+      block:
+        - name: Install APT prerequisites
+          ansible.builtin.apt:
+            name:
+              - ca-certificates
+              - curl
+              - gnupg
+              - apt-transport-https
+            state: present
+            update_cache: yes
+
+        - name: Ensure /etc/apt/keyrings directory exists
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+
+        - name: Download AnyDesk APT GPG key
+          ansible.builtin.get_url:
+            url: https://keys.anydesk.com/repos/DEB-GPG-KEY
+            dest: /etc/apt/keyrings/anydesk.asc
+            mode: '0644'
+
+        - name: Add AnyDesk APT repository
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/anydesk.asc] http://deb.anydesk.com/ all main"
+            state: present
+            filename: anydesk
+            update_cache: yes
+
+        - name: Install AnyDesk package (DEB)
+          ansible.builtin.apt:
+            name: anydesk
+            state: present
+            update_cache: yes
+
+    # ----------------------------------------------------
+    # 3. SYSTEMD SERVICE MANAGEMENT
+    # ----------------------------------------------------
+    - name: Manage AnyDesk systemd service
+      when: ansible_facts['service_mgr'] == "systemd"
+      ansible.builtin.systemd:
+        name: anydesk
+        state: "{{ 'started' if anydesk_service_enabled | bool else 'stopped' }}"
+        enabled: "{{ anydesk_service_enabled | bool }}"
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 4. FZL LAUNCH SCRIPTS (RULE 2: FZL APP PATTERN)
+    # ----------------------------------------------------
+    - name: Create fzl-anydesk-start background launcher script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-anydesk-start"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL AnyDesk Background Launcher
+          mkdir -p "$HOME/.cache/anydesk"
+          nohup anydesk "$@" > "$HOME/.cache/anydesk/anydesk.log" 2>&1 &
+
+    - name: Create fzl-anydesk foreground launcher script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-anydesk"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL AnyDesk Foreground Launcher
+          exec anydesk "$@"
+
+    - name: Add fzl-anydesk shell aliases to user ~/.bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        line: "{{ item }}"
+        state: present
+        create: true
+        owner: "{{ target_user }}"
+        mode: '0644'
+      loop:
+        - "alias fzl-anydesk-start='nohup anydesk > /dev/null 2>&1 &'"
+        - "alias fzl-anydesk='anydesk'"
+      when: target_user != 'root'
+
+    # ----------------------------------------------------
+    # 5. POST-INSTALLATION STATUS & INFO
+    # ----------------------------------------------------
+    - name: Display AnyDesk installation completion summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - " AnyDesk installation completed successfully!"
+          - "========================================================="
+          - " - Binary: /usr/bin/anydesk"
+          - " - FZL Background Launcher: fzl-anydesk-start"
+          - " - FZL Foreground Launcher: fzl-anydesk"
+          - " - Service status: {{ 'Enabled & Started' if anydesk_service_enabled | bool else 'Disabled' }}"
+          - "========================================================="

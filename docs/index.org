@@ -27,3 +27,6 @@ A technical guide explaining and resolving network routing/internet connectivity
 ** [[file:fin-trader-metatrader5-usage.org][MetaTrader 5 (MT5) Setup & Trading Automation Guide (BTG Pactual / Fedora Linux)]]
 A comprehensive guide for installing MetaTrader 5 on Fedora Linux via Wine, connecting to BTG Pactual brokers, and running automated Expert Advisors (EAs) and Python scripts.
 
+** [[file:gamedevmachine-godot-usage.org][Game Development: Godot Engine 4 Setup & Usage Guide]]
+A complete guide for installing and configuring Godot Engine 4 with FZL background launch patterns, live logging, export templates, and desktop environment integration.
+
