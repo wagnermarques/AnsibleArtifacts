@@ -1,0 +1,84 @@
+================================================================================
+DIAGNÓSTICO TÉCNICO: ACESSO REMOTO RDP (hjr0ah6z7cj.sn.mynetname.net)
+================================================================================
+Data: 02/09/2026
+Destino Externo (DDNS MikroTik): hjr0ah6z7cj.sn.mynetname.net (IP: 177.121.148.110)
+Destino Interno (LAN): 192.168.30.178
+Porta Padrão RDP: 3389
+
+--------------------------------------------------------------------------------
+1. RESUMO EXECUTIVO
+--------------------------------------------------------------------------------
+A falha de conexão ("ERRCONNECT_CONNECT_FAILED / TIMEOUT [15000ms]") NÃO é causada
+pelo firewall da máquina local (Fedora Linux).
+
+Por padrão no Linux/Fedora:
+- O firewall local (firewalld) bloqueia conexões de ENTRADA (inbound), mas permite
+  100% de conexões de SAÍDA (outbound) originadas pelo usuário.
+- Se o firewall local estivesse bloqueando a saída da conexão, o sistema retornaria
+  um erro IMEDIATO de "Operação não permitida" (EPERM em 0 milissegundos).
+- O fato de ocorrer um TIMEOUT (espera de 15 segundos) comprova que o pacote TCP SYN
+  saiu da máquina do cliente com sucesso, viajou pela internet, mas o roteador ou a
+  máquina de destino remota NÃO responderam.
+
+--------------------------------------------------------------------------------
+2. COMO DESATIVAR O FIREWALL NO FEDORA PARA PROVA DE CONCEITO
+--------------------------------------------------------------------------------
+Para demonstrar formalmente que o firewall local não interfere na tentativa de
+conexão, siga os passos abaixo no terminal:
+
+Passo 1: Desative temporariamente o firewall local:
+$ sudo systemctl stop firewalld
+
+Passo 2: Verifique se o firewall está realmente inativo (deve retornar 'inactive'):
+$ sudo firewall-cmd --state
+# Retorno esperado: not running
+
+Passo 3: Execute o teste de conexão de porta:
+$ nc -zv -w 5 hjr0ah6z7cj.sn.mynetname.net 3389
+# Ou tente a conexão RDP direta:
+$ fzl-rdp hjr0ah6z7cj.sn.mynetname.net infomac
+
+Resultado obtido:
+A conexão continuará dando TIMEOUT, comprovando que o bloqueio está no lado remoto.
+
+Passo 4: Reative o firewall local por segurança:
+$ sudo systemctl start firewalld
+$ sudo firewall-cmd --state
+# Retorno esperado: running
+
+--------------------------------------------------------------------------------
+3. CAUSAS REAIS NO LADO REMOTO (ROTEADOR / SERVIDOR)
+--------------------------------------------------------------------------------
+
+A) Redirecionamento de Porta (NAT / Port Forwarding no MikroTik):
+   - O roteador MikroTik precisa de uma regra ativa em:
+     /ip firewall nat add chain=dstnat dst-port=3389 protocol=tcp action=dst-nat to-addresses=192.168.30.178 to-ports=3389
+
+B) Porta Externa Customizada (Muito comum por segurança):
+   - Muitos administradores não abrem a porta 3389 pública para evitar ataques de força bruta,
+     usando portas alternativas (ex: 3390, 33890, 53389).
+   - Se foi configurada uma porta externa diferente, é necessário informá-la para conexão:
+     $ fzl-rdp hjr0ah6z7cj.sn.mynetname.net:PORTA infomac
+
+C) Bloqueio da Porta 3389 pela Operadora de Internet (ISP):
+   - A maioria das operadoras bloqueia conexões de entrada na porta 3389 em links residenciais
+     e comerciais padrão. A solução é mudar a porta pública no MikroTik (ex: 33890 -> 3389 interno).
+
+D) Firewall do Windows / Host de Destino (192.168.30.178):
+   - O Firewall do Windows da máquina de destino pode estar configurado para permitir RDP
+     apenas para a sub-rede local (192.168.30.0/24), rejeitando pacotes que chegam via WAN/NAT.
+   - A máquina de destino precisa estar ligada e sem suspensão/hibernação de energia.
+
+--------------------------------------------------------------------------------
+4. MENSAGEM SUGERIDA PARA O ADMINISTRADOR DO SERVIDOR
+--------------------------------------------------------------------------------
+"Fiz os testes aqui com o firewall da minha máquina totalmente desligado e o tráfego
+de saída está liberado normalmente. O cliente RDP envia os pacotes mas toma timeout
+de 15 segundos sem resposta do roteador/destino.
+
+Poderia confirmar por gentileza:
+1. Se no MikroTik a regra de dst-nat está apontando para o IP 192.168.30.178:3389?
+2. Se foi usada uma porta externa diferente de 3389 (ex: 3390, 33890)?
+3. Se no Windows do IP 192.168.30.178 o firewall permite RDP vindo de fora da sub-rede local?"
+================================================================================
