@@ -1,0 +1,65 @@
+---
+# ==============================================================================
+# Tasks for desktopmachine_browser_ai_extensions role
+# Configures system-wide AI extensions (Claude, Gemini, Copilot, etc.) for
+# Google Chrome, Chromium, Brave, and Edge.
+# ==============================================================================
+
+- name: Collect active AI extension IDs
+  set_fact:
+    active_extension_ids: >-
+      {{
+        (browser_ai_extensions | selectattr('enabled', 'equalto', true) | map(attribute='id') | list)
+        + browser_extra_extension_ids
+      }}
+
+- name: Display active AI extensions to be configured
+  debug:
+    msg: "Configuring {{ active_extension_ids | length }} browser extension(s): {{ active_extension_ids }}"
+
+- name: Ensure browser policy directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop: "{{ browser_policy_directories }}"
+  become: yes
+
+- name: Ensure browser external extension directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  loop: "{{ browser_external_extension_directories }}"
+  become: yes
+
+- name: Deploy managed policy JSON for browser extensions
+  template:
+    src: ai_extensions_policy.json.j2
+    dest: "{{ item }}/ai_extensions.json"
+    mode: '0644'
+    owner: root
+    group: root
+  loop: "{{ browser_policy_directories }}"
+  become: yes
+  when: active_extension_ids | length > 0
+
+- name: Deploy external extension descriptor files
+  copy:
+    dest: "{{ item.0 }}/{{ item.1 }}.json"
+    mode: '0644'
+    owner: root
+    group: root
+    content: |
+      {
+        "external_update_url": "{{ chrome_web_store_update_url }}"
+      }
+  with_nested:
+    - "{{ browser_external_extension_directories }}"
+    - "{{ active_extension_ids }}"
+  become: yes
+  when: active_extension_ids | length > 0

@@ -1,0 +1,340 @@
+---
+- name: Install Multimedia and YouTube Tooling on Fedora Desktop
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. OS CHECK
+    # ----------------------------------------------------
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    # ----------------------------------------------------
+    # 2. INSTALL MULTIMEDIA PREREQUISITES (yt-dlp, ffmpeg, python)
+    # ----------------------------------------------------
+    - name: Install yt-dlp, ffmpeg, python3, and pip
+      ansible.builtin.dnf:
+        name:
+          - yt-dlp
+          - ffmpeg
+          - python3
+          - python3-pip
+          - python3-requests
+        state: present
+        update_cache: yes
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 3. INSTALL PYTHON TRANSCRIPTION LIBRARIES
+    # ----------------------------------------------------
+    - name: Install youtube-transcript-api globally
+      ansible.builtin.pip:
+        name:
+          - youtube-transcript-api
+          - requests
+        state: present
+        extra_args: "--break-system-packages"
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 4. FZL MULTIMEDIA CLI COMMANDS (RULE 2: FZL APP PATTERN)
+    # ----------------------------------------------------
+    - name: Create fzl-multimedia-youtube-transcript-video script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-multimedia-youtube-transcript-video"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env python3
+          """
+          FZL Multimedia YouTube Transcript CLI
+          Extracts and formats transcripts from YouTube videos into Markdown, Plain Text, SRT, or JSON.
+          """
+          import sys
+          import os
+          import re
+          import json
+          import argparse
+          import urllib.request
+
+          def extract_video_id(url_or_id: str) -> str:
+              """Extract YouTube video ID from various URL formats or raw ID."""
+              url_or_id = url_or_id.strip()
+              patterns = [
+                  r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+                  r'(?:embed\/|v\/|shorts\/)([0-9A-Za-z_-]{11})',
+                  r'^([0-9A-Za-z_-]{11})$'
+              ]
+              for pattern in patterns:
+                  match = re.search(pattern, url_or_id)
+                  if match:
+                      return match.group(1)
+              return url_or_id
+
+          def format_timestamp(seconds: float) -> str:
+              """Format seconds into HH:MM:SS or MM:SS."""
+              hrs = int(seconds // 3600)
+              mins = int((seconds % 3600) // 60)
+              secs = int(seconds % 60)
+              if hrs > 0:
+                  return f"{hrs:02d}:{mins:02d}:{secs:02d}"
+              return f"{mins:02d}:{secs:02d}"
+
+          def format_srt_time(seconds: float) -> str:
+              """Format seconds into SRT subtitle timestamp (HH:MM:SS,mmm)."""
+              hrs = int(seconds // 3600)
+              mins = int((seconds % 3600) // 60)
+              secs = int(seconds % 60)
+              millis = int((seconds - int(seconds)) * 1000)
+              return f"{hrs:02d}:{mins:02d}:{secs:02d},{millis:03d}"
+
+          def fetch_video_title(video_id: str) -> str:
+              """Fetch video title using YouTube OEMBED API."""
+              try:
+                  oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+                  req = urllib.request.Request(oembed_url, headers={'User-Agent': 'Mozilla/5.0'})
+                  with urllib.request.urlopen(req, timeout=5) as response:
+                      data = json.loads(response.read().decode('utf-8'))
+                      return data.get('title', f"YouTube Video ({video_id})")
+              except Exception:
+                  return f"YouTube Video ({video_id})"
+
+          def get_transcript(video_id: str, languages: list):
+              """Fetch transcript via youtube_transcript_api supporting both v1.x and legacy v0.x."""
+              try:
+                  import youtube_transcript_api
+                  from youtube_transcript_api import YouTubeTranscriptApi
+              except ImportError:
+                  print("Error: youtube-transcript-api library is not installed.", file=sys.stderr)
+                  print("Run: pip install youtube-transcript-api", file=sys.stderr)
+                  sys.exit(1)
+
+              raw_snippets = None
+              lang_found = "pt"
+              is_gen = True
+
+              # Instantiate API if class instance is supported (v1.x)
+              api = YouTubeTranscriptApi() if isinstance(YouTubeTranscriptApi, type) else YouTubeTranscriptApi
+
+              # Try modern v1.x list() method
+              if hasattr(api, 'list'):
+                  try:
+                      transcript_list = api.list(video_id)
+                      try:
+                          t = transcript_list.find_manually_created_transcript(languages)
+                          raw_snippets = t.fetch()
+                          lang_found, is_gen = t.language, False
+                      except Exception:
+                          try:
+                              t = transcript_list.find_generated_transcript(languages)
+                              raw_snippets = t.fetch()
+                              lang_found, is_gen = t.language, True
+                          except Exception:
+                              for t in transcript_list:
+                                  raw_snippets = t.fetch()
+                                  lang_found, is_gen = t.language, t.is_generated
+                                  break
+                  except Exception:
+                      pass
+
+              # Try v1.x direct fetch()
+              if raw_snippets is None and hasattr(api, 'fetch'):
+                  try:
+                      raw_snippets = api.fetch(video_id, languages=languages)
+                      lang_found, is_gen = "auto", True
+                  except Exception:
+                      pass
+
+              # Try legacy v0.x get_transcript()
+              if raw_snippets is None and hasattr(YouTubeTranscriptApi, 'get_transcript'):
+                  try:
+                      raw_snippets = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
+                      lang_found, is_gen = "auto", True
+                  except Exception as e:
+                      raise RuntimeError(f"Could not retrieve transcript for video {video_id}: {e}")
+
+              if raw_snippets is None:
+                  raise RuntimeError(f"Could not retrieve transcript for video {video_id}. Subtitles may be disabled or unavailable in requested languages.")
+
+              normalized = []
+              for item in raw_snippets:
+                  text = getattr(item, 'text', None) if not isinstance(item, dict) else item.get('text', '')
+                  start = getattr(item, 'start', 0.0) if not isinstance(item, dict) else item.get('start', 0.0)
+                  duration = getattr(item, 'duration', 2.0) if not isinstance(item, dict) else item.get('duration', 2.0)
+                  normalized.append({
+                      'text': str(text or ''),
+                      'start': float(start or 0.0),
+                      'duration': float(duration or 0.0)
+                  })
+
+              return normalized, lang_found, is_gen
+
+          def main():
+              parser = argparse.ArgumentParser(
+                  description="FZL YouTube Transcript Tool - Download and format transcripts from YouTube videos."
+              )
+              parser.add_argument("url", help="YouTube Video URL or Video ID (e.g. https://www.youtube.com/watch?v=KipmuANQCGk)")
+              parser.add_argument("-l", "--lang", default="pt,pt-BR,en,es", help="Comma-separated language preferences (default: pt,pt-BR,en,es)")
+              parser.add_argument("-f", "--format", choices=["markdown", "text", "srt", "json"], default="markdown", help="Output format (default: markdown)")
+              parser.add_argument("-o", "--output", help="Save output to specific file path")
+              parser.add_argument("--no-timestamps", action="store_true", help="Omit timestamps from markdown format")
+
+              args = parser.parse_args()
+
+              video_id = extract_video_id(args.url)
+              preferred_langs = [l.strip() for l in args.lang.split(",") if l.strip()]
+
+              title = fetch_video_title(video_id)
+              print(f"[*] Processing Video: {title} [{video_id}]", file=sys.stderr)
+              print(f"[*] Fetching transcript (preferred languages: {', '.join(preferred_langs)})...", file=sys.stderr)
+
+              try:
+                  items, lang_found, is_gen = get_transcript(video_id, preferred_langs)
+              except Exception as e:
+                  print(f"[-] {e}", file=sys.stderr)
+                  sys.exit(1)
+
+              print(f"[+] Transcript retrieved! Language: {lang_found} (Auto-generated: {is_gen}), Segments: {len(items)}", file=sys.stderr)
+
+              output_text = ""
+
+              if args.format == "markdown":
+                  output_text += f"# {title}\n\n"
+                  output_text += f"- **Video URL:** https://www.youtube.com/watch?v={video_id}\n"
+                  output_text += f"- **Language:** {lang_found} ({'Auto-generated' if is_gen else 'Manual'})\n"
+                  output_text += f"- **Total Segments:** {len(items)}\n\n"
+                  output_text += "---\n\n## Transcript\n\n"
+                  
+                  if args.no_timestamps:
+                      full_text = " ".join(item.get("text", "").strip() for item in items)
+                      output_text += full_text + "\n"
+                  else:
+                      for item in items:
+                          start_fmt = format_timestamp(item.get("start", 0))
+                          text = item.get("text", "").strip()
+                          # Replace line breaks inside single caption chunk
+                          text = text.replace("\n", " ")
+                          output_text += f"**`[{start_fmt}]`** {text}\n\n"
+
+              elif args.format == "text":
+                  output_text = " ".join(item.get("text", "").strip().replace("\n", " ") for item in items) + "\n"
+
+              elif args.format == "srt":
+                  for idx, item in enumerate(items, 1):
+                      start_sec = item.get("start", 0)
+                      dur_sec = item.get("duration", 2)
+                      end_sec = start_sec + dur_sec
+                      text = item.get("text", "").strip()
+                      output_text += f"{idx}\n{format_srt_time(start_sec)} --> {format_srt_time(end_sec)}\n{text}\n\n"
+
+              elif args.format == "json":
+                  output_text = json.dumps({
+                      "video_id": video_id,
+                      "title": title,
+                      "language": lang_found,
+                      "is_generated": is_gen,
+                      "transcript": items
+                  }, indent=2, ensure_ascii=False)
+
+              if args.output:
+                  with open(args.output, "w", encoding="utf-8") as f:
+                      f.write(output_text)
+                  print(f"[+] Transcript successfully saved to: {args.output}", file=sys.stderr)
+              else:
+                  # Sanitize title for auto-saving
+                  safe_title = re.sub(r'[^\w\-_\. ]', '_', title)[:60].strip()
+                  ext = "md" if args.format == "markdown" else args.format
+                  default_filename = f"{safe_title}_{video_id}.{ext}"
+                  with open(default_filename, "w", encoding="utf-8") as f:
+                      f.write(output_text)
+                  print(f"[+] Transcript saved to file: {default_filename}", file=sys.stderr)
+                  print("\n" + "=" * 60 + "\n")
+                  print(output_text[:1500] + ("\n... [truncated preview, full content in file]" if len(output_text) > 1500 else ""))
+
+          if __name__ == "__main__":
+              main()
+
+    - name: Create fzl-multimedia-youtube-download-audio script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-multimedia-youtube-download-audio"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL YouTube Audio Downloader (MP3 High Quality)
+          set -e
+          URL="${1:-}"
+          if [ -z "$URL" ]; then
+            echo "Usage: fzl-multimedia-youtube-download-audio <youtube-url-or-id> [output-dir]"
+            exit 1
+          fi
+          OUT_DIR="${2:-.}"
+          mkdir -p "$OUT_DIR"
+          echo "Downloading highest quality audio from: $URL..."
+          yt-dlp --extract-audio --audio-format mp3 --audio-quality 0 \
+                 -o "$OUT_DIR/%(title)s [%(id)s].%(ext)s" "$URL"
+
+    - name: Create fzl-multimedia-youtube-download-video script in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-multimedia-youtube-download-video"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL YouTube Video Downloader (Best Quality MP4)
+          set -e
+          URL="${1:-}"
+          if [ -z "$URL" ]; then
+            echo "Usage: fzl-multimedia-youtube-download-video <youtube-url-or-id> [output-dir]"
+            exit 1
+          fi
+          OUT_DIR="${2:-.}"
+          mkdir -p "$OUT_DIR"
+          echo "Downloading best quality video from: $URL..."
+          yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
+                 --merge-output-format mp4 \
+                 -o "$OUT_DIR/%(title)s [%(id)s].%(ext)s" "$URL"
+
+    - name: Add FZL multimedia aliases to user .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        line: "{{ item }}"
+        state: present
+        create: true
+        owner: "{{ target_user }}"
+        mode: '0644'
+      loop:
+        - "alias fzl-yt-transcript='fzl-multimedia-youtube-transcript-video'"
+        - "alias fzl-yt-audio='fzl-multimedia-youtube-download-audio'"
+        - "alias fzl-yt-video='fzl-multimedia-youtube-download-video'"
+      when: target_user != 'root'
+
+    # ----------------------------------------------------
+    # 5. SUMMARY AND USAGE EXAMPLES
+    # ----------------------------------------------------
+    - name: Display Multimedia Tools Setup Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Fedora Desktop Multimedia & YouTube Tools Setup Completed!"
+          - "=========================================================================="
+          - " Available Commands:"
+          - "   1. YouTube Transcript Extractor:"
+          - "      $ fzl-multimedia-youtube-transcript-video <URL/ID> [-f markdown|text|srt|json] [-o out.md]"
+          - "      Shortcut: $ fzl-yt-transcript <URL/ID>"
+          - ""
+          - "   2. YouTube Audio Downloader (MP3):"
+          - "      $ fzl-multimedia-youtube-download-audio <URL/ID>"
+          - "      Shortcut: $ fzl-yt-audio <URL/ID>"
+          - ""
+          - "   3. YouTube Video Downloader (MP4):"
+          - "      $ fzl-multimedia-youtube-download-video <URL/ID>"
+          - "      Shortcut: $ fzl-yt-video <URL/ID>"
+          - "=========================================================================="

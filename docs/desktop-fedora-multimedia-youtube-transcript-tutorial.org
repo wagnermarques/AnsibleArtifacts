@@ -1,0 +1,122 @@
+#+TITLE: Tutorial: Transcribing YouTube Videos, Downloading Audio, and Managing Subtitles on Fedora
+#+AUTHOR: FzlSoft
+#+DATE: [2026-09-02 Wed]
+#+OPTIONS: toc:3 num:t ^:nil
+
+* Overview
+This tutorial covers how to extract transcripts, download closed captions/subtitles (=.srt=, =.vtt=, =.txt=, =.md=), and fetch audio/video from YouTube classes and lectures directly from your Linux terminal using the FZL multimedia suite and =yt-dlp=.
+
+* Installation & Setup
+To ensure all dependencies and FZL CLI commands are installed, run the Ansible playbook:
+
+#+BEGIN_SRC bash
+ansible-playbook -K playbooks/desktop-fedora-multimedia-youtube-tools-setup.yml
+#+END_SRC
+
+This installs:
+- =yt-dlp= (Latest YouTube media downloader)
+- =ffmpeg= (Audio/video processing engine)
+- =youtube-transcript-api= (Python caption extractor)
+- FZL CLI Commands:
+  - =fzl-yt-transcript= (=fzl-multimedia-youtube-transcript-video=)
+  - =fzl-yt-audio= (=fzl-multimedia-youtube-download-audio=)
+  - =fzl-yt-video= (=fzl-multimedia-youtube-download-video=)
+
+* 1. Extracting Transcripts with =fzl-yt-transcript=
+
+The =fzl-yt-transcript= command allows fetching transcripts in various formats with language auto-detection.
+
+** A. Markdown Format with Timestamps (Default)
+Generates structured Markdown with video metadata and timestamped paragraphs:
+
+#+BEGIN_SRC bash
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+Specify custom output filename:
+#+BEGIN_SRC bash
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" -f markdown -o aula_universidade.md
+#+END_SRC
+
+** B. Subtitle Format (=.srt= with Timecodes)
+Generates standard SubRip (=.srt=) subtitle blocks with millisecond timecodes compatible with video players (VLC, MPV) and editors:
+
+#+BEGIN_SRC bash
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" -f srt -o legendas_aula.srt
+#+END_SRC
+
+** C. Continuous Plain Text (=.txt=)
+Generates clean paragraph text without timestamps (ideal for feeding into LLMs/AI models for summarization):
+
+#+BEGIN_SRC bash
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" -f text -o transcricao_aula.txt
+#+END_SRC
+
+** D. Markdown without Timestamps
+#+BEGIN_SRC bash
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" --no-timestamps -o aula_sem_timestamps.md
+#+END_SRC
+
+** E. JSON Format
+Exports raw structured data with start time, duration, and text tokens:
+
+#+BEGIN_SRC bash
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" -f json -o transcript.json
+#+END_SRC
+
+* 2. Direct Subtitle Extraction using =yt-dlp=
+
+You can also use =yt-dlp= directly to download subtitles without downloading the video.
+
+** List Available Subtitles and Automatic Captions
+#+BEGIN_SRC bash
+yt-dlp --list-subs "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+** Download Portuguese Auto-Generated Subtitles (.srt)
+#+BEGIN_SRC bash
+yt-dlp --write-auto-sub --sub-lang pt --convert-subs srt --skip-download \
+       -o "%(title)s_legendas.%(ext)s" "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+** Download All Available Subtitles in English and Portuguese
+#+BEGIN_SRC bash
+yt-dlp --write-sub --write-auto-sub --sub-lang "pt,en" --convert-subs srt --skip-download \
+       "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+* 3. Downloading Audio & Video
+
+** Download High-Quality MP3 Audio
+Extracts audio and converts it to 320kbps MP3:
+
+#+BEGIN_SRC bash
+# Using FZL helper:
+fzl-yt-audio "https://www.youtube.com/watch?v=KipmuANQCGk"
+
+# Or directly with yt-dlp:
+yt-dlp --extract-audio --audio-format mp3 --audio-quality 0 \
+       -o "%(title)s.%(ext)s" "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+** Download Best Quality Video (MP4)
+#+BEGIN_SRC bash
+# Using FZL helper:
+fzl-yt-video "https://www.youtube.com/watch?v=KipmuANQCGk"
+
+# Or directly with yt-dlp:
+yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" \
+       --merge-output-format mp4 \
+       -o "%(title)s.%(ext)s" "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+* 4. Quick Reference Cheat Sheet
+
+| Task | Command |
+|--------------------------------------+--------------------------------------------------------------------------------------|
+| Timestamped Markdown Transcript | =fzl-yt-transcript "<URL>"= |
+| Plain Text Transcript | =fzl-yt-transcript "<URL>" -f text -o out.txt= |
+| Standard SRT Subtitles | =fzl-yt-transcript "<URL>" -f srt -o out.srt= |
+| Download Audio (MP3) | =fzl-yt-audio "<URL>"= |
+| Download Video (MP4) | =fzl-yt-video "<URL>"= |
+| Direct Subtitles Download via yt-dlp | =yt-dlp --write-auto-sub --sub-lang pt --convert-subs srt --skip-download "<URL>"= |

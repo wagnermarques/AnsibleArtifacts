@@ -1,0 +1,7 @@
+{
+  "ExtensionInstallForcelist": [
+{% for ext in active_extension_ids %}
+    "{{ ext }};{{ chrome_web_store_update_url }}"{{ "," if not loop.last else "" }}
+{% endfor %}
+  ]
+}

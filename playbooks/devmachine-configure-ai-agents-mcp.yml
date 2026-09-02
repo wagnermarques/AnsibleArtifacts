@@ -1,0 +1,6 @@
+---
+- name: Configure AI Agents MCP Servers
+  hosts: devmachines_workstations
+  become: yes
+  roles:
+    - devmachine_ai_agents_mcp

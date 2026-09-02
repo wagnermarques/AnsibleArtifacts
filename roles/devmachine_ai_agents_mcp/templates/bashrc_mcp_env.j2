@@ -1,0 +1,9 @@
+# ==============================================================================
+# Model Context Protocol (MCP) Environment Variables
+# Managed by Ansible devmachine_ai_agents_mcp role
+# ==============================================================================
+
+{% if effective_github_token %}
+export GITHUB_PERSONAL_ACCESS_TOKEN="{{ effective_github_token }}"
+export GITHUB_TOKEN="${GITHUB_TOKEN:-{{ effective_github_token }}}"
+{% endif %}

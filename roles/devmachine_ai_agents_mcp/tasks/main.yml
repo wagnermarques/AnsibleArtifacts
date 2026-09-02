@@ -1,0 +1,152 @@
+---
+# ==============================================================================
+# Tasks for devmachine_ai_agents_mcp role
+# Configures AI agents on the machine to use MCP servers, starting with GitHub MCP
+# and loading GITHUB_PERSONAL_ACCESS_TOKEN from .env file.
+# ==============================================================================
+
+- name: Determine real user and home directory
+  set_fact:
+    real_user: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
+    real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
+
+- name: Find existing .env file
+  stat:
+    path: "{{ item }}"
+  loop: "{{ mcp_dotenv_paths }}"
+  register: dotenv_stat_results
+  delegate_to: localhost
+  become: no
+
+- name: Select the first existing .env file
+  set_fact:
+    found_dotenv_path: "{{ (dotenv_stat_results.results | selectattr('stat.exists', 'equalto', true) | map(attribute='stat.path') | list | first) | default('') }}"
+
+- name: Display detected .env file
+  debug:
+    msg: "Using .env file at: {{ found_dotenv_path if found_dotenv_path != '' else 'None found (falling back to role variables/env)' }}"
+
+- name: Read .env file content if found
+  slurp:
+    src: "{{ found_dotenv_path }}"
+  register: dotenv_file_content
+  when: found_dotenv_path != ''
+  delegate_to: localhost
+  become: no
+
+- name: Extract GITHUB_PERSONAL_ACCESS_TOKEN from .env file
+  set_fact:
+    dotenv_github_token: >-
+      {{ (dotenv_file_content.content | b64decode | regex_findall('^\s*GITHUB_PERSONAL_ACCESS_TOKEN\s*=\s*["\']?(.*?)["\']?\s*$', multiline=True) | first) | default('') }}
+  when:
+    - found_dotenv_path != ''
+    - dotenv_file_content is defined
+    - dotenv_file_content.content is defined
+
+- name: Set effective GITHUB_PERSONAL_ACCESS_TOKEN
+  set_fact:
+    effective_github_token: "{{ (dotenv_github_token | default('')) if (dotenv_github_token is defined and dotenv_github_token != '') else (github_personal_access_token if github_personal_access_token != '' else (lookup('env', 'GITHUB_PERSONAL_ACCESS_TOKEN') | default('', true))) }}"
+
+- name: Check if npm is installed
+  command: which npm
+  register: npm_check
+  changed_when: false
+  failed_when: false
+
+- name: Install MCP packages globally via npm
+  npm:
+    name: "{{ item }}"
+    global: yes
+    state: present
+  loop: "{{ mcp_npm_packages }}"
+  when: npm_check.rc == 0
+  become: yes
+
+- name: Ensure agent configuration directories exist in user home
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ real_user }}"
+  loop:
+    - "{{ real_user_home }}/.gemini"
+    - "{{ real_user_home }}/.claude"
+    - "{{ real_user_home }}/.config/Claude"
+    - "{{ real_user_home }}/.config/opencode"
+    - "{{ real_user_home }}/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings"
+    - "{{ real_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings"
+    - "{{ real_user_home }}/.config/agents"
+  become: yes
+
+- name: Configure Gemini CLI MCP settings (~/.gemini/settings.json)
+  template:
+    src: gemini_settings.json.j2
+    dest: "{{ real_user_home }}/.gemini/settings.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_gemini_mcp | bool
+  become: yes
+
+- name: Configure Claude Desktop MCP settings (~/.config/Claude/claude_desktop_config.json)
+  template:
+    src: claude_desktop_config.json.j2
+    dest: "{{ real_user_home }}/.config/Claude/claude_desktop_config.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_claude_desktop_mcp | bool
+  become: yes
+
+- name: Configure Claude Code MCP settings (~/.claude.json)
+  template:
+    src: claude_code_config.json.j2
+    dest: "{{ real_user_home }}/.claude.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_claude_code_mcp | bool
+  become: yes
+
+- name: Configure VSCode Cline extension MCP settings
+  template:
+    src: cline_mcp_settings.json.j2
+    dest: "{{ real_user_home }}/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_vscode_cline_mcp | bool
+  become: yes
+
+- name: Configure VSCode Roo-Code extension MCP settings
+  template:
+    src: cline_mcp_settings.json.j2
+    dest: "{{ real_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_vscode_cline_mcp | bool
+  become: yes
+
+- name: Configure OpenCode MCP settings (~/.config/opencode/opencode.json)
+  template:
+    src: opencode_mcp.json.j2
+    dest: "{{ real_user_home }}/.config/opencode/opencode.json"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_opencode_mcp | bool
+  become: yes
+
+- name: Configure MCP shell environment (~/.bashrc_ai_mcp)
+  template:
+    src: bashrc_mcp_env.j2
+    dest: "{{ real_user_home }}/.bashrc_ai_mcp"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: configure_shell_env_mcp | bool
+  become: yes
+
+- name: Ensure ~/.bashrc_ai_mcp is sourced in user's ~/.bashrc
+  lineinfile:
+    path: "{{ real_user_home }}/.bashrc"
+    line: "source ~/.bashrc_ai_mcp"
+    state: present
+    create: yes
+    owner: "{{ real_user }}"
+  when: configure_shell_env_mcp | bool
+  become: yes

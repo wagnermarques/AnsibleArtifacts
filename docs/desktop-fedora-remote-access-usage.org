@@ -1,0 +1,51 @@
+#+TITLE: Remote Access Tools Setup & Usage Guide (Fedora Desktop)
+#+AUTHOR: FzlSoft
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+This playbook installs and configures remote access tools on Fedora Workstation:
+- **RDP Clients**: [[https://remmina.org/][Remmina]] (GUI with RDP/VNC/SPICE plugins), [[https://www.freerdp.net/][FreeRDP]] (CLI =xfreerdp= / =wlfreerdp=), and KRDC.
+- **Remote Desktop Systems**: [[https://rustdesk.com/][RustDesk]] (Open-source) and [[https://anydesk.com/][AnyDesk]] (official RPM repository).
+- **VNC & Virtualization Viewers**: TigerVNC (=vncviewer=) and Virt-Viewer (=remote-viewer=).
+- **FZL Launchers & Utilities**: =fzl-remmina=, =fzl-rustdesk=, =fzl-anydesk=, and =fzl-rdp-connect= helper.
+
+* Running the Playbook
+#+BEGIN_SRC bash
+ansible-playbook -K playbooks/desktop-fedora-remote-access-tools-setup.yml
+#+END_SRC
+
+* Connecting to Remote RDP Hosts
+
+** 1. Quick CLI Helper (=fzl-rdp= / =fzl-rdp-connect=)
+
+*** Internal Network (Local IP):
+#+BEGIN_SRC bash
+fzl-rdp 192.168.30.178
+# Or with specific username:
+fzl-rdp 192.168.30.178 <username>
+#+END_SRC
+
+*** External Network (DDNS):
+#+BEGIN_SRC bash
+fzl-rdp hjr0ah6z7cj.sn.mynetname.net
+# Or with specific username:
+fzl-rdp hjr0ah6z7cj.sn.mynetname.net <username>
+#+END_SRC
+
+** 2. FreeRDP Direct Command
+#+BEGIN_SRC bash
+# Internal IP
+xfreerdp /v:192.168.30.178 /cert:ignore /dynamic-resolution +clipboard /sound:sys:pulse /f
+
+# External DDNS
+xfreerdp /v:hjr0ah6z7cj.sn.mynetname.net /cert:ignore /dynamic-resolution +clipboard /sound:sys:pulse /f
+#+END_SRC
+
+** 3. Remmina GUI
+Launch Remmina via CLI or desktop app menu:
+#+BEGIN_SRC bash
+fzl-remmina-start
+#+END_SRC
+- Choose protocol *RDP*.
+- Enter Server address: ~192.168.30.178~ (Internal) or ~hjr0ah6z7cj.sn.mynetname.net~ (External).
+- Save profile for quick reconnects.

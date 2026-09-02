@@ -1,0 +1,45 @@
+#+TITLE: Multimedia & YouTube Tools Setup & Usage Guide (Fedora Desktop)
+#+AUTHOR: FzlSoft
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+This playbook configures multimedia tooling and creates dedicated FZL CLI utilities for downloading and transcribing YouTube content locally.
+
+* Included Tools & Commands
+1. =fzl-multimedia-youtube-transcript-video= (Alias: =fzl-yt-transcript=)
+   - Extracts YouTube video transcripts and auto-generated captions.
+   - Formats to **Markdown** (with video metadata and timestamps), **Plain Text**, **SRT Subtitles**, or **JSON**.
+   - Supports Portuguese (=pt=, =pt-BR=), English (=en=), Spanish (=es=), or automatic detection.
+2. =fzl-multimedia-youtube-download-audio= (Alias: =fzl-yt-audio=)
+   - Downloads high-quality MP3 audio extracted from YouTube using =yt-dlp= and =ffmpeg=.
+3. =fzl-multimedia-youtube-download-video= (Alias: =fzl-yt-video=)
+   - Downloads best-quality video and audio merged into standard MP4.
+
+* Running the Playbook
+#+BEGIN_SRC bash
+ansible-playbook -K playbooks/desktop-fedora-multimedia-youtube-tools-setup.yml
+#+END_SRC
+
+* Usage Examples
+
+** 1. Transcribe a YouTube Video Class
+#+BEGIN_SRC bash
+# Markdown format with timestamps (default):
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk"
+
+# Plain text output saved directly to file:
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" -f text -o aula_transcript.txt
+
+# Subtitle SRT format:
+fzl-yt-transcript "https://www.youtube.com/watch?v=KipmuANQCGk" -f srt -o aula.srt
+#+END_SRC
+
+** 2. Download YouTube Audio (MP3)
+#+BEGIN_SRC bash
+fzl-yt-audio "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC
+
+** 3. Download YouTube Video (MP4)
+#+BEGIN_SRC bash
+fzl-yt-video "https://www.youtube.com/watch?v=KipmuANQCGk"
+#+END_SRC

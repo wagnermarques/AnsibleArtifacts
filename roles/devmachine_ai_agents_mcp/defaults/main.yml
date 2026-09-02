@@ -1,0 +1,33 @@
+---
+# ==============================================================================
+# Defaults for devmachine_ai_agents_mcp role
+# Configures AI agents on the machine to use MCP (Model Context Protocol) servers,
+# starting with the GitHub MCP server configured with GITHUB_PERSONAL_ACCESS_TOKEN.
+# ==============================================================================
+
+# Search paths for .env file (checked in order)
+mcp_dotenv_paths:
+  - "{{ playbook_dir }}/../.env"
+  - "{{ playbook_dir }}/.env"
+  - "{{ inventory_dir }}/../.env"
+  - "{{ inventory_dir }}/.env"
+  - "./.env"
+
+# Explicit fallback for GitHub Personal Access Token (if not provided, loaded from .env)
+github_personal_access_token: ""
+
+# MCP NPM packages to install globally
+mcp_npm_packages:
+  - "@modelcontextprotocol/server-github"
+
+# Client integration toggles
+configure_gemini_mcp: true
+configure_claude_desktop_mcp: true
+configure_claude_code_mcp: true
+configure_vscode_cline_mcp: true
+configure_opencode_mcp: true
+configure_shell_env_mcp: true
+
+# Additional MCP server configuration placeholders
+google_maps_mcp_key: ""
+brave_search_mcp_key: ""

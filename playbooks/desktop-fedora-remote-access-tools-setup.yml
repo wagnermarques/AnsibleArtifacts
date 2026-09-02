@@ -1,0 +1,275 @@
+---
+- name: Install Remote Access Tools on Fedora Desktop (RDP, RustDesk, AnyDesk, VNC)
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    anydesk_service_enabled: true
+    rustdesk_version: "1.3.8"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. OS CHECK
+    # ----------------------------------------------------
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    # ----------------------------------------------------
+    # 2. INSTALL STANDARD REPOSITORY PACKAGES (RDP, VNC, SPICE)
+    # ----------------------------------------------------
+    - name: Install Remmina, FreeRDP, KRDC, TigerVNC, Virt-Viewer, and PuTTY
+      ansible.builtin.dnf:
+        name:
+          - remmina
+          - remmina-plugins-rdp
+          - remmina-plugins-vnc
+          - remmina-plugins-secret
+          - remmina-plugins-spice
+          - remmina-plugins-exec
+          - freerdp
+          - krdc
+          - tigervnc
+          - virt-viewer
+          - putty
+        state: present
+        update_cache: yes
+
+    # ----------------------------------------------------
+    # 3. CONFIGURE AND INSTALL ANYDESK
+    # ----------------------------------------------------
+    - name: Configure and install AnyDesk
+      block:
+        - name: Import AnyDesk RPM GPG key
+          ansible.builtin.rpm_key:
+            key: https://keys.anydesk.com/repos/RPM-GPG-KEY
+            state: present
+          ignore_errors: true
+
+        - name: Add AnyDesk RPM repository
+          ansible.builtin.yum_repository:
+            name: anydesk
+            description: AnyDesk Linux - stable
+            baseurl: "{{ 'http://rpm.anydesk.com/fedora/$basearch/' if ansible_facts['distribution'] == 'Fedora' else 'http://rpm.anydesk.com/centos/$basearch/' }}"
+            gpgkey: https://keys.anydesk.com/repos/RPM-GPG-KEY
+            gpgcheck: true
+            repo_gpgcheck: false
+            enabled: true
+
+        - name: Install AnyDesk package via DNF
+          ansible.builtin.dnf:
+            name: anydesk
+            state: present
+          ignore_errors: true
+
+        - name: Manage AnyDesk systemd service
+          when: ansible_facts['service_mgr'] == "systemd"
+          ansible.builtin.systemd:
+            name: anydesk
+            state: "{{ 'started' if anydesk_service_enabled | bool else 'stopped' }}"
+            enabled: "{{ anydesk_service_enabled | bool }}"
+          ignore_errors: true
+
+    # ----------------------------------------------------
+    # 4. CONFIGURE AND INSTALL RUSTDESK
+    # ----------------------------------------------------
+    - name: Download and install RustDesk RPM
+      block:
+        - name: Get latest release metadata from GitHub for RustDesk
+          ansible.builtin.uri:
+            url: https://api.github.com/repos/rustdesk/rustdesk/releases/latest
+            return_content: true
+          register: rustdesk_release_json
+          ignore_errors: true
+
+        - name: Determine RustDesk RPM download URL
+          ansible.builtin.set_fact:
+            rustdesk_rpm_url: >-
+              {{
+                (rustdesk_release_json.json.assets
+                 | default([])
+                 | selectattr('name', 'search', 'x86_64.*\\.rpm$')
+                 | map(attribute='browser_download_url')
+                 | first)
+                | default('https://github.com/rustdesk/rustdesk/releases/download/' ~ rustdesk_version ~ '/rustdesk-' ~ rustdesk_version ~ '-x86_64.rpm')
+              }}
+
+        - name: Download RustDesk RPM package
+          ansible.builtin.get_url:
+            url: "{{ rustdesk_rpm_url }}"
+            dest: "/tmp/rustdesk.rpm"
+            mode: '0644'
+            timeout: 60
+
+        - name: Install RustDesk RPM
+          ansible.builtin.dnf:
+            name: "/tmp/rustdesk.rpm"
+            state: present
+            disable_gpg_check: true
+      rescue:
+        - name: Display warning if RustDesk RPM installation failed
+          ansible.builtin.debug:
+            msg: "Warning: Direct RPM installation for RustDesk failed. RustDesk can also be installed via Flatpak: flatpak install -y flathub com.rustdesk.RustDesk"
+
+    # ----------------------------------------------------
+    # 5. FZL APPLICATION LAUNCH PATTERNS (RULE 2)
+    # ----------------------------------------------------
+    - name: Create fzl-remmina-start and fzl-remmina launchers
+      block:
+        - name: Create /usr/local/bin/fzl-remmina-start
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-remmina-start"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL Remmina Background Launcher
+              mkdir -p "$HOME/.cache/remmina"
+              nohup remmina "$@" > "$HOME/.cache/remmina/remmina.log" 2>&1 &
+
+        - name: Create /usr/local/bin/fzl-remmina
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-remmina"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL Remmina Foreground Launcher
+              exec remmina "$@"
+
+    - name: Create fzl-rustdesk-start and fzl-rustdesk launchers
+      block:
+        - name: Create /usr/local/bin/fzl-rustdesk-start
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-rustdesk-start"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL RustDesk Background Launcher
+              mkdir -p "$HOME/.cache/rustdesk"
+              nohup rustdesk "$@" > "$HOME/.cache/rustdesk/rustdesk.log" 2>&1 &
+
+        - name: Create /usr/local/bin/fzl-rustdesk
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-rustdesk"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL RustDesk Foreground Launcher
+              exec rustdesk "$@"
+
+    - name: Create fzl-anydesk-start and fzl-anydesk launchers
+      block:
+        - name: Create /usr/local/bin/fzl-anydesk-start
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-anydesk-start"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL AnyDesk Background Launcher
+              mkdir -p "$HOME/.cache/anydesk"
+              nohup anydesk "$@" > "$HOME/.cache/anydesk/anydesk.log" 2>&1 &
+
+        - name: Create /usr/local/bin/fzl-anydesk
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-anydesk"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL AnyDesk Foreground Launcher
+              exec anydesk "$@"
+
+    - name: Create quick RDP connection utility (fzl-rdp-connect)
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-rdp-connect"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Quick RDP Connection Helper (Uses xfreerdp / wlfreerdp)
+          # Usage: fzl-rdp-connect <host/ip> [username] [options...]
+          set -e
+
+          TARGET_HOST="${1:-}"
+          TARGET_USER="${2:-}"
+
+          if [ -z "$TARGET_HOST" ]; then
+            echo "Usage: fzl-rdp-connect <host-or-ip> [username]"
+            echo ""
+            echo "Examples:"
+            echo "  Internal: fzl-rdp-connect 192.168.30.178"
+            echo "  External: fzl-rdp-connect hjr0ah6z7cj.sn.mynetname.net"
+            echo "  With user: fzl-rdp-connect 192.168.30.178 Administrator"
+            exit 1
+          fi
+
+          shift 2 2>/dev/null || shift 1 2>/dev/null || true
+
+          RDP_CLIENT=""
+          if command -v xfreerdp3 >/dev/null 2>&1; then
+            RDP_CLIENT="xfreerdp3"
+          elif command -v xfreerdp >/dev/null 2>&1; then
+            RDP_CLIENT="xfreerdp"
+          elif command -v wlfreerdp >/dev/null 2>&1; then
+            RDP_CLIENT="wlfreerdp"
+          else
+            echo "FreeRDP binary not found. Falling back to Remmina..."
+            exec remmina "rdp://${TARGET_HOST}"
+          fi
+
+          EXTRA_ARGS=("/cert:ignore" "/dynamic-resolution" "+clipboard" "/sound:sys:pulse" "/f")
+          if [ -n "$TARGET_USER" ]; then
+            EXTRA_ARGS+=("/u:${TARGET_USER}")
+          fi
+
+          echo "Connecting to RDP target: ${TARGET_HOST} using ${RDP_CLIENT}..."
+          exec "$RDP_CLIENT" "/v:${TARGET_HOST}" "${EXTRA_ARGS[@]}" "$@"
+
+    - name: Add FZL remote access aliases to user .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        line: "{{ item }}"
+        state: present
+        create: true
+        owner: "{{ target_user }}"
+        mode: '0644'
+      loop:
+        - "alias fzl-remmina-start='nohup remmina > /dev/null 2>&1 &'"
+        - "alias fzl-remmina='remmina'"
+        - "alias fzl-rustdesk-start='nohup rustdesk > /dev/null 2>&1 &'"
+        - "alias fzl-rustdesk='rustdesk'"
+        - "alias fzl-anydesk-start='nohup anydesk > /dev/null 2>&1 &'"
+        - "alias fzl-anydesk='anydesk'"
+        - "alias fzl-rdp='fzl-rdp-connect'"
+      when: target_user != 'root'
+
+    # ----------------------------------------------------
+    # 6. SUMMARY AND QUICK ACCESS INSTRUCTIONS
+    # ----------------------------------------------------
+    - name: Display Remote Access Setup Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Fedora Desktop Remote Access Tools Setup Completed!"
+          - "=========================================================================="
+          - " Installed Tools:"
+          - "   - Remmina (RDP, VNC, SPICE GUI Client): fzl-remmina / fzl-remmina-start"
+          - "   - FreeRDP (CLI RDP Client): freerdp / xfreerdp / wlfreerdp"
+          - "   - RustDesk (Open-source Remote Desktop): fzl-rustdesk / fzl-rustdesk-start"
+          - "   - AnyDesk (Remote Desktop): fzl-anydesk / fzl-anydesk-start"
+          - "   - TigerVNC (VNC Client): vncviewer"
+          - "   - Virt-Viewer (VM SPICE/VNC Viewer): remote-viewer"
+          - "   - PuTTY (SSH/Serial Client): putty"
+          - ""
+          - " Quick RDP Access Commands:"
+          - "   Internal Access (Local Network):"
+          - "     $ fzl-rdp 192.168.30.178 [username]"
+          - "     OR: xfreerdp /v:192.168.30.178 /cert:ignore /dynamic-resolution +clipboard"
+          - ""
+          - "   External Access (DDNS):"
+          - "     $ fzl-rdp hjr0ah6z7cj.sn.mynetname.net [username]"
+          - "     OR: xfreerdp /v:hjr0ah6z7cj.sn.mynetname.net /cert:ignore /dynamic-resolution +clipboard"
+          - "=========================================================================="

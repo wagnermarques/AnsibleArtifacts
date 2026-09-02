@@ -1,0 +1,6 @@
+---
+- name: Configure Browser AI Extensions (Chrome, Chromium, Brave, Edge)
+  hosts: devmachines_workstations
+  become: yes
+  roles:
+    - desktopmachine_browser_ai_extensions

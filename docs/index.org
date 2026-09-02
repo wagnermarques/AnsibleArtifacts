@@ -30,3 +30,10 @@ A comprehensive guide for installing MetaTrader 5 on Fedora Linux via Wine, conn
 ** [[file:gamedevmachine-godot-usage.org][Game Development: Godot Engine 4 Setup & Usage Guide]]
 A complete guide for installing and configuring Godot Engine 4 with FZL background launch patterns, live logging, export templates, and desktop environment integration.
 
+** [[file:desktop-fedora-multimedia-youtube-transcript-tutorial.org][Multimedia: YouTube Video Transcription, Subtitles & Media Downloader Tutorial]]
+Tutorial on downloading transcripts, closed captions (.srt, .txt, .md), and media (MP3/MP4) from YouTube videos using =fzl-yt-transcript=, =fzl-yt-audio=, =fzl-yt-video=, and =yt-dlp=.
+
+** [[file:desktop-fedora-remote-access-usage.org][Fedora Desktop Remote Access Tools Setup & Usage Guide]]
+Guide for setting up and connecting to remote machines via RDP (Remmina, FreeRDP), RustDesk, AnyDesk, and VNC with FZL launchers.
+
+

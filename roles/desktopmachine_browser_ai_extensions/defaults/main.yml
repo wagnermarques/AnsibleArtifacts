@@ -1,0 +1,56 @@
+---
+# ==============================================================================
+# Defaults for desktopmachine_browser_ai_extensions role
+# Automates the system-wide installation of AI extensions (Claude, Gemini, Copilot, etc.)
+# for Chromium-based browsers (Google Chrome, Chromium, Brave, Microsoft Edge).
+# ==============================================================================
+
+# Browser Policy Directories
+browser_policy_directories:
+  - "/etc/opt/chrome/policies/managed"
+  - "/etc/chromium/policies/managed"
+  - "/etc/brave/policies/managed"
+  - "/etc/opt/edge/policies/managed"
+
+# Browser External Extension Directories
+browser_external_extension_directories:
+  - "/usr/share/google-chrome/extensions"
+  - "/usr/share/chromium/extensions"
+  - "/opt/google/chrome/extensions"
+
+# Update URL for Chrome Web Store extensions
+chrome_web_store_update_url: "https://clients2.google.com/service/update2/crx"
+
+# AI Extensions to install
+# Each item must have:
+# - id: 32-character Chrome Web Store ID
+# - name: Friendly name
+# - enabled: Boolean toggle
+browser_ai_extensions:
+  # Sider AI (ChatGPT-4o, Claude 3.5 Sonnet, Gemini 1.5/2.0 all-in-one sidebar)
+  - id: "difoiogjjojoaoomphldepapgpbgkhkb"
+    name: "Sider AI (Claude & Gemini & ChatGPT Sidebar)"
+    enabled: true
+
+  # Monica AI (Claude 3.5, Gemini Pro, GPT-4o Copilot)
+  - id: "fjjllbmlgdnedbgikijgcmigfpnnjflf"
+    name: "Monica AI Assistant (Claude, Gemini, GPT Copilot)"
+    enabled: true
+
+  # Harpa AI (Automation Agent, Web Assistant with Claude, Gemini & GPT)
+  - id: "eagjogbihmfgmjegmhdibllbdfmmhdik"
+    name: "HARPA AI (Web Agent, Claude & Gemini Automations)"
+    enabled: true
+
+  # Microsoft Copilot / Bing Chat AI
+  - id: "bonjafkgidgipaoegkgnjfjpblbhbepn"
+    name: "Microsoft Copilot"
+    enabled: true
+
+  # GitHub Copilot & Developer AI Helpers
+  - id: "bhemlafiggnccaeidomafjhnlbfkianf"
+    name: "GitHub Copilot / Developer AI helper"
+    enabled: false
+
+# Custom extra extension IDs list (strings)
+browser_extra_extension_ids: []
