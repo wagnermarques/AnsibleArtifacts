@@ -36,4 +36,7 @@ Tutorial on downloading transcripts, closed captions (.srt, .txt, .md), and medi
 ** [[file:desktop-fedora-remote-access-usage.org][Fedora Desktop Remote Access Tools Setup & Usage Guide]]
 Guide for setting up and connecting to remote machines via RDP (Remmina, FreeRDP), RustDesk, AnyDesk, and VNC with FZL launchers.
 
+** [[file:desktop-bash-configuration.org][Desktop Bash Configuration, Prompts & Productivity Utilities Guide]]
+Guide for modular =~/.bashrc.d/= shell tuning, dynamic prompt switchers (=fzl-bash-prompt--shortpath.sh=, =fzl-prompt-git=), aliases, shell functions (=extract=, =mkcd=, =fzl-path=), and Lattes CV PDF downloader (=fzl-lattes-download-pdf=).
+
 

@@ -1,0 +1,318 @@
+#+TITLE: Desktop Bash Shell Configuration & Productivity Utilities Guide
+#+AUTHOR: FzlSoft
+#+DATE: [2026-09-03 Thu]
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+The =playbooks/desktop-bash-configuration.yml= playbook establishes a modern, modular, and highly productive Bash shell environment for Linux workstations (Fedora, RedHat, Debian/Ubuntu).
+
+Instead of maintaining a monolithic, hard-to-maintain =~/.bashrc= file, this playbook provisions a structured =~/.bashrc.d/= directory layout, dynamic *on-demand* prompt switchers with Git and exit-code awareness, hardened shell options, ergonomic aliases, and standalone CLI utilities installed into =/usr/local/bin/=.
+
+#+begin_important
+*Default Prompt Policy:* Running the playbook *does NOT alter your default shell prompt* automatically upon login. Your standard prompt remains intact. The new prompt styles are activated only on-demand when you explicitly run one of the =fzl-bash-prompt-...= commands or shortcuts.
+#+end_important
+
+* Key Capabilities
+- **Modular Shell Architecture**: Clean =~/.bashrc.d/= structure automatically loaded upon terminal startup.
+- **On-Demand Prompt Switchers**: Instant prompt switching between *Shortpath*, *Git-Aware Two-Line*, *Minimalist*, *Full Path*, and *System Standard* formats with zero visual glitching.
+- **Enhanced History & Usability**: 50,000 command history with ISO timestamps, duplicate deduplication, =autocd=, typo auto-correction (=cdspell=), and recursive globbing (=globstar=).
+- **Productive Aliases & Safety**: Safe interactive file operations (=cp -i=, =rm -I=), sorted listings (=lt=, =ll=, =lh=), and instant networking helpers (=myip=, =localip=, =ports=).
+- **Built-in Power Functions**: Universal archive uncompressor (=extract=), directory creator and navigator (=mkcd=), PATH health inspector (=fzl-path=), quick file backupper (=backup=), command cheat sheet (=fzl-cheat=), and terminal calculator (=calc=).
+- **Curriculum Lattes PDF Downloader**: One-command PDF export tool (=fzl-lattes-download-pdf=) with default ID =5700493017480725=.
+
+* Running the Playbook
+
+Execute the playbook with privilege escalation:
+
+#+begin_src bash
+ansible-playbook -K playbooks/desktop-bash-configuration.yml
+#+end_src
+
+#+begin_quote
+*Note:* The playbook is idempotent. You can re-run it at any time to restore configurations or update scripts without losing custom environment variables.
+#+end_quote
+
+After the playbook finishes, reload your active shell:
+#+begin_src bash
+source ~/.bashrc
+# Or using the alias:
+reloadbash
+#+end_src
+
+* Architecture & Directory Layout
+
+#+begin_example
+~/.bashrc
+│  ├── Sourced globally from /etc/bashrc
+│  └── Loads all modular scripts from ~/.bashrc.d/*.bash
+│
+~/.bashrc.d/
+├── 00-bash-options.bash     # History tuning, shopt flags, colored man pages
+├── 10-bash-aliases.bash     # Listing, navigation, safety, network aliases
+├── 20-bash-prompt.bash      # Dynamic prompt switchers (on-demand functions)
+└── 30-bash-functions.bash   # mkcd, extract, backup, pathview, cheat, calc
+
+/usr/local/bin/
+├── fzl-bash-prompt--shortpath.sh  # Standalone short path prompt script
+├── fzl-bash-prompt--git.sh        # Standalone Git-aware prompt script
+├── fzl-bash-prompt--minimal.sh    # Standalone minimalist prompt script
+├── fzl-bash-prompt--full.sh       # Standalone full path prompt script
+├── fzl-bash-prompt--reset.sh      # Standalone reset prompt script
+├── fzl-bash-sysinfo               # System diagnostic dashboard (alias: fzl-sysinfo)
+├── fzl-bash-path                  # PATH directory inspector (alias: fzl-path)
+├── fzl-bash-extract               # Universal file extractor (alias: fzl-extract)
+└── fzl-lattes-download-pdf        # Lattes CV PDF downloader (alias: fzl-lattes-pdf)
+#+end_example
+
+* Detailed Features & Usage Guide
+
+** 1. Dynamic On-Demand Prompt Switchers
+When opening a terminal, your prompt stays in its standard default appearance. Whenever you wish to change your prompt during a work session, run any of the commands below:
+
+*** Profile 1: Shortpath Prompt
+Trims deeply nested paths to the last 2 directory components (=PROMPT_DIRTRIM=2=), displaying username, hostname, Git branch with dirty/clean status, and non-zero exit codes.
+
+#+begin_src bash
+fzl-bash-prompt--shortpath.sh
+# Or short alias:
+fzl-prompt-short
+#+end_src
+
+- *Format preview:*
+  #+begin_example
+  user@workstation:~/.../Projects-Srcs/AnsibleArtifacts (main✓)$ 
+  #+end_example
+
+*** Profile 2: Git-Aware Two-Line Prompt
+Ideal for active software development. Displays current timestamp, host info, working directory, Git branch status on line 1, followed by a dedicated input cursor on line 2.
+
+#+begin_src bash
+fzl-bash-prompt--git.sh
+# Or short alias:
+fzl-prompt-git
+#+end_src
+
+- *Format preview:*
+  #+begin_example
+  [17:30:15] user@workstation:~/.../Projects-Srcs/AnsibleArtifacts (main*)
+  ➔ 
+  #+end_example
+
+*** Profile 3: Minimalist Clean Prompt
+A modern distraction-free prompt displaying only the current directory name and an arrow prompt.
+
+#+begin_src bash
+fzl-bash-prompt--minimal.sh
+# Or short alias:
+fzl-prompt-minimal
+#+end_src
+
+- *Format preview:*
+  #+begin_example
+  AnsibleArtifacts (main✓) ❯ 
+  #+end_example
+
+*** Profile 4: Full Path Prompt
+Displays the complete, unabbreviated absolute path to the current directory.
+
+#+begin_src bash
+fzl-bash-prompt--full.sh
+# Or short alias:
+fzl-prompt-full
+#+end_src
+
+- *Format preview:*
+  #+begin_example
+  user@workstation:/home/user/mnt/ext4/Projects-Srcs/AnsibleArtifacts (main✓)$ 
+  #+end_example
+
+*** Profile 5: System Standard Reset
+Restores the standard bash prompt without extra ANSI formatting.
+
+#+begin_src bash
+fzl-bash-prompt--reset.sh
+# Or short alias:
+fzl-prompt-reset
+#+end_src
+
+- *Format preview:*
+  #+begin_example
+  [user@workstation AnsibleArtifacts]$ 
+  #+end_example
+
+*** Visual Status Indicators
+- **Exit Code Marker**: If a previous command exited with an error, the prompt displays ~[✘ <exit_code>]~ in bold red.
+- **Git Clean Marker**: ~(branch✓)~ in green indicates a clean working tree.
+- **Git Dirty Marker**: ~(branch*)~ in yellow indicates uncommitted changes or untracked files.
+
+---
+
+** 2. Shell Usability & Quality of Life (=00-bash-options.bash=)
+
+*** History Tuning
+- **History Size**: =HISTSIZE=50000= commands in memory, =HISTFILESIZE=100000= lines in =~/.bash_history=.
+- **Timestamps**: Every history command is recorded with =YYYY-MM-DD HH:MM:SS= timestamps.
+- **Deduplication**: Duplicate commands and commands starting with a space are automatically filtered out (=HISTCONTROL=ignoreboth:erasedups=).
+- **Multi-Line Commands**: Multi-line commands are recorded as single historical entries (=shopt -s cmdhist=).
+
+*** Shell Ergonomics (=shopt=)
+- **Auto-cd**: Type any directory path directly to navigate without typing =cd=:
+  #+begin_src bash
+  /var/log
+  # Automatically runs: cd /var/log
+  #+end_src
+- **Typo Auto-correction**: Minor typos in =cd= commands and tab completion are automatically corrected:
+  #+begin_src bash
+  cd Dowloads
+  # Automatically corrected to: cd Downloads/
+  #+end_src
+- **Recursive Globbing (=globstar=)**: Use =**= to match nested subdirectories recursively:
+  #+begin_src bash
+  ls **/*.yml
+  #+end_src
+- **Window Resize Tracking**: Automatically adjusts terminal =$LINES= and =$COLUMNS= when the window is resized.
+- **Colored Man Pages**: Terminal manual pages (=man bash=, =man ssh=) are displayed with color-coded syntax highlights.
+
+---
+
+** 3. Productive Aliases (=10-bash-aliases.bash=)
+
+*** Directory Listings
+| Alias | Equivalent Command | Purpose |
+| :--- | :--- | :--- |
+| =ll= | =ls -alF --color=auto= | Detailed listing with permissions, hidden files, and type indicators |
+| =la= | =ls -A --color=auto= | List almost all files (including hidden, excluding =.= and =..=) |
+| =lt= | =ls -ltr --color=auto= | List files sorted by modification time (*newest files at the bottom*) |
+| =lh= | =ls -lh --color=auto= | List with human-readable file sizes (KB, MB, GB) |
+| =ldot= | =ls -ld .* --color=auto= | List only hidden directories and configuration files |
+
+*** Navigation
+| Alias | Equivalent Command | Purpose |
+| :--- | :--- | :--- |
+| =..= | =cd ..= | Move up 1 directory level |
+| =...= | =cd ../..= | Move up 2 directory levels |
+| =....= | =cd ../../..= | Move up 3 directory levels |
+| =cd..= | =cd ..= | Handles missing space typo |
+| =cd-= | =cd -= | Switch back to the previous directory |
+
+*** Safety & Diagnostics
+| Alias | Equivalent Command | Purpose |
+| :--- | :--- | :--- |
+| =cp= | =cp -i= | Interactive copy (prompts before overwriting existing files) |
+| =mv= | =mv -i= | Interactive move/rename |
+| =rm= | =rm -I= | Prompts once before removing more than 3 files or recursive targets |
+| =ports= | =ss -tulanp= | Lists all open listening TCP/UDP ports with associated processes |
+| =myip= | =curl -s https://ifconfig.me= | Displays your current public WAN IP address |
+| =localip= | LAN IP helper | Displays your local network adapter IP address |
+| =meminfo= | =free -h -t= | Formatted human-readable RAM and Swap summary |
+| =reloadbash= | =source ~/.bashrc= | Re-sources =~/.bashrc= and reloads all modular configurations |
+
+---
+
+** 4. Built-in Power Functions (=30-bash-functions.bash=)
+
+*** A. Create & Enter Directory (=mkcd=)
+Creates a directory tree (including parent directories) and navigates into it in a single step:
+#+begin_src bash
+mkcd /path/to/my/new/nested/project
+#+end_src
+
+*** B. Universal Archive Extractor (=extract= / =fzl-extract=)
+Automatically identifies the archive compression algorithm and extracts the content:
+#+begin_src bash
+extract archive.tar.gz
+extract backup.tar.xz
+extract package.zip
+extract bundle.7z
+extract software.rpm
+#+end_src
+/Supported formats: .tar.gz, .tgz, .tar.bz2, .tbz2, .tar.xz, .txz, .tar.zst, .zip, .7z, .rar, .bz2, .gz, .tar, .deb, .rpm/
+
+*** C. PATH Health Inspector (=fzl-path= / =pathview=)
+Analyzes your current =$PATH= variable line-by-line, highlighting existing directories in green =[✓ FOUND]= and broken or non-existent directories in red =[✗ MISSING]=:
+#+begin_src bash
+fzl-path
+#+end_src
+
+*** D. Timestamped File Backup (=backup= / =fzl-backup=)
+Creates a safe timestamped copy of a file before modifying it:
+#+begin_src bash
+backup /etc/nginx/nginx.conf
+# Creates: /etc/nginx/nginx.conf.bak.20260903_173000
+#+end_src
+
+*** E. Interactive Cheat Sheet (=fzl-cheat=)
+Fetches cheat sheets and usage examples directly inside the terminal from [[https://cht.sh][cht.sh]]:
+#+begin_src bash
+# Quick command examples:
+fzl-cheat tar
+fzl-cheat find
+fzl-cheat rsync
+
+# Language snippets:
+fzl-cheat python/list_comprehension
+fzl-cheat golang/goroutines
+#+end_src
+
+*** F. Terminal Calculator (=calc=)
+Evaluates mathematical expressions right from the shell:
+#+begin_src bash
+calc '2 ** 10'
+calc '1024 * 768 * 4 / (1024 * 1024)'
+calc 'math.sqrt(144) + math.sin(math.pi / 2)'
+#+end_src
+
+*** G. System Overview Dashboard (=fzl-sysinfo=)
+Displays a colorized system diagnostic dashboard:
+#+begin_src bash
+fzl-sysinfo
+#+end_src
+
+---
+
+** 5. Curriculum Lattes PDF Downloader (=fzl-lattes-download-pdf=)
+
+The =fzl-lattes-download-pdf= CLI utility downloads academic curricula from CNPq's Plataforma Lattes directly into publication-quality PDF documents using headless Chrome/Chromium.
+
+*** Default Execution
+If no ID is passed, it uses the default Lattes Curriculum number *5700493017480725*:
+#+begin_src bash
+fzl-lattes-download-pdf
+# Or short alias:
+fzl-lattes-pdf
+#+end_src
+
+- *Output:* =curriculo_lattes_5700493017480725.pdf= in the current directory.
+
+*** Custom ID or Output Filename
+You can provide any 16-digit Lattes ID or full URL and specify a custom output path:
+#+begin_src bash
+# Specify Lattes ID:
+fzl-lattes-download-pdf 5700493017480725
+
+# Specify Lattes ID and custom filename:
+fzl-lattes-download-pdf 5700493017480725 curriculo_pesquisador.pdf
+
+# Specify full URL:
+fzl-lattes-download-pdf "http://lattes.cnpq.br/5700493017480725" ~/Downloads/lattes.pdf
+#+end_src
+
+* Customization & Extensibility
+
+To add your own custom aliases, environment variables, or scripts without modifying Ansible-managed files:
+
+1. Create a new file in =~/.bashrc.d/=, e.g. =~/.bashrc.d/99-custom.bash=:
+   #+begin_src bash
+   cat << 'EOF' > ~/.bashrc.d/99-custom.bash
+   # Custom user overrides
+   export MY_PROJECT_ROOT="$HOME/Projects"
+   alias myproj="cd $MY_PROJECT_ROOT"
+   EOF
+   #+end_src
+
+2. Reload your configuration:
+   #+begin_src bash
+   reloadbash
+   #+end_src
+
+All files in =~/.bashrc.d/*.bash= are automatically loaded in alphabetical order upon every new shell session.

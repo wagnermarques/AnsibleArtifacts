@@ -1,0 +1,690 @@
+---
+- name: Configure Desktop Bash Shell, Prompts, Aliases and Utilities
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    bashrc_d_dir: "{{ target_home }}/.bashrc.d"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. DIRECTORY INITIALIZATION
+    # ----------------------------------------------------
+    - name: Ensure ~/.bashrc.d directory exists for target user
+      ansible.builtin.file:
+        path: "{{ bashrc_d_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: '0755'
+
+    - name: Ensure /usr/local/bin exists
+      ansible.builtin.file:
+        path: "/usr/local/bin"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # ----------------------------------------------------
+    # 2. ENSURE ~/.bashrc SOURCES ~/.bashrc.d/*.bash
+    # ----------------------------------------------------
+    - name: Ensure ~/.bashrc sources all scripts in ~/.bashrc.d
+      ansible.builtin.blockinfile:
+        path: "{{ target_home }}/.bashrc"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK: BASHRC.D LOADER"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        create: true
+        block: |
+          if [ -d ~/.bashrc.d ]; then
+              for rc in ~/.bashrc.d/*.bash; do
+                  if [ -f "$rc" ]; then
+                      . "$rc"
+                  fi
+              done
+              unset rc
+          fi
+
+    # ----------------------------------------------------
+    # 3. INSTALL BASH OPTIONS (00-bash-options.bash)
+    # ----------------------------------------------------
+    - name: Install 00-bash-options.bash in ~/.bashrc.d
+      ansible.builtin.copy:
+        dest: "{{ bashrc_d_dir }}/00-bash-options.bash"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # ==============================================================================
+          # 00-bash-options.bash - Shell Options & History Tuning
+          # Managed by Ansible desktop-bash-configuration playbook
+          # ==============================================================================
+
+          # --- History Settings ---
+          export HISTSIZE=50000
+          export HISTFILESIZE=100000
+          export HISTCONTROL=ignoreboth:erasedups
+          export HISTTIMEFORMAT="%Y-%m-%d %H:%M:%S "
+          export HISTIGNORE="ls:ll:la:cd:pwd:exit:clear:history:reloadbash"
+
+          # Append to history file instead of overwriting
+          shopt -s histappend
+          # Save multi-line commands as a single history entry
+          shopt -s cmdhist
+
+          # --- Shell Usability (shopt) ---
+          # Autocd: type directory name directly to cd into it
+          shopt -s autocd 2>/dev/null
+          # Correct minor spelling errors in cd commands
+          shopt -s cdspell 2>/dev/null
+          # Correct directory spelling errors during tab completion
+          shopt -s dirspell 2>/dev/null
+          # Update window size (LINES/COLUMNS) after each command
+          shopt -s checkwinsize 2>/dev/null
+          # Enable extended globbing and recursive '**' globbing
+          shopt -s extglob 2>/dev/null
+          shopt -s globstar 2>/dev/null
+          # Do not attempt command completion on empty line
+          shopt -s no_empty_cmd_completion 2>/dev/null
+
+          # --- Terminal Colors for Man Pages (less) ---
+          export LESS_TERMCAP_mb=$'\e[1;31m'      # begin blink (red)
+          export LESS_TERMCAP_md=$'\e[1;36m'      # begin bold (cyan)
+          export LESS_TERMCAP_me=$'\e[0m'         # reset bold/blink
+          export LESS_TERMCAP_so=$'\e[01;33;44m'  # begin standout (yellow on blue)
+          export LESS_TERMCAP_se=$'\e[0m'         # reset standout
+          export LESS_TERMCAP_us=$'\e[1;32m'      # begin underline (green)
+          export LESS_TERMCAP_ue=$'\e[0m'         # reset underline
+
+          # Colored GCC / Clang output
+          export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
+
+    # ----------------------------------------------------
+    # 4. INSTALL BASH ALIASES (10-bash-aliases.bash)
+    # ----------------------------------------------------
+    - name: Install 10-bash-aliases.bash in ~/.bashrc.d
+      ansible.builtin.copy:
+        dest: "{{ bashrc_d_dir }}/10-bash-aliases.bash"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # ==============================================================================
+          # 10-bash-aliases.bash - Common Productive Shell Aliases
+          # Managed by Ansible desktop-bash-configuration playbook
+          # ==============================================================================
+
+          # --- Directory Listings with Colors ---
+          alias ls='ls --color=auto'
+          alias ll='ls -alF --color=auto'
+          alias la='ls -A --color=auto'
+          alias l='ls -CF --color=auto'
+          alias lt='ls -ltr --color=auto'
+          alias lh='ls -lh --color=auto'
+          alias ldot='ls -ld .* --color=auto'
+
+          # --- Navigation Shortcuts ---
+          alias ..='cd ..'
+          alias ...='cd ../..'
+          alias ....='cd ../../..'
+          alias .....='cd ../../../..'
+          alias cd..='cd ..'
+          alias cd-='cd -'
+
+          # --- Safe Interactive File Operations ---
+          alias cp='cp -i'
+          alias mv='mv -i'
+          alias rm='rm -I'
+          alias ln='ln -i'
+
+          # --- Search & Grep with Color ---
+          alias grep='grep --color=auto'
+          alias egrep='egrep --color=auto'
+          alias fgrep='fgrep --color=auto'
+          alias diff='diff --color=auto'
+
+          # --- System Information & Resources ---
+          alias df='df -h'
+          alias du1='du -h -d 1'
+          alias free='free -h -t'
+          alias meminfo='free -h -t'
+          alias ports='ss -tulanp'
+          alias myip='curl -s https://ifconfig.me; echo'
+          alias localip="ip route get 1.1.1.1 2>/dev/null | awk '{print \$7; exit}' || hostname -I | awk '{print \$1}'"
+
+          # --- Reload Bashrc ---
+          alias reloadbash='source ~/.bashrc && echo "✓ ~/.bashrc reloaded successfully."'
+
+    # ----------------------------------------------------
+    # 5. INSTALL BASH PROMPT ENGINE (20-bash-prompt.bash)
+    # Note: Does NOT modify default prompt on login.
+    # Prompts are activated only on-demand by the user via fzl-bash-prompt-* commands.
+    # ----------------------------------------------------
+    - name: Install 20-bash-prompt.bash in ~/.bashrc.d
+      ansible.builtin.copy:
+        dest: "{{ bashrc_d_dir }}/20-bash-prompt.bash"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # ==============================================================================
+          # 20-bash-prompt.bash - Dynamic On-Demand Prompt Switchers & Git Awareness
+          # Managed by Ansible desktop-bash-configuration playbook
+          # Prompts are activated ONLY when the user executes a switcher command.
+          # ==============================================================================
+
+          # Internal prompt generator: Shortpath
+          __fzl_render_prompt_shortpath() {
+              local last_exit=$?
+              local exit_str=""
+              if [ $last_exit -ne 0 ]; then
+                  exit_str="\[\e[1;31m\][✘ ${last_exit}]\[\e[0m\] "
+              fi
+              local git_str=""
+              if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+                  local branch dirty
+                  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --always 2>/dev/null)
+                  if [ -n "$branch" ]; then
+                      if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+                          dirty="\[\e[1;33m\]*\[\e[0m\]"
+                      else
+                          dirty="\[\e[1;32m\]✓\[\e[0m\]"
+                      fi
+                      git_str=" \[\e[1;35m\](${branch}${dirty}\[\e[1;35m\])\[\e[0m\]"
+                  fi
+              fi
+              PS1="${exit_str}\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]${git_str}\[\e[1;36m\]\$\[\e[0m\] "
+          }
+
+          # Internal prompt generator: Git Two-Line
+          __fzl_render_prompt_git() {
+              local last_exit=$?
+              local exit_str=""
+              if [ $last_exit -ne 0 ]; then
+                  exit_str="\[\e[1;31m\][✘ ${last_exit}]\[\e[0m\] "
+              fi
+              local git_str=""
+              if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+                  local branch dirty
+                  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --always 2>/dev/null)
+                  if [ -n "$branch" ]; then
+                      if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+                          dirty="\[\e[1;33m\]*\[\e[0m\]"
+                      else
+                          dirty="\[\e[1;32m\]✓\[\e[0m\]"
+                      fi
+                      git_str=" \[\e[1;35m\](${branch}${dirty}\[\e[1;35m\])\[\e[0m\]"
+                  fi
+              fi
+              PS1="${exit_str}\[\e[1;36m\][\t]\[\e[0m\] \[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]${git_str}\n\[\e[1;33m\]➔ \[\e[0m\]"
+          }
+
+          # Internal prompt generator: Minimalist
+          __fzl_render_prompt_minimal() {
+              local last_exit=$?
+              local status_color="\[\e[1;32m\]"
+              if [ $last_exit -ne 0 ]; then
+                  status_color="\[\e[1;31m\]"
+              fi
+              local git_str=""
+              if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+                  local branch dirty
+                  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --always 2>/dev/null)
+                  if [ -n "$branch" ]; then
+                      if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+                          dirty="\[\e[1;33m\]*\[\e[0m\]"
+                      else
+                          dirty="\[\e[1;32m\]✓\[\e[0m\]"
+                      fi
+                      git_str=" \[\e[1;35m\](${branch}${dirty}\[\e[1;35m\])\[\e[0m\]"
+                  fi
+              fi
+              PS1="\[\e[1;34m\]\W\[\e[0m\]${git_str} ${status_color}❯\[\e[0m\] "
+          }
+
+          # Internal prompt generator: Full Path
+          __fzl_render_prompt_full() {
+              local last_exit=$?
+              local exit_str=""
+              if [ $last_exit -ne 0 ]; then
+                  exit_str="\[\e[1;31m\][✘ ${last_exit}]\[\e[0m\] "
+              fi
+              local git_str=""
+              if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+                  local branch dirty
+                  branch=$(git symbolic-ref --short HEAD 2>/dev/null || git describe --tags --always 2>/dev/null)
+                  if [ -n "$branch" ]; then
+                      if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+                          dirty="\[\e[1;33m\]*\[\e[0m\]"
+                      else
+                          dirty="\[\e[1;32m\]✓\[\e[0m\]"
+                      fi
+                      git_str=" \[\e[1;35m\](${branch}${dirty}\[\e[1;35m\])\[\e[0m\]"
+                  fi
+              fi
+              PS1="${exit_str}\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]${git_str}\[\e[1;36m\]\$\[\e[0m\] "
+          }
+
+          # ----------------------------------------------------
+          # USER INTERACTIVE COMMANDS / FUNCTIONS
+          # ----------------------------------------------------
+
+          # 1. Short Path Prompt (PROMPT_DIRTRIM=2 with Git and Exit status)
+          fzl-bash-prompt--shortpath() {
+              export PROMPT_DIRTRIM=2
+              export PROMPT_COMMAND="__fzl_render_prompt_shortpath"
+              echo "✓ Switched to Shortpath Prompt (PROMPT_DIRTRIM=2)"
+          }
+
+          # 2. Rich Git Prompt (Two-line layout with time & branch)
+          fzl-bash-prompt--git() {
+              export PROMPT_DIRTRIM=2
+              export PROMPT_COMMAND="__fzl_render_prompt_git"
+              echo "✓ Switched to Git-Aware Two-Line Prompt"
+          }
+
+          # 3. Minimalist Prompt
+          fzl-bash-prompt--minimal() {
+              export PROMPT_DIRTRIM=1
+              export PROMPT_COMMAND="__fzl_render_prompt_minimal"
+              echo "✓ Switched to Minimalist Prompt"
+          }
+
+          # 4. Full Path Prompt
+          fzl-bash-prompt--full() {
+              unset PROMPT_DIRTRIM
+              export PROMPT_COMMAND="__fzl_render_prompt_full"
+              echo "✓ Switched to Full Path Prompt"
+          }
+
+          # 5. Default Standard Reset
+          fzl-bash-prompt--reset() {
+              unset PROMPT_DIRTRIM
+              unset PROMPT_COMMAND
+              export PS1='[\u@\h \W]\$ '
+              echo "✓ Reset to Standard Bash Prompt"
+          }
+
+          # Command & Script Aliases
+          alias fzl-bash-prompt--shortpath.sh='fzl-bash-prompt--shortpath'
+          alias fzl-bash-prompt--git.sh='fzl-bash-prompt--git'
+          alias fzl-bash-prompt--minimal.sh='fzl-bash-prompt--minimal'
+          alias fzl-bash-prompt--full.sh='fzl-bash-prompt--full'
+          alias fzl-bash-prompt--reset.sh='fzl-bash-prompt--reset'
+
+          alias fzl-prompt-short='fzl-bash-prompt--shortpath'
+          alias fzl-prompt-git='fzl-bash-prompt--git'
+          alias fzl-prompt-minimal='fzl-bash-prompt--minimal'
+          alias fzl-prompt-full='fzl-bash-prompt--full'
+          alias fzl-prompt-reset='fzl-bash-prompt--reset'
+
+    # ----------------------------------------------------
+    # 6. INSTALL BASH UTILITY FUNCTIONS (30-bash-functions.bash)
+    # ----------------------------------------------------
+    - name: Install 30-bash-functions.bash in ~/.bashrc.d
+      ansible.builtin.copy:
+        dest: "{{ bashrc_d_dir }}/30-bash-functions.bash"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # ==============================================================================
+          # 30-bash-functions.bash - Productive Shell Functions & Helpers
+          # Managed by Ansible desktop-bash-configuration playbook
+          # ==============================================================================
+
+          # Make directory and cd into it immediately
+          fzl-bash-mkcd() {
+              if [ -z "$1" ]; then
+                  echo "Usage: mkcd <directory_path>"
+                  return 1
+              fi
+              mkdir -p "$1" && cd "$1"
+          }
+          alias mkcd='fzl-bash-mkcd'
+
+          # Universal Archive Extractor
+          fzl-bash-extract() {
+              if [ -z "$1" ]; then
+                  echo "Usage: extract <archive_file>"
+                  return 1
+              fi
+              if [ ! -f "$1" ]; then
+                  echo "Error: '$1' is not a valid file."
+                  return 1
+              fi
+              case "$1" in
+                  *.tar.bz2|*.tbz2)   tar xvjf "$1"     ;;
+                  *.tar.gz|*.tgz)     tar xvzf "$1"     ;;
+                  *.tar.xz|*.txz)     tar xvJf "$1"     ;;
+                  *.tar.zst)          tar --zstd -xvf "$1" ;;
+                  *.bz2)              bunzip2 "$1"      ;;
+                  *.rar)              unrar x "$1"      ;;
+                  *.gz)               gunzip "$1"       ;;
+                  *.tar)              tar xvf "$1"      ;;
+                  *.zip)              unzip "$1"        ;;
+                  *.Z)                uncompress "$1"   ;;
+                  *.7z)               7z x "$1"         ;;
+                  *.deb)              ar x "$1"         ;;
+                  *.rpm)              rpm2cpio "$1" | cpio -idmv ;;
+                  *)                  echo "Error: Cannot extract '$1' - unsupported format." ; return 1 ;;
+              esac
+          }
+          alias extract='fzl-bash-extract'
+          alias fzl-extract='fzl-bash-extract'
+
+          # View and analyze PATH line by line
+          fzl-bash-path() {
+              echo "=== Current PATH Directories ==="
+              echo "$PATH" | tr ':' '\n' | while IFS= read -r dir; do
+                  if [ -d "$dir" ]; then
+                      printf "  \e[1;32m[✓]\e[0m %s\n" "$dir"
+                  else
+                      printf "  \e[1;31m[✗]\e[0m %s (non-existent)\n" "$dir"
+                  fi
+              done
+          }
+          alias pathview='fzl-bash-path'
+          alias fzl-path='fzl-bash-path'
+
+          # Quick backup of a file with timestamp
+          fzl-bash-backup() {
+              if [ -z "$1" ]; then
+                  echo "Usage: backup <file_to_backup>"
+                  return 1
+              fi
+              local timestamp
+              timestamp=$(date +"%Y%m%d_%H%M%S")
+              cp -a "$1" "${1}.bak.${timestamp}" && echo "✓ Backup created: ${1}.bak.${timestamp}"
+          }
+          alias backup='fzl-bash-backup'
+          alias fzl-backup='fzl-bash-backup'
+
+          # Cheat Sheet lookup via cht.sh
+          fzl-bash-cheat() {
+              if [ -z "$1" ]; then
+                  echo "Usage: fzl-cheat <command-or-language> [query]"
+                  return 1
+              fi
+              local query="$*"
+              curl -s "https://cht.sh/${query// /+}"
+          }
+          alias fzl-cheat='fzl-bash-cheat'
+
+          # Quick Terminal Calculator
+          fzl-bash-calc() {
+              if [ -z "$1" ]; then
+                  echo "Usage: calc '<math expression>' (e.g. calc '2.5 * 1024 / 8')"
+                  return 1
+              fi
+              python3 -c "import math; print($*)" 2>/dev/null || echo "scale=4; $*" | bc -l
+          }
+          alias calc='fzl-bash-calc'
+
+    # ----------------------------------------------------
+    # 7. STANDALONE EXECUTABLE CLI UTILITIES IN /usr/local/bin
+    # ----------------------------------------------------
+    - name: Create /usr/local/bin/fzl-bash-prompt--shortpath.sh
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-prompt--shortpath.sh"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Prompt Switcher: Short Path
+          if [ -n "$BASH_SOURCE" ] && [ "$BASH_SOURCE" != "$0" ]; then
+              if command -v fzl-bash-prompt--shortpath >/dev/null 2>&1; then
+                  fzl-bash-prompt--shortpath
+              else
+                  export PROMPT_DIRTRIM=2
+                  export PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\[\e[1;36m\]\$\[\e[0m\] '
+                  echo "✓ Switched to Shortpath Prompt (PROMPT_DIRTRIM=2)"
+              fi
+          else
+              echo "To switch your prompt in the active shell, run:"
+              echo "  $ source fzl-bash-prompt--shortpath.sh"
+              echo "  or simply:"
+              echo "  $ fzl-prompt-short"
+          fi
+
+    - name: Create /usr/local/bin/fzl-bash-prompt--git.sh
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-prompt--git.sh"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Prompt Switcher: Git Two-Line Prompt
+          if [ -n "$BASH_SOURCE" ] && [ "$BASH_SOURCE" != "$0" ]; then
+              if command -v fzl-bash-prompt--git >/dev/null 2>&1; then
+                  fzl-bash-prompt--git
+              else
+                  export PROMPT_DIRTRIM=2
+                  export PS1='\[\e[1;36m\][\t]\[\e[0m\] \[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\n\[\e[1;33m\]➔ \[\e[0m\]'
+                  echo "✓ Switched to Git-Aware Two-Line Prompt"
+              fi
+          else
+              echo "To switch your prompt in the active shell, run:"
+              echo "  $ source fzl-bash-prompt--git.sh"
+              echo "  or simply:"
+              echo "  $ fzl-prompt-git"
+          fi
+
+    - name: Create /usr/local/bin/fzl-bash-prompt--minimal.sh
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-prompt--minimal.sh"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Prompt Switcher: Minimalist Prompt
+          if [ -n "$BASH_SOURCE" ] && [ "$BASH_SOURCE" != "$0" ]; then
+              if command -v fzl-bash-prompt--minimal >/dev/null 2>&1; then
+                  fzl-bash-prompt--minimal
+              else
+                  export PROMPT_DIRTRIM=1
+                  export PS1='\[\e[1;34m\]\W\[\e[0m\] \[\e[1;32m\]❯\[\e[0m\] '
+                  echo "✓ Switched to Minimalist Prompt"
+              fi
+          else
+              echo "To switch your prompt in the active shell, run:"
+              echo "  $ source fzl-bash-prompt--minimal.sh"
+              echo "  or simply:"
+              echo "  $ fzl-prompt-minimal"
+          fi
+
+    - name: Create /usr/local/bin/fzl-bash-prompt--full.sh
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-prompt--full.sh"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Prompt Switcher: Full Path Prompt
+          if [ -n "$BASH_SOURCE" ] && [ "$BASH_SOURCE" != "$0" ]; then
+              if command -v fzl-bash-prompt--full >/dev/null 2>&1; then
+                  fzl-bash-prompt--full
+              else
+                  unset PROMPT_DIRTRIM
+                  export PS1='\[\e[1;32m\]\u@\h\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\[\e[1;36m\]\$\[\e[0m\] '
+                  echo "✓ Switched to Full Path Prompt"
+              fi
+          else
+              echo "To switch your prompt in the active shell, run:"
+              echo "  $ source fzl-bash-prompt--full.sh"
+              echo "  or simply:"
+              echo "  $ fzl-prompt-full"
+          fi
+
+    - name: Create /usr/local/bin/fzl-bash-prompt--reset.sh
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-prompt--reset.sh"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Prompt Switcher: Reset Prompt
+          if [ -n "$BASH_SOURCE" ] && [ "$BASH_SOURCE" != "$0" ]; then
+              if command -v fzl-bash-prompt--reset >/dev/null 2>&1; then
+                  fzl-bash-prompt--reset
+              else
+                  unset PROMPT_DIRTRIM
+                  unset PROMPT_COMMAND
+                  export PS1='[\u@\h \W]\$ '
+                  echo "✓ Reset to Standard Bash Prompt"
+              fi
+          else
+              echo "To reset your prompt in the active shell, run:"
+              echo "  $ source fzl-bash-prompt--reset.sh"
+              echo "  or simply:"
+              echo "  $ fzl-prompt-reset"
+          fi
+
+    - name: Create /usr/local/bin/fzl-bash-sysinfo
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-sysinfo"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL System Information Dashboard
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;32m                      FZL SYSTEM OVERVIEW                         \e[0m"
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;33m  Hostname:\e[0m     $(hostname -f 2>/dev/null || hostname)"
+          echo -e "\e[1;33m  OS / Distro:\e[0m  $(grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || uname -s)"
+          echo -e "\e[1;33m  Kernel:\e[0m       $(uname -r)"
+          echo -e "\e[1;33m  Uptime:\e[0m       $(uptime -p 2>/dev/null || uptime)"
+          echo -e "\e[1;33m  Active User:\e[0m  $(whoami) (UID: $(id -u))"
+          echo -e "\e[1;33m  Local IP:\e[0m     $(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}' || hostname -I | awk '{print $1}')"
+          echo -e "\e[1;36m------------------------------------------------------------------\e[0m"
+          echo -e "\e[1;32m  CPU & Memory Usage:\e[0m"
+          free -h | awk 'NR==1{printf "    %-10s %-10s %-10s %-10s\n", $1, $2, $3, $4} NR==2{printf "    %-10s %-10s %-10s %-10s\n", $1, $2, $3, $4}'
+          echo -e "\e[1;36m------------------------------------------------------------------\e[0m"
+          echo -e "\e[1;32m  Disk Usage (Root & Home):\e[0m"
+          df -h / /home 2>/dev/null | awk 'NR==1 || NR>1 {printf "    %-18s %-8s %-8s %-8s %-6s %s\n", $1, $2, $3, $4, $5, $6}'
+          echo -e "\e[1;36m==================================================================\e[0m"
+
+    - name: Create /usr/local/bin/fzl-bash-path
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-bash-path"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL PATH Inspector CLI
+          echo -e "\e[1;36m=== System & User PATH Directories ===\e[0m"
+          echo "$PATH" | tr ':' '\n' | while IFS= read -r dir; do
+              if [ -d "$dir" ]; then
+                  printf "  \e[1;32m[✓ FOUND]\e[0m   %s\n" "$dir"
+              else
+                  printf "  \e[1;31m[✗ MISSING]\e[0m %s\n" "$dir"
+              fi
+          done
+
+    - name: Create /usr/local/bin/fzl-lattes-download-pdf
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-lattes-download-pdf"
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Lattes PDF Curriculum Downloader
+          # Downloads CNPq Lattes CV as a high-quality PDF using Google Chrome / Chromium headless.
+          # ==============================================================================
+          set -e
+
+          LATTES_ID="${1:-5700493017480725}"
+          OUTPUT_PDF="${2:-curriculo_lattes_${LATTES_ID}.pdf}"
+
+          # Extract numbers only if URL passed
+          LATTES_ID=$(echo "$LATTES_ID" | grep -oE '[0-9]{10,20}' || echo "$LATTES_ID")
+          LATTES_URL="http://lattes.cnpq.br/${LATTES_ID}"
+
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;32m            FZL LATTES CURRICULUM PDF DOWNLOADER                  \e[0m"
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;33m[*] Lattes ID / Number:\e[0m  ${LATTES_ID}"
+          echo -e "\e[1;33m[*] Target URL:\e[0m          ${LATTES_URL}"
+          echo -e "\e[1;33m[*] Output PDF File:\e[0m     ${OUTPUT_PDF}"
+          echo -e "\e[1;36m------------------------------------------------------------------\e[0m"
+
+          # Detect Chrome / Chromium binary
+          CHROME_BIN=""
+          for bin in google-chrome google-chrome-stable chromium chromium-browser /usr/bin/google-chrome; do
+              if command -v "$bin" >/dev/null 2>&1; then
+                  CHROME_BIN="$bin"
+                  break
+              fi
+          done
+
+          if [ -z "$CHROME_BIN" ]; then
+              echo -e "\e[1;31m[-] Error: Google Chrome or Chromium is required for PDF rendering.\e[0m"
+              echo "Please install Google Chrome or Chromium: sudo dnf install google-chrome-stable"
+              exit 1
+          fi
+
+          echo -e "\e[1;34m[*] Generating PDF via ${CHROME_BIN} (headless mode)...\e[0m"
+          "$CHROME_BIN" --headless=new \
+                        --disable-gpu \
+                        --no-sandbox \
+                        --virtual-time-budget=8000 \
+                        --print-to-pdf="$OUTPUT_PDF" \
+                        "$LATTES_URL" 2>&1 | grep -v "GL" || true
+
+          if [ -f "$OUTPUT_PDF" ] && [ -s "$OUTPUT_PDF" ]; then
+              FILE_SIZE=$(du -h "$OUTPUT_PDF" | cut -f1)
+              echo -e "\e[1;32m[+] SUCCESS: Lattes CV PDF saved successfully!\e[0m"
+              echo -e "    File: \e[1m${OUTPUT_PDF}\e[0m (${FILE_SIZE})"
+              echo -e "\e[1;36m==================================================================\e[0m"
+          else
+              echo -e "\e[1;31m[-] Failed to generate PDF file.\e[0m"
+              exit 1
+          fi
+
+    # Symlinks for convenience and standard aliases
+    - name: Create symlinks in /usr/local/bin for utilities
+      ansible.builtin.file:
+        src: "/usr/local/bin/{{ item.src }}"
+        dest: "/usr/local/bin/{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - { src: "fzl-bash-sysinfo", dest: "fzl-sysinfo" }
+        - { src: "fzl-bash-path", dest: "fzl-path" }
+        - { src: "fzl-lattes-download-pdf", dest: "fzl-lattes-pdf" }
+        - { src: "fzl-lattes-download-pdf", dest: "fzl-lattes-download" }
+
+    # ----------------------------------------------------
+    # 8. DISPLAY COMPLETION SUMMARY
+    # ----------------------------------------------------
+    - name: Display Setup Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Desktop Bash Shell & Utilities Setup Completed Successfully!"
+          - "=========================================================================="
+          - " Note: Your default shell prompt has NOT been changed automatically."
+          - " You can switch prompts on-demand whenever you want using:"
+          - ""
+          - "   $ fzl-bash-prompt--shortpath.sh  (or: fzl-prompt-short)"
+          - "   $ fzl-bash-prompt--git.sh        (or: fzl-prompt-git)"
+          - "   $ fzl-bash-prompt--minimal.sh    (or: fzl-prompt-minimal)"
+          - "   $ fzl-bash-prompt--full.sh       (or: fzl-prompt-full)"
+          - "   $ fzl-bash-prompt--reset.sh      (or: fzl-prompt-reset)"
+          - ""
+          - " Utility Commands in /usr/local/bin:"
+          - "   $ fzl-sysinfo                  (System status dashboard)"
+          - "   $ fzl-path                     (PATH directories health check)"
+          - "   $ fzl-extract <archive>        (Universal extractor)"
+          - "   $ fzl-cheat <command>          (Cheat sheet lookup via cht.sh)"
+          - "   $ fzl-lattes-download-pdf [id] (Download Lattes CV as PDF, default: 5700493017480725)"
+          - "=========================================================================="
