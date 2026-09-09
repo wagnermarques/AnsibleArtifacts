@@ -1,0 +1,118 @@
+#+TITLE: Multimedia & Document Converters Setup & Usage Guide (Fedora Desktop)
+#+AUTHOR: FzlSoft
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+This playbook configures the complete *FZL Converter Suite* (=fzl-convert-*=) on Fedora Linux. It provides robust CLI utilities for high-fidelity conversion across PDF documents, images, video containers, audio streams, and office files.
+
+* Why FFmpeg Fails on PDF to Image Conversion
+Running =ffmpeg -i document.pdf output.png= causes errors such as:
+#+BEGIN_EXAMPLE
+[image2 @ 0x5567969f4100] The specified filename 'output.png' does not contain an image sequence pattern or a pattern is invalid.
+[image2 @ 0x5567969f4100] Cannot write more than one file with the same name. Are you missing the -update option or a sequence pattern?
+Conversion failed!
+#+END_EXAMPLE
+
+**Technical Cause:**
+- FFmpeg treats PDF streams as video/multi-frame sequences rather than vector/paged documents. When a multi-page PDF or variable-sized page stream is passed without pattern sequences, the =image2= muxer aborts.
+- *The Solution:* The FZL suite uses =pdftoppm= (from =poppler-utils=) and =ImageMagick= to render PDF pages at crisp, high print-resolution (300 DPI by default) with automatic naming and format handling.
+
+* Included Converters & CLI Tools
+
+| Command | Symlink / Alias | Purpose / Engine | Key Features |
+|---------+-----------------+------------------+--------------|
+| =fzl-convert-pdf-file= | =fzl-convert-pdf=, =fzl-pdf-to-img= | PDF to PNG/JPG/WebP/TIFF/TXT (=pdftoppm=, =poppler=) | 300+ DPI, single/multi-page, text extraction, embedded image extraction |
+| =fzl-convert-image= | =fzl-convert-img=, =fzl-img= | Image conversion & optimization (=ImageMagick=, =cwebp=) | PNG, JPG, WebP, AVIF, TIFF, SVG, ICO, PDF, batch mode, scaling, metadata strip |
+| =fzl-convert-video= | =fzl-convert-vid=, =fzl-vid= | Video transcode & GIF builder (=FFmpeg=) | MP4, MKV, WebM, MOV, high-quality 2-pass palette GIFs, resolution presets, trimming |
+| =fzl-convert-audio= | =fzl-convert-aud=, =fzl-aud= | Audio transcode & normalizer (=FFmpeg=) | MP3, FLAC, WAV, AAC, M4A, OGG, OPUS, 320kbps, EBU R128 loudness normalization |
+| =fzl-convert-doc= | =fzl-convert-document=, =fzl-doc= | Office & Markdown documents (=LibreOffice=, =Pandoc=) | DOCX, PPTX, XLSX, ODT to PDF/HTML/TXT; Markdown to PDF/HTML/DOCX |
+| =fzl-convert= | | Smart Universal Dispatcher | Auto-detects input/output types and invokes the appropriate specialized tool |
+
+* Running the Playbook
+#+BEGIN_SRC bash
+ansible-playbook -K playbooks/desktop-fedora-multimedia-converters-setup.yml
+#+END_SRC
+
+* Usage Examples
+
+** 1. PDF Conversion (=fzl-convert-pdf-file= / =fzl-convert-pdf=)
+#+BEGIN_SRC bash
+# Convert CNH or document PDF to crisp PNG (resolves the ffmpeg issue):
+fzl-convert-pdf-file CNHWgn.pdf CNHWgn.png
+
+# Convert PDF to high-resolution (400 DPI) JPEG:
+fzl-convert-pdf-file contrato.pdf contrato.jpg -d 400
+
+# Convert only page 1 of a document to PNG:
+fzl-convert-pdf-file relatorio.pdf pagina1.png -p 1
+
+# Extract all raw embedded images inside a PDF:
+fzl-convert-pdf-file documento.pdf ./imagens_extraidas/ -e
+
+# Extract plain text from PDF:
+fzl-convert-pdf-file documento.pdf texto.txt -t
+#+END_SRC
+
+** 2. Image Conversion & Optimization (=fzl-convert-image= / =fzl-convert-img=)
+#+BEGIN_SRC bash
+# Convert PNG to WebP (90% quality):
+fzl-convert-image foto.png foto.webp
+
+# Resize image to 1920x1080 and strip EXIF metadata:
+fzl-convert-image input.jpg output.jpg -s 1920x1080 --strip
+
+# Batch convert all PNG images in current directory to WebP:
+fzl-convert-image *.png --to webp
+
+# Combine multiple scanned images into a single PDF document:
+fzl-convert-image pagina1.png pagina2.png documento_completo.pdf
+#+END_SRC
+
+** 3. Video Transcoding & High-Quality GIF Builder (=fzl-convert-video= / =fzl-convert-vid=)
+#+BEGIN_SRC bash
+# Transcode MKV or MOV recording to web-compatible MP4 (H.264 + AAC):
+fzl-convert-video gravacao.mkv video.mp4
+
+# Create high-quality animated GIF from video snippet (with palette optimization):
+fzl-convert-video demo.mp4 demo.gif --ss 00:00:10 -t 5 --gif
+
+# Downscale video to 720p for fast upload/sharing:
+fzl-convert-video aula_4k.mp4 aula_720p.mp4 -s 720p
+
+# Extract audio directly from video as 320kbps MP3:
+fzl-convert-video palestra.mp4 --extract-audio mp3
+#+END_SRC
+
+** 4. Audio Transcoding & Loudness Normalization (=fzl-convert-audio= / =fzl-convert-aud=)
+#+BEGIN_SRC bash
+# Convert WAV or FLAC to 320kbps MP3:
+fzl-convert-audio musica.wav musica.mp3
+
+# Convert and apply broadcast EBU R128 volume normalization:
+fzl-convert-audio podcast.m4a podcast_normalizado.mp3 --normalize
+
+# Convert recording to lossless FLAC:
+fzl-convert-audio gravacao.wav gravacao.flac
+#+END_SRC
+
+** 5. Office & Markdown Document Conversion (=fzl-convert-doc= / =fzl-convert-document=)
+#+BEGIN_SRC bash
+# Convert DOCX / ODT to PDF:
+fzl-convert-doc relatorio.docx relatorio.pdf
+
+# Convert Markdown file to HTML:
+fzl-convert-doc anotacoes.md anotacoes.html
+
+# Convert Markdown file to Word DOCX:
+fzl-convert-doc README.md manual.docx
+#+END_SRC
+
+** 6. Universal Converter Dispatcher (=fzl-convert=)
+The unified =fzl-convert= CLI automatically detects input and output formats and delegates to the right tool:
+#+BEGIN_SRC bash
+fzl-convert CNHWgn.pdf CNHWgn.png
+fzl-convert gravacao.mov gravacao.mp4
+fzl-convert demo.mp4 demo.gif
+fzl-convert musica.wav musica.mp3
+fzl-convert contrato.docx contrato.pdf
+#+END_SRC

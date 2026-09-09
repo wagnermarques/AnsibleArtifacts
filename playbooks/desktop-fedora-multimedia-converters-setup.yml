@@ -1,0 +1,1125 @@
+---
+- name: Install Multimedia and Document Converters on Fedora Desktop (fzl-convert-*)
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. OS CHECK
+    # ----------------------------------------------------
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    # ----------------------------------------------------
+    # 2. INSTALL CONVERTER SYSTEM PACKAGES
+    # ----------------------------------------------------
+    - name: Install poppler-utils, ImageMagick, ghostscript, ffmpeg, webp, and conversion tools
+      ansible.builtin.dnf:
+        name:
+          - poppler-utils      # pdftoppm, pdfinfo, pdftotext, pdfimages
+          - ImageMagick        # magick, convert, identify
+          - ghostscript        # gs
+          - ffmpeg             # ffmpeg, ffprobe
+          - libwebp-tools      # cwebp, dwebp
+          - optipng            # PNG optimizer
+          - jpegoptim          # JPEG optimizer
+          - pandoc             # Universal document converter
+          - qpdf               # PDF inspection and transformation
+          - bc                 # Math calculations for scripts
+          - file               # File MIME type detection
+        state: present
+        update_cache: false
+      ignore_errors: true
+
+    - name: Install optional LibreOffice headless for office document conversion
+      ansible.builtin.dnf:
+        name:
+          - libreoffice-headless
+          - libreoffice-writer
+          - libreoffice-calc
+          - libreoffice-impress
+        state: present
+        update_cache: false
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 3. FZL PDF CONVERTER SCRIPT (/usr/local/bin/fzl-convert-pdf-file)
+    # ----------------------------------------------------
+    - name: Create fzl-convert-pdf-file CLI utility in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-convert-pdf-file"
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env bash
+          # ==============================================================================
+          # FZL PDF Converter CLI (fzl-convert-pdf-file / fzl-convert-pdf)
+          # Converts PDF files to PNG, JPG, WEBP, TIFF, TXT, or extracts embedded images.
+          # Uses pdftoppm (poppler-utils) and ImageMagick for crisp, high-DPI rendering.
+          # ==============================================================================
+          set -euo pipefail
+
+          show_help() {
+            cat <<'EOF'
+          Usage:
+            fzl-convert-pdf-file <input.pdf> [output_file_or_dir] [options]
+            fzl-convert-pdf <input.pdf> [output.png|output.jpg|output.webp]
+
+          Options:
+            -d, --dpi <DPI>           Output resolution DPI (default: 300 for crisp document images)
+            -f, --format <fmt>        Target image format: png, jpg, jpeg, webp, tiff, txt (default: deduced from output filename or png)
+            -p, --page <num>          Convert only a specific page number (e.g. -p 1)
+            -r, --range <first-last>  Convert a range of pages (e.g. -r 1-3)
+            -e, --extract-images      Extract embedded raw image streams from PDF (using pdfimages)
+            -t, --text                Extract plain text from PDF (using pdftotext)
+            -h, --help                Show this help message
+
+          Examples:
+            # 1. Convert PDF document to PNG (crisp 300 DPI, handles single/multi-page):
+            fzl-convert-pdf-file CNHWgn.pdf CNHWgn.png
+
+            # 2. Convert PDF to high-quality JPEG at 400 DPI:
+            fzl-convert-pdf-file document.pdf document.jpg -d 400
+
+            # 3. Convert only Page 1 to PNG:
+            fzl-convert-pdf-file document.pdf page1.png -p 1
+
+            # 4. Extract all text from PDF:
+            fzl-convert-pdf-file document.pdf document.txt
+
+            # 5. Extract all embedded photos/images inside PDF:
+            fzl-convert-pdf-file document.pdf /tmp/extracted_imgs -e
+          EOF
+          }
+
+          if [ $# -eq 0 ]; then
+            show_help
+            exit 1
+          fi
+
+          INPUT_FILE=""
+          OUTPUT_TARGET=""
+          DPI=300
+          FORMAT=""
+          SINGLE_PAGE=""
+          FIRST_PAGE=""
+          LAST_PAGE=""
+          EXTRACT_MODE="render" # render, extract-images, text
+
+          while [ $# -gt 0 ]; do
+            case "$1" in
+              -h|--help)
+                show_help
+                exit 0
+                ;;
+              -d|--dpi)
+                DPI="$2"
+                shift 2
+                ;;
+              -f|--format)
+                FORMAT="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+                shift 2
+                ;;
+              -p|--page)
+                SINGLE_PAGE="$2"
+                shift 2
+                ;;
+              -r|--range)
+                FIRST_PAGE="${2%%-*}"
+                LAST_PAGE="${2##*-}"
+                shift 2
+                ;;
+              -e|--extract-images)
+                EXTRACT_MODE="extract-images"
+                shift
+                ;;
+              -t|--text)
+                EXTRACT_MODE="text"
+                shift
+                ;;
+              *)
+                if [ -z "$INPUT_FILE" ]; then
+                  INPUT_FILE="$1"
+                elif [ -z "$OUTPUT_TARGET" ]; then
+                  OUTPUT_TARGET="$1"
+                else
+                  echo "[-] Unexpected argument: $1" >&2
+                  exit 1
+                fi
+                shift
+                ;;
+            esac
+          done
+
+          if [ -z "$INPUT_FILE" ]; then
+            echo "[-] Error: Input PDF file required." >&2
+            exit 1
+          fi
+
+          if [ ! -f "$INPUT_FILE" ]; then
+            echo "[-] Error: File not found: $INPUT_FILE" >&2
+            exit 1
+          fi
+
+          INPUT_DIR="$(cd "$(dirname "$INPUT_FILE")" && pwd)"
+          INPUT_BASENAME="$(basename "$INPUT_FILE")"
+          INPUT_NAME="${INPUT_BASENAME%.*}"
+
+          # Determine target format & output path if not specified
+          if [ -z "$OUTPUT_TARGET" ]; then
+            if [ "$EXTRACT_MODE" = "text" ]; then
+              OUTPUT_TARGET="${INPUT_DIR}/${INPUT_NAME}.txt"
+            elif [ "$EXTRACT_MODE" = "extract-images" ]; then
+              OUTPUT_TARGET="${INPUT_DIR}/${INPUT_NAME}_images"
+            else
+              OUTPUT_TARGET="${INPUT_DIR}/${INPUT_NAME}.${FORMAT:-png}"
+            fi
+          fi
+
+          # Deducing format from target filename extension if not explicitly set
+          if [ -z "$FORMAT" ]; then
+            EXT="${OUTPUT_TARGET##*.}"
+            EXT_LOWER="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
+            case "$EXT_LOWER" in
+              png|jpg|jpeg|webp|tif|tiff|txt)
+                FORMAT="$EXT_LOWER"
+                ;;
+              *)
+                FORMAT="png"
+                ;;
+            esac
+          fi
+
+          if [ "$FORMAT" = "jpeg" ]; then
+            FORMAT="jpg"
+          fi
+
+          echo "[*] Processing PDF: $INPUT_FILE"
+          echo "[*] Target Output:  $OUTPUT_TARGET"
+
+          # Mode 1: Extract Text
+          if [ "$EXTRACT_MODE" = "text" ] || [ "$FORMAT" = "txt" ]; then
+            echo "[*] Extracting plain text using pdftotext..."
+            pdftotext "$INPUT_FILE" "$OUTPUT_TARGET"
+            echo "[+] Text extracted successfully: $OUTPUT_TARGET"
+            exit 0
+          fi
+
+          # Mode 2: Extract embedded raw images
+          if [ "$EXTRACT_MODE" = "extract-images" ]; then
+            mkdir -p "$OUTPUT_TARGET"
+            echo "[*] Extracting embedded images to $OUTPUT_TARGET..."
+            pdfimages -png "$INPUT_FILE" "$OUTPUT_TARGET/img"
+            echo "[+] Images extracted to: $OUTPUT_TARGET/"
+            exit 0
+          fi
+
+          # Mode 3: Render Pages as Images (pdftoppm)
+          TMP_DIR="$(mktemp -d /tmp/fzl_pdf_conv_XXXXXX)"
+          trap 'rm -rf "$TMP_DIR"' EXIT
+
+          PPM_OPTS=("-r" "$DPI")
+          if [ "$FORMAT" = "jpg" ]; then
+            PPM_OPTS+=("-jpeg")
+          elif [ "$FORMAT" = "tiff" ] || [ "$FORMAT" = "tif" ]; then
+            PPM_OPTS+=("-tiff")
+          else
+            # Default to PNG for highest quality
+            PPM_OPTS+=("-png")
+          fi
+
+          if [ -n "$SINGLE_PAGE" ]; then
+            PPM_OPTS+=("-f" "$SINGLE_PAGE" "-l" "$SINGLE_PAGE")
+          elif [ -n "$FIRST_PAGE" ] && [ -n "$LAST_PAGE" ]; then
+            PPM_OPTS+=("-f" "$FIRST_PAGE" "-l" "$LAST_PAGE")
+          fi
+
+          echo "[*] Rendering PDF pages (DPI: ${DPI}, Format: ${FORMAT})..."
+          pdftoppm "${PPM_OPTS[@]}" "$INPUT_FILE" "$TMP_DIR/page"
+
+          GENERATED_FILES=("$TMP_DIR"/page-*.${FORMAT/#jpg/jpg})
+          # Check for png/jpg extensions generated by pdftoppm
+          if [ ! -e "${GENERATED_FILES[0]}" ]; then
+            # Try finding any generated file in TMP_DIR
+            GENERATED_FILES=("$TMP_DIR"/*)
+          fi
+
+          COUNT="${#GENERATED_FILES[@]}"
+          if [ "$COUNT" -eq 0 ] || [ ! -f "${GENERATED_FILES[0]}" ]; then
+            echo "[-] Error: Failed to render pages from PDF." >&2
+            exit 1
+          fi
+
+          echo "[*] Rendered $COUNT page(s)."
+
+          # Handle WebP conversion if requested
+          if [ "$FORMAT" = "webp" ]; then
+            for f in "${GENERATED_FILES[@]}"; do
+              cwebp -q 90 "$f" -o "${f%.*}.webp" >/dev/null 2>&1 || magick "$f" -quality 90 "${f%.*}.webp"
+              rm -f "$f"
+            done
+            GENERATED_FILES=("$TMP_DIR"/*.webp)
+          fi
+
+          # If destination is a directory or user specified a folder
+          if [ -d "$OUTPUT_TARGET" ] || [[ "$OUTPUT_TARGET" == */ ]]; then
+            mkdir -p "$OUTPUT_TARGET"
+            for f in "${GENERATED_FILES[@]}"; do
+              PAGE_NUM="$(basename "$f" | sed -e 's/page-//' -e "s/\.${FORMAT}//")"
+              mv "$f" "${OUTPUT_TARGET}/${INPUT_NAME}-${PAGE_NUM}.${FORMAT}"
+            done
+            echo "[+] All pages saved to directory: $OUTPUT_TARGET"
+            exit 0
+          fi
+
+          # Target is a specific file name
+          TARGET_DIR="$(dirname "$OUTPUT_TARGET")"
+          TARGET_BASENAME="$(basename "$OUTPUT_TARGET")"
+          TARGET_NAME="${TARGET_BASENAME%.*}"
+          TARGET_EXT="${TARGET_BASENAME##*.}"
+          mkdir -p "$TARGET_DIR"
+
+          if [ "$COUNT" -eq 1 ]; then
+            # Single page produced: save exactly as requested (e.g. CNHWgn.png)
+            mv "${GENERATED_FILES[0]}" "$OUTPUT_TARGET"
+            echo "[+] Conversion successful: $OUTPUT_TARGET"
+          else
+            # Multiple pages produced: save as <output_name>-1.ext, <output_name>-2.ext
+            IDX=1
+            for f in "${GENERATED_FILES[@]}"; do
+              OUT_PATH="${TARGET_DIR}/${TARGET_NAME}-${IDX}.${TARGET_EXT}"
+              mv "$f" "$OUT_PATH"
+              echo "  -> Created: $OUT_PATH"
+              IDX=$((IDX + 1))
+            done
+            echo "[+] Multi-page conversion completed successfully."
+          fi
+          {% endraw %}
+
+    - name: Create symlink fzl-convert-pdf -> fzl-convert-pdf-file
+      ansible.builtin.file:
+        src: "/usr/local/bin/fzl-convert-pdf-file"
+        dest: "/usr/local/bin/fzl-convert-pdf"
+        state: link
+        force: true
+
+    # ----------------------------------------------------
+    # 4. FZL IMAGE CONVERTER SCRIPT (/usr/local/bin/fzl-convert-image)
+    # ----------------------------------------------------
+    - name: Create fzl-convert-image CLI utility in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-convert-image"
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Image Converter CLI (fzl-convert-image / fzl-convert-img)
+          # Converts, compresses, and optimizes images (PNG, JPG, WEBP, AVIF, BMP, TIFF, SVG, ICO, PDF).
+          # ==============================================================================
+          set -euo pipefail
+
+          show_help() {
+            cat <<'EOF'
+          Usage:
+            fzl-convert-image <input_image(s)> [output_image_or_dir] [options]
+            fzl-convert-img <input.png> <output.webp>
+
+          Options:
+            -q, --quality <1-100>   Output quality percentage (default: 90)
+            -s, --scale <WxH|%>     Resize image (e.g. -s 1920x1080, -s 50%, -s 1024x)
+            -g, --grayscale         Convert image to grayscale
+            --strip                 Strip all metadata/EXIF for smaller file size
+            --to <format>           Batch convert input files to target format (e.g. --to webp)
+            -h, --help              Show this help message
+
+          Examples:
+            # 1. Convert PNG to WebP with 90% quality:
+            fzl-convert-image photo.png photo.webp
+
+            # 2. Resize JPEG to 1920x1080 and strip metadata:
+            fzl-convert-image input.jpg output.jpg -s 1920x1080 --strip
+
+            # 3. Batch convert all PNGs in current directory to WebP:
+            fzl-convert-image *.png --to webp
+
+            # 4. Convert multiple images into a single PDF:
+            fzl-convert-image doc1.png doc2.png scanned_doc.pdf
+          EOF
+          }
+
+          if [ $# -eq 0 ]; then
+            show_help
+            exit 1
+          fi
+
+          QUALITY=90
+          RESIZE=""
+          GRAYSCALE=false
+          STRIP=false
+          BATCH_FORMAT=""
+          INPUT_FILES=()
+          OUTPUT_TARGET=""
+
+          while [ $# -gt 0 ]; do
+            case "$1" in
+              -h|--help)
+                show_help
+                exit 0
+                ;;
+              -q|--quality)
+                QUALITY="$2"
+                shift 2
+                ;;
+              -s|--scale|--resize)
+                RESIZE="$2"
+                shift 2
+                ;;
+              -g|--grayscale)
+                GRAYSCALE=true
+                shift
+                ;;
+              --strip)
+                STRIP=true
+                shift
+                ;;
+              --to)
+                BATCH_FORMAT="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+                shift 2
+                ;;
+              *)
+                if [ -f "$1" ]; then
+                  INPUT_FILES+=("$1")
+                else
+                  if [ -z "$OUTPUT_TARGET" ]; then
+                    OUTPUT_TARGET="$1"
+                  else
+                    INPUT_FILES+=("$1")
+                  fi
+                fi
+                shift
+                ;;
+            esac
+          done
+
+          if [ ${#INPUT_FILES[@]} -eq 0 ]; then
+            echo "[-] Error: No input images provided." >&2
+            exit 1
+          fi
+
+          # Batch Mode with --to <format>
+          if [ -n "$BATCH_FORMAT" ]; then
+            echo "[*] Batch converting ${#INPUT_FILES[@]} file(s) to .$BATCH_FORMAT..."
+            for file in "${INPUT_FILES[@]}"; do
+              if [ ! -f "$file" ]; then continue; fi
+              DIR="$(dirname "$file")"
+              BASE="$(basename "$file")"
+              NAME="${BASE%.*}"
+              OUT_FILE="${DIR}/${NAME}.${BATCH_FORMAT}"
+              echo "  -> Converting: $file -> $OUT_FILE"
+
+              CMD=("magick" "$file" "-quality" "$QUALITY")
+              if [ -n "$RESIZE" ]; then CMD+=("-resize" "$RESIZE"); fi
+              if [ "$GRAYSCALE" = true ]; then CMD+=("-colorspace" "Gray"); fi
+              if [ "$STRIP" = true ]; then CMD+=("-strip"); fi
+              CMD+=("$OUT_FILE")
+              "${CMD[@]}"
+            done
+            echo "[+] Batch conversion completed."
+            exit 0
+          fi
+
+          # Single or Multi-file to PDF / Output Target Mode
+          if [ ${#INPUT_FILES[@]} -gt 1 ]; then
+            if [ -z "$OUTPUT_TARGET" ]; then
+              OUTPUT_TARGET="combined_images.pdf"
+            fi
+            echo "[*] Combining ${#INPUT_FILES[@]} images into: $OUTPUT_TARGET"
+            CMD=("magick")
+            for f in "${INPUT_FILES[@]}"; do CMD+=("$f"); done
+            if [ -n "$RESIZE" ]; then CMD+=("-resize" "$RESIZE"); fi
+            if [ "$STRIP" = true ]; then CMD+=("-strip"); fi
+            CMD+=("-quality" "$QUALITY" "$OUTPUT_TARGET")
+            "${CMD[@]}"
+            echo "[+] Combined image created successfully: $OUTPUT_TARGET"
+            exit 0
+          fi
+
+          INPUT_FILE="${INPUT_FILES[0]}"
+          if [ -z "$OUTPUT_TARGET" ]; then
+            DIR="$(dirname "$INPUT_FILE")"
+            BASE="$(basename "$INPUT_FILE")"
+            NAME="${BASE%.*}"
+            OUTPUT_TARGET="${DIR}/${NAME}.webp"
+          fi
+
+          echo "[*] Converting: $INPUT_FILE -> $OUTPUT_TARGET"
+          CMD=("magick" "$INPUT_FILE" "-quality" "$QUALITY")
+          if [ -n "$RESIZE" ]; then CMD+=("-resize" "$RESIZE"); fi
+          if [ "$GRAYSCALE" = true ]; then CMD+=("-colorspace" "Gray"); fi
+          if [ "$STRIP" = true ]; then CMD+=("-strip"); fi
+          CMD+=("$OUTPUT_TARGET")
+          "${CMD[@]}"
+          echo "[+] Image converted successfully: $OUTPUT_TARGET"
+          {% endraw %}
+
+    - name: Create symlink fzl-convert-img -> fzl-convert-image
+      ansible.builtin.file:
+        src: "/usr/local/bin/fzl-convert-image"
+        dest: "/usr/local/bin/fzl-convert-img"
+        state: link
+        force: true
+
+    # ----------------------------------------------------
+    # 5. FZL VIDEO CONVERTER SCRIPT (/usr/local/bin/fzl-convert-video)
+    # ----------------------------------------------------
+    - name: Create fzl-convert-video CLI utility in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-convert-video"
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Video Converter CLI (fzl-convert-video / fzl-convert-vid)
+          # Converts video formats (MP4, MKV, WEBM, AVI, MOV), creates high-quality GIFs,
+          # resizes, clips, and extracts audio streams using FFmpeg.
+          # ==============================================================================
+          set -euo pipefail
+
+          show_help() {
+            cat <<'EOF'
+          Usage:
+            fzl-convert-video <input_video> [output_video] [options]
+            fzl-convert-vid <input.mkv> <output.mp4>
+
+          Options:
+            -c, --codec <codec>         Video codec (h264, h265, vp9, av1, copy; default: h264/libx264)
+            -crf, --crf <value>         Constant Rate Factor quality (0-51; default: 22 for h264)
+            -s, --scale <res>           Scale video resolution (e.g. 1080p, 720p, 480p, or 1920x1080)
+            --gif                       Convert video/clip to high-quality animated GIF (with palette optimization)
+            --ss <start_time>           Start timestamp for clipping (e.g. 00:01:30 or 90)
+            -t, --duration <seconds>    Duration of clip (e.g. 10 or 00:00:10)
+            --to-time <end_time>        End timestamp for clipping
+            --no-audio                  Strip audio track
+            --extract-audio <fmt>       Extract audio only (mp3, aac, flac, wav)
+            -h, --help                  Show this help message
+
+          Examples:
+            # 1. Convert MKV or MOV to web-compatible MP4 (H.264 + AAC):
+            fzl-convert-video recording.mkv output.mp4
+
+            # 2. Convert video clip to smooth, high-quality GIF:
+            fzl-convert-video demo.mp4 demo.gif --ss 00:00:05 -t 6 --gif
+
+            # 3. Downscale video to 720p for fast sharing:
+            fzl-convert-video large_4k.mp4 compressed.mp4 -s 720p
+
+            # 4. Extract audio from video as high-quality MP3:
+            fzl-convert-video lecture.mp4 --extract-audio mp3
+          EOF
+          }
+
+          if [ $# -eq 0 ]; then
+            show_help
+            exit 1
+          fi
+
+          INPUT_FILE=""
+          OUTPUT_TARGET=""
+          CODEC="libx264"
+          CRF="22"
+          SCALE=""
+          IS_GIF=false
+          START_TIME=""
+          DURATION=""
+          END_TIME=""
+          NO_AUDIO=false
+          EXTRACT_AUDIO_FMT=""
+
+          while [ $# -gt 0 ]; do
+            case "$1" in
+              -h|--help)
+                show_help
+                exit 0
+                ;;
+              -c|--codec)
+                case "$2" in
+                  h264|x264) CODEC="libx264" ;;
+                  h265|x265|hevc) CODEC="libx265" ;;
+                  vp9) CODEC="libvpx-vp9" ;;
+                  av1) CODEC="libsvtav1" ;;
+                  copy) CODEC="copy" ;;
+                  *) CODEC="$2" ;;
+                esac
+                shift 2
+                ;;
+              -crf|--crf)
+                CRF="$2"
+                shift 2
+                ;;
+              -s|--scale|--res)
+                case "$2" in
+                  1080p|1080) SCALE="scale=-2:1080" ;;
+                  720p|720)   SCALE="scale=-2:720" ;;
+                  480p|480)   SCALE="scale=-2:480" ;;
+                  *)          SCALE="scale=$2" ;;
+                esac
+                shift 2
+                ;;
+              --gif)
+                IS_GIF=true
+                shift
+                ;;
+              --ss)
+                START_TIME="$2"
+                shift 2
+                ;;
+              -t|--duration)
+                DURATION="$2"
+                shift 2
+                ;;
+              --to-time)
+                END_TIME="$2"
+                shift 2
+                ;;
+              --no-audio)
+                NO_AUDIO=true
+                shift
+                ;;
+              --extract-audio)
+                EXTRACT_AUDIO_FMT="$2"
+                shift 2
+                ;;
+              *)
+                if [ -z "$INPUT_FILE" ]; then
+                  INPUT_FILE="$1"
+                elif [ -z "$OUTPUT_TARGET" ]; then
+                  OUTPUT_TARGET="$1"
+                else
+                  echo "[-] Unexpected argument: $1" >&2
+                  exit 1
+                fi
+                shift
+                ;;
+            esac
+          done
+
+          if [ -z "$INPUT_FILE" ] || [ ! -f "$INPUT_FILE" ]; then
+            echo "[-] Error: Valid input video file required." >&2
+            exit 1
+          fi
+
+          DIR="$(dirname "$INPUT_FILE")"
+          BASE="$(basename "$INPUT_FILE")"
+          NAME="${BASE%.*}"
+
+          # Extract Audio Mode
+          if [ -n "$EXTRACT_AUDIO_FMT" ]; then
+            if [ -z "$OUTPUT_TARGET" ]; then
+              OUTPUT_TARGET="${DIR}/${NAME}.${EXTRACT_AUDIO_FMT}"
+            fi
+            echo "[*] Extracting audio from $INPUT_FILE -> $OUTPUT_TARGET..."
+            fzl-convert-audio "$INPUT_FILE" "$OUTPUT_TARGET"
+            exit 0
+          fi
+
+          # GIF Mode
+          if [ "$IS_GIF" = true ] || [[ "${OUTPUT_TARGET:-}" == *.gif ]]; then
+            if [ -z "$OUTPUT_TARGET" ]; then
+              OUTPUT_TARGET="${DIR}/${NAME}.gif"
+            fi
+            echo "[*] Generating high-quality palette-optimized GIF: $OUTPUT_TARGET..."
+            VF_FILTER="fps=15"
+            if [ -n "$SCALE" ]; then
+              VF_FILTER="${VF_FILTER},${SCALE}:flags=lanczos"
+            else
+              VF_FILTER="${VF_FILTER},scale=-2:480:flags=lanczos"
+            fi
+
+            FF_ARGS=("-y")
+            if [ -n "$START_TIME" ]; then FF_ARGS+=("-ss" "$START_TIME"); fi
+            if [ -n "$DURATION" ]; then FF_ARGS+=("-t" "$DURATION"); fi
+            if [ -n "$END_TIME" ]; then FF_ARGS+=("-to" "$END_TIME"); fi
+            FF_ARGS+=("-i" "$INPUT_FILE")
+            FF_ARGS+=("-vf" "${VF_FILTER},split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3")
+            FF_ARGS+=("$OUTPUT_TARGET")
+
+            ffmpeg "${FF_ARGS[@]}"
+            echo "[+] Animated GIF created successfully: $OUTPUT_TARGET"
+            exit 0
+          fi
+
+          if [ -z "$OUTPUT_TARGET" ]; then
+            OUTPUT_TARGET="${DIR}/${NAME}_converted.mp4"
+          fi
+
+          echo "[*] Converting Video: $INPUT_FILE -> $OUTPUT_TARGET"
+          FF_ARGS=("-y")
+          if [ -n "$START_TIME" ]; then FF_ARGS+=("-ss" "$START_TIME"); fi
+          if [ -n "$DURATION" ]; then FF_ARGS+=("-t" "$DURATION"); fi
+          if [ -n "$END_TIME" ]; then FF_ARGS+=("-to" "$END_TIME"); fi
+          FF_ARGS+=("-i" "$INPUT_FILE")
+
+          if [ "$CODEC" = "copy" ]; then
+            FF_ARGS+=("-c" "copy")
+          else
+            FF_ARGS+=("-c:v" "$CODEC")
+            if [ "$CODEC" = "libx264" ] || [ "$CODEC" = "libx265" ]; then
+              FF_ARGS+=("-crf" "$CRF" "-preset" "medium" "-pix_fmt" "yuv420p")
+            fi
+            if [ -n "$SCALE" ]; then
+              FF_ARGS+=("-vf" "$SCALE")
+            fi
+          fi
+
+          if [ "$NO_AUDIO" = true ]; then
+            FF_ARGS+=("-an")
+          elif [ "$CODEC" != "copy" ]; then
+            FF_ARGS+=("-c:a" "aac" "-b:a" "192k")
+          fi
+
+          FF_ARGS+=("$OUTPUT_TARGET")
+          ffmpeg "${FF_ARGS[@]}"
+          echo "[+] Video converted successfully: $OUTPUT_TARGET"
+          {% endraw %}
+
+    - name: Create symlink fzl-convert-vid -> fzl-convert-video
+      ansible.builtin.file:
+        src: "/usr/local/bin/fzl-convert-video"
+        dest: "/usr/local/bin/fzl-convert-vid"
+        state: link
+        force: true
+
+    # ----------------------------------------------------
+    # 6. FZL AUDIO CONVERTER SCRIPT (/usr/local/bin/fzl-convert-audio)
+    # ----------------------------------------------------
+    - name: Create fzl-convert-audio CLI utility in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-convert-audio"
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Audio Converter CLI (fzl-convert-audio / fzl-convert-aud)
+          # Converts audio formats (MP3, WAV, FLAC, M4A, AAC, OGG, OPUS),
+          # normalizes volume, and extracts audio tracks using FFmpeg.
+          # ==============================================================================
+          set -euo pipefail
+
+          show_help() {
+            cat <<'EOF'
+          Usage:
+            fzl-convert-audio <input_file> [output_file] [options]
+            fzl-convert-aud <input.wav> <output.mp3>
+
+          Options:
+            -b, --bitrate <rate>    Audio bitrate (e.g. 320k, 256k, 192k, 128k; default: 320k)
+            -n, --normalize         Apply EBU R128 two-pass broadcast volume normalization
+            -c, --channels <1|2>    Audio channels (1 for mono, 2 for stereo)
+            --hz, --rate <hz>       Sample rate (e.g. 44100, 48000)
+            -h, --help              Show this help message
+
+          Examples:
+            # 1. Convert WAV or FLAC to 320kbps MP3:
+            fzl-convert-audio track.wav track.mp3
+
+            # 2. Convert and normalize audio volume:
+            fzl-convert-audio podcast.m4a podcast.mp3 --normalize
+
+            # 3. Convert MP4 video directly to FLAC lossless audio:
+            fzl-convert-audio video.mp4 music.flac
+          EOF
+          }
+
+          if [ $# -eq 0 ]; then
+            show_help
+            exit 1
+          fi
+
+          INPUT_FILE=""
+          OUTPUT_TARGET=""
+          BITRATE="320k"
+          NORMALIZE=false
+          CHANNELS=""
+          SAMPLE_RATE=""
+
+          while [ $# -gt 0 ]; do
+            case "$1" in
+              -h|--help)
+                show_help
+                exit 0
+                ;;
+              -b|--bitrate)
+                BITRATE="$2"
+                shift 2
+                ;;
+              -n|--normalize)
+                NORMALIZE=true
+                shift
+                ;;
+              -c|--channels)
+                CHANNELS="$2"
+                shift 2
+                ;;
+              --hz|--rate)
+                SAMPLE_RATE="$2"
+                shift 2
+                ;;
+              *)
+                if [ -z "$INPUT_FILE" ]; then
+                  INPUT_FILE="$1"
+                elif [ -z "$OUTPUT_TARGET" ]; then
+                  OUTPUT_TARGET="$1"
+                else
+                  echo "[-] Unexpected argument: $1" >&2
+                  exit 1
+                fi
+                shift
+                ;;
+            esac
+          done
+
+          if [ -z "$INPUT_FILE" ] || [ ! -f "$INPUT_FILE" ]; then
+            echo "[-] Error: Valid input audio or video file required." >&2
+            exit 1
+          fi
+
+          DIR="$(dirname "$INPUT_FILE")"
+          BASE="$(basename "$INPUT_FILE")"
+          NAME="${BASE%.*}"
+
+          if [ -z "$OUTPUT_TARGET" ]; then
+            OUTPUT_TARGET="${DIR}/${NAME}.mp3"
+          fi
+
+          TARGET_EXT="${OUTPUT_TARGET##*.}"
+          TARGET_EXT_LOWER="$(echo "$TARGET_EXT" | tr '[:upper:]' '[:lower:]')"
+
+          echo "[*] Converting Audio: $INPUT_FILE -> $OUTPUT_TARGET"
+          FF_ARGS=("-y" "-i" "$INPUT_FILE" "-vn")
+
+          case "$TARGET_EXT_LOWER" in
+            mp3)
+              FF_ARGS+=("-c:a" "libmp3lame" "-b:a" "$BITRATE" "-q:a" "0")
+              ;;
+            m4a|aac)
+              FF_ARGS+=("-c:a" "aac" "-b:a" "$BITRATE")
+              ;;
+            flac)
+              FF_ARGS+=("-c:a" "flac")
+              ;;
+            wav)
+              FF_ARGS+=("-c:a" "pcm_s16le")
+              ;;
+            ogg)
+              FF_ARGS+=("-c:a" "libvorbis" "-q:a" "6")
+              ;;
+            opus)
+              FF_ARGS+=("-c:a" "libopus" "-b:a" "$BITRATE")
+              ;;
+            *)
+              FF_ARGS+=("-b:a" "$BITRATE")
+              ;;
+          esac
+
+          if [ -n "$CHANNELS" ]; then
+            FF_ARGS+=("-ac" "$CHANNELS")
+          fi
+          if [ -n "$SAMPLE_RATE" ]; then
+            FF_ARGS+=("-ar" "$SAMPLE_RATE")
+          fi
+          if [ "$NORMALIZE" = true ]; then
+            FF_ARGS+=("-af" "loudnorm=I=-16:LRA=11:TP=-1.5")
+          fi
+
+          FF_ARGS+=("$OUTPUT_TARGET")
+          ffmpeg "${FF_ARGS[@]}"
+          echo "[+] Audio converted successfully: $OUTPUT_TARGET"
+          {% endraw %}
+
+    - name: Create symlink fzl-convert-aud -> fzl-convert-audio
+      ansible.builtin.file:
+        src: "/usr/local/bin/fzl-convert-audio"
+        dest: "/usr/local/bin/fzl-convert-aud"
+        state: link
+        force: true
+
+    # ----------------------------------------------------
+    # 7. FZL DOCUMENT CONVERTER SCRIPT (/usr/local/bin/fzl-convert-doc)
+    # ----------------------------------------------------
+    - name: Create fzl-convert-doc CLI utility in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-convert-doc"
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Document Converter CLI (fzl-convert-doc / fzl-convert-document)
+          # Converts Office docs (DOCX, PPTX, XLSX, ODT), Markdown, HTML, and TXT using
+          # LibreOffice headless and Pandoc.
+          # ==============================================================================
+          set -euo pipefail
+
+          show_help() {
+            cat <<'EOF'
+          Usage:
+            fzl-convert-doc <input_doc> [output_doc_or_dir] [options]
+            fzl-convert-document <report.docx> <report.pdf>
+
+          Options:
+            -t, --to <format>   Target format (pdf, docx, odt, txt, html, md)
+            -h, --help          Show this help message
+
+          Examples:
+            # 1. Convert DOCX or ODT to PDF:
+            fzl-convert-doc report.docx report.pdf
+
+            # 2. Convert Markdown document to formatted HTML:
+            fzl-convert-doc notes.md notes.html
+
+            # 3. Convert Markdown document to Word DOCX:
+            fzl-convert-doc notes.md notes.docx
+          EOF
+          }
+
+          if [ $# -eq 0 ]; then
+            show_help
+            exit 1
+          fi
+
+          INPUT_FILE=""
+          OUTPUT_TARGET=""
+          TARGET_FORMAT=""
+
+          while [ $# -gt 0 ]; do
+            case "$1" in
+              -h|--help)
+                show_help
+                exit 0
+                ;;
+              -t|--to)
+                TARGET_FORMAT="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+                shift 2
+                ;;
+              *)
+                if [ -z "$INPUT_FILE" ]; then
+                  INPUT_FILE="$1"
+                elif [ -z "$OUTPUT_TARGET" ]; then
+                  OUTPUT_TARGET="$1"
+                else
+                  echo "[-] Unexpected argument: $1" >&2
+                  exit 1
+                fi
+                shift
+                ;;
+            esac
+          done
+
+          if [ -z "$INPUT_FILE" ] || [ ! -f "$INPUT_FILE" ]; then
+            echo "[-] Error: Valid input document required." >&2
+            exit 1
+          fi
+
+          DIR="$(dirname "$INPUT_FILE")"
+          BASE="$(basename "$INPUT_FILE")"
+          NAME="${BASE%.*}"
+          EXT="${BASE##*.}"
+          EXT_LOWER="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
+
+          if [ -z "$OUTPUT_TARGET" ]; then
+            OUTPUT_TARGET="${DIR}/${NAME}.${TARGET_FORMAT:-pdf}"
+          fi
+
+          OUT_EXT="${OUTPUT_TARGET##*.}"
+          OUT_EXT_LOWER="$(echo "$OUT_EXT" | tr '[:upper:]' '[:lower:]')"
+          TARGET_FORMAT="${TARGET_FORMAT:-$OUT_EXT_LOWER}"
+
+          echo "[*] Converting Document: $INPUT_FILE -> $OUTPUT_TARGET"
+
+          # Markdown to other formats via Pandoc
+          if [ "$EXT_LOWER" = "md" ] || [ "$EXT_LOWER" = "markdown" ]; then
+            if command -v pandoc >/dev/null 2>&1; then
+              pandoc "$INPUT_FILE" -s -o "$OUTPUT_TARGET"
+              echo "[+] Markdown document converted via Pandoc: $OUTPUT_TARGET"
+              exit 0
+            fi
+          fi
+
+          # Office documents via LibreOffice headless
+          if command -v libreoffice >/dev/null 2>&1 || command -v soffice >/dev/null 2>&1; then
+            LO_BIN="$(command -v libreoffice || command -v soffice)"
+            TARGET_DIR="$(dirname "$OUTPUT_TARGET")"
+            mkdir -p "$TARGET_DIR"
+
+            "$LO_BIN" --headless --convert-to "$TARGET_FORMAT" --outdir "$TARGET_DIR" "$INPUT_FILE"
+            PRODUCED="${TARGET_DIR}/${NAME}.${TARGET_FORMAT}"
+            if [ "$PRODUCED" != "$OUTPUT_TARGET" ] && [ -f "$PRODUCED" ]; then
+              mv "$PRODUCED" "$OUTPUT_TARGET"
+            fi
+            echo "[+] Office document converted successfully: $OUTPUT_TARGET"
+            exit 0
+          fi
+
+          echo "[-] Error: LibreOffice or Pandoc not available for conversion." >&2
+          exit 1
+          {% endraw %}
+
+    - name: Create symlink fzl-convert-document -> fzl-convert-doc
+      ansible.builtin.file:
+        src: "/usr/local/bin/fzl-convert-doc"
+        dest: "/usr/local/bin/fzl-convert-document"
+        state: link
+        force: true
+
+    # ----------------------------------------------------
+    # 8. FZL MASTER UNIFIED CONVERTER DISPATCHER (/usr/local/bin/fzl-convert)
+    # ----------------------------------------------------
+    - name: Create fzl-convert Master Dispatcher CLI utility in /usr/local/bin
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-convert"
+        mode: '0755'
+        content: |
+          {% raw %}#!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Unified Converter CLI (fzl-convert)
+          # Smart dispatcher that auto-detects file types and delegates to the appropriate
+          # specialized converter (PDF, Image, Video, Audio, or Document).
+          # ==============================================================================
+          set -euo pipefail
+
+          show_help() {
+            cat <<'EOF'
+          ==============================================================================
+           FZL Unified Multimedia & Document Converter Suite
+          ==============================================================================
+          Usage:
+            fzl-convert <input_file> [output_file_or_dir] [options]
+
+          Specialized Sub-Commands:
+            fzl-convert-pdf-file / fzl-convert-pdf   - PDF to PNG/JPG/WebP/TXT/Images
+            fzl-convert-image    / fzl-convert-img   - Image formats, resize, quality
+            fzl-convert-video    / fzl-convert-vid   - Video transcode, GIF, trim, scale
+            fzl-convert-audio    / fzl-convert-aud   - Audio transcode, bitrate, normalize
+            fzl-convert-doc      / fzl-convert-document - Office & Markdown document converter
+
+          Quick Examples:
+            # Convert PDF document to PNG image (resolves ffmpeg pdf errors):
+            fzl-convert CNHWgn.pdf CNHWgn.png
+
+            # Convert Video to MP4 or GIF:
+            fzl-convert demo.mov demo.mp4
+            fzl-convert clip.mp4 clip.gif
+
+            # Convert Audio to 320k MP3:
+            fzl-convert song.wav song.mp3
+
+            # Convert Word Document to PDF:
+            fzl-convert contract.docx contract.pdf
+          ==============================================================================
+          EOF
+          }
+
+          if [ $# -eq 0 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+            show_help
+            exit 0
+          fi
+
+          INPUT_FILE="$1"
+          if [ ! -f "$INPUT_FILE" ]; then
+            echo "[-] Error: Input file does not exist: $INPUT_FILE" >&2
+            exit 1
+          fi
+
+          EXT="${INPUT_FILE##*.}"
+          EXT_LOWER="$(echo "$EXT" | tr '[:upper:]' '[:lower:]')"
+          MIME_TYPE="$(file --mime-type -b "$INPUT_FILE" 2>/dev/null || echo "")"
+
+          case "$EXT_LOWER" in
+            pdf)
+              exec fzl-convert-pdf-file "$@"
+              ;;
+            png|jpg|jpeg|webp|avif|bmp|tiff|tif|svg|ico|heic|heif)
+              exec fzl-convert-image "$@"
+              ;;
+            mp4|mkv|webm|avi|mov|flv|wmv|ts|m4v|3gp)
+              exec fzl-convert-video "$@"
+              ;;
+            mp3|wav|flac|aac|m4a|ogg|opus|wma|aiff)
+              exec fzl-convert-audio "$@"
+              ;;
+            docx|doc|odt|pptx|ppt|xlsx|xls|md|markdown|html|rtf|txt)
+              exec fzl-convert-doc "$@"
+              ;;
+            *)
+              # Fallback via MIME detection
+              if [[ "$MIME_TYPE" == *"pdf"* ]]; then
+                exec fzl-convert-pdf-file "$@"
+              elif [[ "$MIME_TYPE" == *"image"* ]]; then
+                exec fzl-convert-image "$@"
+              elif [[ "$MIME_TYPE" == *"video"* ]]; then
+                exec fzl-convert-video "$@"
+              elif [[ "$MIME_TYPE" == *"audio"* ]]; then
+                exec fzl-convert-audio "$@"
+              else
+                echo "[-] Unknown file type for '$INPUT_FILE'. Trying fzl-convert-pdf-file..." >&2
+                exec fzl-convert-pdf-file "$@"
+              fi
+              ;;
+          esac
+          {% endraw %}
+
+    # ----------------------------------------------------
+    # 9. SHELL ALIASES CONFIGURATION
+    # ----------------------------------------------------
+    - name: Add FZL converter aliases to user .bashrc
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        line: "{{ item }}"
+        state: present
+        create: true
+        owner: "{{ target_user }}"
+        mode: '0644'
+      loop:
+        - "alias fzl-pdf-to-img='fzl-convert-pdf-file'"
+        - "alias fzl-pdf='fzl-convert-pdf-file'"
+        - "alias fzl-img='fzl-convert-image'"
+        - "alias fzl-vid='fzl-convert-video'"
+        - "alias fzl-aud='fzl-convert-audio'"
+        - "alias fzl-doc='fzl-convert-doc'"
+      when: target_user != 'root'
+
+    # ----------------------------------------------------
+    # 10. SETUP SUMMARY
+    # ----------------------------------------------------
+    - name: Display FZL Converters Setup Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Fedora Desktop Multimedia & Document Converters (fzl-convert-*) Ready!"
+          - "=========================================================================="
+          - " Installed CLI Utilities in /usr/local/bin:"
+          - "   1. PDF Converter:"
+          - "      $ fzl-convert-pdf-file <input.pdf> [output.png] [-d 300] [-p 1]"
+          - "      Shortcut: fzl-convert-pdf, fzl-pdf-to-img"
+          - "   2. Image Converter:"
+          - "      $ fzl-convert-image <input.png> <output.webp> [-q 90] [-s 1920x1080]"
+          - "      Shortcut: fzl-convert-img, fzl-img"
+          - "   3. Video Converter & GIF Generator:"
+          - "      $ fzl-convert-video <input.mov> <output.mp4> [--gif] [-s 720p]"
+          - "      Shortcut: fzl-convert-vid, fzl-vid"
+          - "   4. Audio Converter & Normalizer:"
+          - "      $ fzl-convert-audio <input.wav> <output.mp3> [-b 320k] [--normalize]"
+          - "      Shortcut: fzl-convert-aud, fzl-aud"
+          - "   5. Office & Markdown Document Converter:"
+          - "      $ fzl-convert-doc <input.docx> <output.pdf>"
+          - "      Shortcut: fzl-convert-document, fzl-doc"
+          - "   6. Smart Unified Dispatcher:"
+          - "      $ fzl-convert <input_file> <output_file>"
+          - "=========================================================================="

@@ -1,0 +1,143 @@
+#+TITLE: Brave Browser Automated Configuration & FZL CLI Guide
+#+AUTHOR: FzlSoft
+#+DATE: [2026-09-03 Thu]
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+The =playbooks/desktop-brave-configuration.yml= playbook automates the provisioning, policy hardening, workspace isolation, and daily workflow tooling for the **Brave Web Browser** on Linux desktop workstations.
+
+Using Chromium's native **Enterprise Policy Engine**, this automation achieves 100% idempotent configuration without risking JSON or SQLite profile corruption. It strips unwanted crypto bloat, pre-installs essential security and productivity extensions, seeds developer bookmarks, and exposes specialized =fzl-browser-brave--*= and =fzl-network-simet= CLI commands.
+
+* Key Features & Architecture
+
+** 1. Enterprise Policies (=/etc/brave/policies/managed/fzl_brave_policies.json=)
+- **Auto-Installed Extensions**:
+  - *Bitwarden* (Password Manager)
+  - *uBlock Origin* (Ad & tracker blocking)
+  - *Dark Reader* (Universal dark mode)
+  - *Vimium* (Keyboard navigation)
+  - *Sider AI* (Multi-model AI Sidebar)
+- **Bloat Cleanup**:
+  - Disabled Brave Rewards and crypto ads (=BraveRewardsDisabled: true=)
+  - Disabled Web3 Wallet prompts (=BraveWalletDisabled: true=)
+  - Disabled Brave VPN popups (=BraveVPNDisabled: true=)
+- **Managed Developer Bookmarks**: Pre-seeded bookmarks bar with quick links to GitHub, Plataforma Lattes, SIMET (NIC.br), Claude, ChatGPT, Gemini, Hugging Face, and Brave Search.
+
+** 2. FZL CLI Command Suite
+Dedicated launchers tailored for development, AI workflows, disposable sandboxes, and internet quality audits:
+
+| Full Command | Short Alias | Purpose |
+| :--- | :--- | :--- |
+| =fzl-browser-brave= | =fzl-brave=, =fzl-brave-start= | Standard hardware-accelerated background launcher |
+| =fzl-browser-brave--dev= | =fzl-brave-dev= | Developer workspace (Port 9222, auto-DevTools, isolated profile) |
+| =fzl-browser-brave--ai= | =fzl-brave-ai= | Standalone AI Hub web application windows |
+| =fzl-browser-brave--app= | =fzl-brave-app= | Universal PWA desktop app window for any URL |
+| =fzl-browser-brave--temp= | =fzl-brave-temp= | Ephemeral sandbox (auto-wipes all cache & cookies on exit) |
+| =fzl-browser-brave--tor= | =fzl-brave-tor= | Private browsing with Tor Onion routing |
+| =fzl-browser-brave--backup= | =fzl-brave-backup= | Snapshots bookmarks, history, and preferences to =~/.backup/brave/= |
+| =fzl-browser-brave--restore= | =fzl-brave-restore= | Restores a selected snapshot archive |
+| =fzl-network-simet= | =fzl-simet=, =fzl-simet-start= | NIC.br SIMET network quality diagnostics & App launcher |
+
+* Running the Playbook
+
+#+begin_src bash
+ansible-playbook -K playbooks/desktop-brave-configuration.yml
+#+end_src
+
+After running the playbook, reload your shell aliases:
+#+begin_src bash
+source ~/.bashrc
+# Or:
+reloadbash
+#+end_src
+
+* Usage Guide & Command Examples
+
+** 1. Standard Background Launch (=fzl-brave= / =fzl-brave-start=)
+Launches Brave in the background with optimal hardware acceleration (VA-API video decode/encode, rasterization) without tying up your terminal prompt:
+
+#+begin_src bash
+fzl-brave
+# Or with specific URLs:
+fzl-brave https://github.com https://lattes.cnpq.br
+#+end_src
+
+** 2. Dedicated Developer Profile (=fzl-brave-dev=)
+Launches an isolated developer instance in =~/.config/brave-dev= with:
+- Remote Debugging Port enabled on =http://localhost:9222= (for automated testing, Playwright, or VS Code / IDE debugger attachments).
+- Developer Tools automatically opened for every tab.
+- Isolated cookies/cache separate from your primary personal profile.
+
+#+begin_src bash
+# Launch local test server (defaults to localhost:3000):
+fzl-brave-dev
+
+# Launch specific dev URL:
+fzl-brave-dev http://localhost:8080/api/docs
+#+end_src
+
+** 3. Dedicated AI Workspace Hub (=fzl-brave-ai=)
+Opens clean, standalone desktop application windows (without browser tabs or URL address bar clutter) pointing directly to AI models:
+
+#+begin_src bash
+# Launch Claude AI standalone app window:
+fzl-brave-ai claude
+
+# Launch ChatGPT standalone app window:
+fzl-brave-ai chatgpt
+
+# Launch Google AI Studio / Gemini:
+fzl-brave-ai gemini
+
+# Launch all AI hubs simultaneously in dedicated windows:
+fzl-brave-ai all
+#+end_src
+
+** 4. Standalone Desktop Web App (=fzl-brave-app=)
+Launches any website or internal tool in a clean, borderless PWA-style window:
+
+#+begin_src bash
+fzl-brave-app https://web.whatsapp.com
+fzl-brave-app https://calendar.google.com
+fzl-brave-app https://mail.google.com
+#+end_src
+
+** 5. Disposable Ephemeral Sandbox (=fzl-brave-temp=)
+Launches Brave in a temporary directory (=/tmp/brave_ephemeral_XXXXXX=) completely isolated from your workstation profiles. When you close Brave, the temporary directory is automatically and securely wiped:
+
+#+begin_src bash
+# Great for untrusted links, guest sessions, or clean tests:
+fzl-brave-temp
+#+end_src
+
+** 6. Private Browsing with Tor Onion Routing (=fzl-brave-tor=)
+Opens Brave's native Tor window with circuit routing:
+
+#+begin_src bash
+fzl-brave-tor
+#+end_src
+
+** 7. NIC.br SIMET Internet Quality Measurement (=fzl-simet= / =fzl-network-simet=)
+Executes pre-test latency, jitter, and packet loss diagnostics against NIC.br Core and IX.br (PTT São Paulo), tests IPv6 connectivity, and opens the official [[https://simet.nic.br][SIMET]] measurement engine in standalone desktop app mode:
+
+#+begin_src bash
+# Full test & Launch SIMET App window:
+fzl-simet
+
+# Run CLI-only diagnostic without launching GUI browser:
+fzl-simet --cli-only
+#+end_src
+
+** 8. Profile Backup & Restore (=fzl-brave-backup= / =fzl-brave-restore=)
+Safely snapshot and restore your Brave profile (Bookmarks, History, Preferences, Sessions):
+
+#+begin_src bash
+# Create a timestamped backup archive:
+fzl-brave-backup
+
+# List available backups and restore:
+fzl-brave-restore
+#+end_src
+
+* Customizing Managed Policies
+If you wish to add or remove extensions or modify managed bookmarks, edit =/etc/brave/policies/managed/fzl_brave_policies.json= or update =playbooks/desktop-brave-configuration.yml= and re-run Ansible.

@@ -1,0 +1,542 @@
+---
+- name: Automate Brave Browser Enterprise Policies, Workspaces, and FZL Tooling
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    bashrc_d_dir: "{{ target_home }}/.bashrc.d"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. ENSURE BRAVE BROWSER IS INSTALLED
+    # ----------------------------------------------------
+    - name: Ensure Brave RPM repository exists (Fedora / RHEL)
+      ansible.builtin.get_url:
+        url: https://brave-browser-rpm-release.s3.brave.com/brave-browser.repo
+        dest: /etc/yum.repos.d/brave-browser.repo
+        mode: '0644'
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+
+    - name: Install Brave Browser (Fedora / RHEL)
+      ansible.builtin.dnf:
+        name: brave-browser
+        state: present
+        update_cache: yes
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+
+    - name: Ensure Brave repository and key exist (Debian / Ubuntu)
+      when: ansible_facts['os_family'] == "Debian"
+      block:
+        - name: Add Brave GPG key (Debian)
+          ansible.builtin.get_url:
+            url: https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
+            dest: /usr/share/keyrings/brave-browser-archive-keyring.gpg
+            mode: '0644'
+
+        - name: Add Brave repository (Debian)
+          ansible.builtin.apt_repository:
+            repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"
+            state: present
+            filename: brave-browser
+
+        - name: Install Brave Browser (Debian / Ubuntu)
+          ansible.builtin.apt:
+            name: brave-browser
+            state: present
+            update_cache: yes
+
+    # ----------------------------------------------------
+    # 2. ENTERPRISE MANAGED POLICIES (/etc/brave/policies/managed/)
+    # ----------------------------------------------------
+    - name: Ensure Brave managed policies directory exists
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - /etc/brave
+        - /etc/brave/policies
+        - /etc/brave/policies/managed
+        - /etc/chromium/policies/managed
+
+    - name: Deploy Brave enterprise managed policies JSON
+      ansible.builtin.copy:
+        dest: /etc/brave/policies/managed/fzl_brave_policies.json
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          {
+            "HomepageLocation": "https://search.brave.com",
+            "HomepageIsNewTabPage": true,
+            "RestoreOnStartup": 1,
+            "BookmarkBarEnabled": true,
+            "BraveRewardsDisabled": true,
+            "BraveWalletDisabled": true,
+            "BraveVPNDisabled": true,
+            "PasswordManagerEnabled": true,
+            "AutofillAddressEnabled": true,
+            "AutofillCreditCardEnabled": false,
+            "ExtensionInstallForcelist": [
+              "nngceckbapebfimnlniiiahkandclblb;https://clients2.google.com/service/update2/crx",
+              "cjpalhdlnbpafiamejdnhcphjbkeiagm;https://clients2.google.com/service/update2/crx",
+              "eimadpbcbfnmbkopoojfekhnkhdbieeh;https://clients2.google.com/service/update2/crx",
+              "dbepggeogbaflgnhgahbhmngjxolafil;https://clients2.google.com/service/update2/crx",
+              "fbgcedjacmlbgleddnoacbnijgmiolem;https://clients2.google.com/service/update2/crx"
+            ],
+            "ManagedBookmarks": [
+              {
+                "toplevel_name": "FZL Productivity & Development"
+              },
+              {
+                "name": "GitHub - Wagner Marques",
+                "url": "https://github.com/wagnermarques"
+              },
+              {
+                "name": "Plataforma Lattes CNPq",
+                "url": "http://lattes.cnpq.br"
+              },
+              {
+                "name": "SIMET - Qualidade Internet NIC.br",
+                "url": "https://simet.nic.br"
+              },
+              {
+                "name": "ChatGPT",
+                "url": "https://chatgpt.com"
+              },
+              {
+                "name": "Claude AI",
+                "url": "https://claude.ai"
+              },
+              {
+                "name": "Google AI Studio",
+                "url": "https://aistudio.google.com"
+              },
+              {
+                "name": "Hugging Face",
+                "url": "https://huggingface.co"
+              },
+              {
+                "name": "Brave Search",
+                "url": "https://search.brave.com"
+              }
+            ]
+          }
+
+    - name: Copy managed policies to Chromium fallback directory
+      ansible.builtin.copy:
+        src: /etc/brave/policies/managed/fzl_brave_policies.json
+        dest: /etc/chromium/policies/managed/fzl_brave_policies.json
+        remote_src: true
+        owner: root
+        group: root
+        mode: '0644'
+      ignore_errors: true
+
+    # ----------------------------------------------------
+    # 3. FZL CLI BROWSER LAUNCHERS (/usr/local/bin)
+    # ----------------------------------------------------
+    - name: Create /usr/local/bin/fzl-browser-brave (Standard Launcher)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave Browser Standard Launcher
+          # Launches Brave in the background with optimal hardware acceleration flags
+          # ==============================================================================
+          nohup /usr/bin/brave-browser \
+            --enable-features=VaapiVideoDecoder,VaapiVideoEncoder,CanvasOopRasterization \
+            --ozone-platform-hint=auto \
+            "$@" >/dev/null 2>&1 &
+          disown
+
+    - name: Create /usr/local/bin/fzl-browser-brave--dev (Developer Profile)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--dev
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave Developer Profile Launcher
+          # Features: Remote debugging port 9222, auto-open DevTools, isolated profile
+          # ==============================================================================
+          DEV_DATA_DIR="${HOME}/.config/brave-dev"
+          mkdir -p "$DEV_DATA_DIR"
+
+          TARGET_URL="${1:-http://localhost:3000}"
+          echo -e "\e[1;36m[*] Launching Brave Developer Workspace...\e[0m"
+          echo -e "\e[1;33m[*] User Data Dir:\e[0m       $DEV_DATA_DIR"
+          echo -e "\e[1;33m[*] Remote Debugging:\e[0m     http://localhost:9222"
+          echo -e "\e[1;33m[*] Target URL:\e[0m           $TARGET_URL"
+
+          nohup /usr/bin/brave-browser \
+            --user-data-dir="$DEV_DATA_DIR" \
+            --remote-debugging-port=9222 \
+            --auto-open-devtools-for-tabs \
+            --no-first-run \
+            --no-default-browser-check \
+            "$TARGET_URL" >/dev/null 2>&1 &
+          disown
+
+    - name: Create /usr/local/bin/fzl-browser-brave--ai (AI Hub Workspaces)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--ai
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave AI Hub Launcher
+          # Launches dedicated standalone AI web app windows
+          # Usage: fzl-browser-brave--ai [chatgpt|claude|gemini|huggingface|all]
+          # ==============================================================================
+          TARGET="${1:-all}"
+          AI_DATA_DIR="${HOME}/.config/brave-ai-workspace"
+          mkdir -p "$AI_DATA_DIR"
+
+          launch_ai_app() {
+              local url="$1"
+              nohup /usr/bin/brave-browser \
+                --user-data-dir="$AI_DATA_DIR" \
+                --app="$url" >/dev/null 2>&1 &
+              disown
+          }
+
+          case "$TARGET" in
+              chatgpt)
+                  launch_ai_app "https://chatgpt.com"
+                  ;;
+              claude)
+                  launch_ai_app "https://claude.ai"
+                  ;;
+              gemini)
+                  launch_ai_app "https://aistudio.google.com"
+                  ;;
+              huggingface|hf)
+                  launch_ai_app "https://huggingface.co/chat"
+                  ;;
+              all)
+                  echo -e "\e[1;36m[*] Launching FZL AI Workspaces (Claude, ChatGPT, Gemini)...\e[0m"
+                  launch_ai_app "https://claude.ai"
+                  launch_ai_app "https://chatgpt.com"
+                  launch_ai_app "https://aistudio.google.com"
+                  ;;
+              *)
+                  launch_ai_app "$TARGET"
+                  ;;
+          esac
+
+    - name: Create /usr/local/bin/fzl-browser-brave--app (PWA Web App Window)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--app
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave PWA Standalone App Window Launcher
+          # Launches any given URL as a clean desktop web application without browser chrome
+          # Usage: fzl-browser-brave--app <URL>
+          # ==============================================================================
+          URL="${1:-}"
+          if [ -z "$URL" ]; then
+              echo "Usage: fzl-browser-brave--app <URL>"
+              echo "Example: fzl-browser-brave--app https://web.whatsapp.com"
+              exit 1
+          fi
+
+          if [[ ! "$URL" =~ ^https?:// ]]; then
+              URL="https://${URL}"
+          fi
+
+          nohup /usr/bin/brave-browser --app="$URL" >/dev/null 2>&1 &
+          disown
+
+    - name: Create /usr/local/bin/fzl-browser-brave--temp (Ephemeral Disposable Sandbox)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--temp
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave Ephemeral Disposable Sandbox
+          # Runs Brave in a temporary directory and completely wipes all data upon exit
+          # ==============================================================================
+          TEMP_DIR=$(mktemp -d /tmp/brave_ephemeral_XXXXXX)
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;32m         FZL BRAVE EPHEMERAL DISPOSABLE SANDBOX                   \e[0m"
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;33m[*] Temp Sandbox Directory:\e[0m $TEMP_DIR"
+          echo -e "\e[1;34m[*] Launching isolated Brave instance. Waiting for exit...\e[0m"
+
+          /usr/bin/brave-browser \
+            --user-data-dir="$TEMP_DIR" \
+            --no-first-run \
+            --no-default-browser-check \
+            --disable-sync \
+            "$@" >/dev/null 2>&1
+
+          echo -e "\e[1;33m[*] Brave exited. Wiping temporary sandbox data...\e[0m"
+          rm -rf "$TEMP_DIR"
+          echo -e "\e[1;32m[+] All session data, cache, and cookies successfully purged.\e[0m"
+          echo -e "\e[1;36m==================================================================\e[0m"
+
+    - name: Create /usr/local/bin/fzl-browser-brave--tor (Private with Tor)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--tor
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave Private Browsing with Tor Onion Routing
+          # ==============================================================================
+          nohup /usr/bin/brave-browser --tor "$@" >/dev/null 2>&1 &
+          disown
+
+    - name: Create /usr/local/bin/fzl-browser-brave--backup (Profile Snapshot Tool)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--backup
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave Profile Backup Tool
+          # Backs up Bookmarks, History, Preferences, and Login Data to ~/.backup/brave/
+          # ==============================================================================
+          set -e
+          SRC_DIR="${HOME}/.config/BraveSoftware/Brave-Browser"
+          BACKUP_DIR="${HOME}/.backup/brave"
+          TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+          ARCHIVE_FILE="${BACKUP_DIR}/brave_backup_${TIMESTAMP}.tar.gz"
+
+          if [ ! -d "$SRC_DIR" ]; then
+              echo "Error: Brave configuration directory not found at $SRC_DIR"
+              exit 1
+          fi
+
+          mkdir -p "$BACKUP_DIR"
+          echo -e "\e[1;36m[*] Creating Brave profile backup...\e[0m"
+
+          tar -czf "$ARCHIVE_FILE" \
+            -C "${HOME}/.config/BraveSoftware" \
+            --exclude="*/Cache/*" \
+            --exclude="*/Code Cache/*" \
+            --exclude="*/GPUCache/*" \
+            "Brave-Browser"
+
+          FILE_SIZE=$(du -h "$ARCHIVE_FILE" | cut -f1)
+          echo -e "\e[1;32m[+] Backup successfully created:\e[0m"
+          echo -e "    Archive: \e[1m${ARCHIVE_FILE}\e[0m (${FILE_SIZE})"
+
+    - name: Create /usr/local/bin/fzl-browser-brave--restore (Profile Restore Tool)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-browser-brave--restore
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL Brave Profile Restore Tool
+          # Restores a selected backup archive to ~/.config/BraveSoftware/Brave-Browser
+          # ==============================================================================
+          set -e
+          BACKUP_FILE="${1:-}"
+          BACKUP_DIR="${HOME}/.backup/brave"
+
+          if [ -z "$BACKUP_FILE" ]; then
+              echo "=== Available Backups in ${BACKUP_DIR} ==="
+              if [ ! -d "$BACKUP_DIR" ] || [ -z "$(ls -A "$BACKUP_DIR" 2>/dev/null)" ]; then
+                  echo "No backups found in $BACKUP_DIR."
+                  exit 1
+              fi
+              ls -1t "$BACKUP_DIR"/brave_backup_*.tar.gz 2>/dev/null | head -n 10
+              echo ""
+              echo "Usage: fzl-browser-brave--restore <path_to_backup_archive.tar.gz>"
+              exit 1
+          fi
+
+          if [ ! -f "$BACKUP_FILE" ]; then
+              echo "Error: Backup file '$BACKUP_FILE' does not exist."
+              exit 1
+          fi
+
+          read -p "Are you sure you want to restore '$BACKUP_FILE'? This will overwrite current Brave settings! (y/N): " confirm
+          if [[ "$confirm" =~ ^[Yy]$ ]]; then
+              echo "[*] Restoring Brave profile..."
+              mkdir -p "${HOME}/.config/BraveSoftware"
+              tar -xzf "$BACKUP_FILE" -C "${HOME}/.config/BraveSoftware"
+              echo "[+] Restore completed successfully."
+          else
+              echo "Restore cancelled."
+          fi
+
+    # ----------------------------------------------------
+    # 4. FZL NIC.BR SIMET NETWORK QUALITY TOOL (/usr/local/bin/fzl-network-simet)
+    # ----------------------------------------------------
+    - name: Create /usr/local/bin/fzl-network-simet (NIC.br Quality Tool)
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-network-simet
+        owner: root
+        group: root
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # ==============================================================================
+          # FZL NIC.br SIMET & Internet Quality Measurement Tool
+          # Runs pre-test latency and packet loss diagnostics to NIC.br/IX.br and
+          # launches the official SIMET quality meter in standalone desktop app mode.
+          # ==============================================================================
+          set -e
+
+          MODE="${1:-}"
+
+          echo -e "\e[1;36m==================================================================\e[0m"
+          echo -e "\e[1;32m       FZL NIC.br SIMET - QUALIDADE DE INTERNET (BRASIL)          \e[0m"
+          echo -e "\e[1;36m==================================================================\e[0m"
+
+          echo -e "\e[1;33m[*] 1. Testando conectividade e latência com nó central NIC.br (SP)...\e[0m"
+          if ping -c 4 -W 2 200.160.2.3 >/tmp/simet_ping_nic.txt 2>&1; then
+              AVG_RTT=$(grep "rtt min/avg/max" /tmp/simet_ping_nic.txt 2>/dev/null | awk -F'/' '{print $5}' || grep "min/avg/max" /tmp/simet_ping_nic.txt | awk -F'/' '{print $5}')
+              LOSS=$(grep -oP '\d+(?=% packet loss|\% de perda)' /tmp/simet_ping_nic.txt | head -n1)
+              echo -e "    \e[1;32m[✓ NIC.br Core]\e[0m  Latência Média: \e[1m${AVG_RTT:-<5} ms\e[0m | Perda: \e[1m${LOSS:-0}%\e[0m"
+          else
+              echo -e "    \e[1;31m[✗ NIC.br Core]\e[0m  Falha ao contactar 200.160.2.3"
+          fi
+
+          echo -e "\e[1;33m[*] 2. Testando latência com IX.br (Ponto de Troca de Tráfego)...\e[0m"
+          if ping -c 4 -W 2 200.219.148.1 >/tmp/simet_ping_ix.txt 2>&1; then
+              AVG_RTT_IX=$(grep "rtt min/avg/max" /tmp/simet_ping_ix.txt 2>/dev/null | awk -F'/' '{print $5}' || grep "min/avg/max" /tmp/simet_ping_ix.txt | awk -F'/' '{print $5}')
+              LOSS_IX=$(grep -oP '\d+(?=% packet loss|\% de perda)' /tmp/simet_ping_ix.txt | head -n1)
+              echo -e "    \e[1;32m[✓ IX.br PTT]\e[0m   Latência Média: \e[1m${AVG_RTT_IX:-<5} ms\e[0m | Perda: \e[1m${LOSS_IX:-0}%\e[0m"
+          else
+              echo -e "    \e[1;31m[✗ IX.br PTT]\e[0m   Falha ao contactar 200.219.148.1"
+          fi
+
+          echo -e "\e[1;33m[*] 3. Verificando conectividade IPv6...\e[0m"
+          if ping6 -c 2 -W 2 2001:12ff::3 >/dev/null 2>&1 || ping -6 -c 2 -W 2 2001:12ff::3 >/dev/null 2>&1; then
+              echo -e "    \e[1;32m[✓ IPv6 Nativo]\e[0m Conectividade IPv6 operacional"
+          else
+              echo -e "    \e[1;33m[!] IPv6]\e[0m        Sem rota IPv6 ativa (apenas IPv4 operacional)"
+          fi
+
+          echo -e "\e[1;36m------------------------------------------------------------------\e[0m"
+
+          if [ "$MODE" == "--cli-only" ] || [ "$MODE" == "-c" ]; then
+              echo -e "\e[1;32m[+] Diagnóstico preliminar concluído.\e[0m"
+              exit 0
+          fi
+
+          echo -e "\e[1;34m[*] Abrindo medidor oficial SIMET (NIC.br) em modo App Standalone...\e[0m"
+          if command -v brave-browser >/dev/null 2>&1; then
+              nohup /usr/bin/brave-browser --app="https://simet.nic.br" >/dev/null 2>&1 &
+              disown
+          elif command -v google-chrome >/dev/null 2>&1; then
+              nohup /usr/bin/google-chrome --app="https://simet.nic.br" >/dev/null 2>&1 &
+              disown
+          else
+              xdg-open "https://simet.nic.br" >/dev/null 2>&1 &
+          fi
+
+          echo -e "\e[1;32m[+] SIMET lançado com sucesso!\e[0m"
+          echo -e "\e[1;36m==================================================================\e[0m"
+
+    # ----------------------------------------------------
+    # 5. SYMLINKS FOR CONVENIENT SHORTHANDS
+    # ----------------------------------------------------
+    - name: Create symlinks in /usr/local/bin for Brave commands
+      ansible.builtin.file:
+        src: "/usr/local/bin/{{ item.src }}"
+        dest: "/usr/local/bin/{{ item.dest }}"
+        state: link
+        force: true
+      loop:
+        - { src: "fzl-browser-brave", dest: "fzl-brave" }
+        - { src: "fzl-browser-brave", dest: "fzl-brave-start" }
+        - { src: "fzl-browser-brave--dev", dest: "fzl-brave-dev" }
+        - { src: "fzl-browser-brave--ai", dest: "fzl-brave-ai" }
+        - { src: "fzl-browser-brave--app", dest: "fzl-brave-app" }
+        - { src: "fzl-browser-brave--temp", dest: "fzl-brave-temp" }
+        - { src: "fzl-browser-brave--tor", dest: "fzl-brave-tor" }
+        - { src: "fzl-browser-brave--backup", dest: "fzl-brave-backup" }
+        - { src: "fzl-browser-brave--restore", dest: "fzl-brave-restore" }
+        - { src: "fzl-network-simet", dest: "fzl-simet" }
+        - { src: "fzl-network-simet", dest: "fzl-simet-start" }
+
+    # ----------------------------------------------------
+    # 6. USER SHELL INTEGRATION (40-brave.bash in ~/.bashrc.d)
+    # ----------------------------------------------------
+    - name: Ensure ~/.bashrc.d directory exists for user
+      ansible.builtin.file:
+        path: "{{ bashrc_d_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: '0755'
+
+    - name: Install 40-brave.bash in ~/.bashrc.d
+      ansible.builtin.copy:
+        dest: "{{ bashrc_d_dir }}/40-brave.bash"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # ==============================================================================
+          # 40-brave.bash - Brave Browser Productivity Aliases & Launchers
+          # Managed by Ansible desktop-brave-configuration playbook
+          # ==============================================================================
+
+          alias fzl-brave='fzl-browser-brave'
+          alias fzl-brave-start='fzl-browser-brave'
+          alias fzl-brave-dev='fzl-browser-brave--dev'
+          alias fzl-brave-ai='fzl-browser-brave--ai'
+          alias fzl-brave-app='fzl-browser-brave--app'
+          alias fzl-brave-temp='fzl-browser-brave--temp'
+          alias fzl-brave-tor='fzl-browser-brave--tor'
+          alias fzl-brave-backup='fzl-browser-brave--backup'
+          alias fzl-brave-restore='fzl-browser-brave--restore'
+          alias fzl-simet='fzl-network-simet'
+          alias fzl-simet-start='fzl-network-simet'
+
+    # ----------------------------------------------------
+    # 7. SUMMARY DISPLAY
+    # ----------------------------------------------------
+    - name: Display Brave Configuration Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Brave Browser Automated Configuration & Tooling Completed!"
+          - "=========================================================================="
+          - " Enterprise Policies deployed to: /etc/brave/policies/managed/fzl_brave_policies.json"
+          - "   - Auto-installed Extensions: Bitwarden, uBlock Origin, Dark Reader, Vimium, Sider AI"
+          - "   - Cleaned Bloat: Disabled Brave Rewards, Web3 Wallet prompts, and VPN popups"
+          - "   - Pre-populated Bookmarks: GitHub, Lattes, SIMET, ChatGPT, Claude, Gemini, HuggingFace"
+          - ""
+          - " Available FZL CLI Commands:"
+          - "   $ fzl-brave (or fzl-brave-start)       Standard hardware-accelerated launcher"
+          - "   $ fzl-brave-dev [url]                  Developer mode (port 9222, auto-DevTools)"
+          - "   $ fzl-brave-ai [chatgpt|claude|gemini] Dedicated AI app workspaces"
+          - "   $ fzl-brave-app <url>                  PWA / Standalone desktop app window"
+          - "   $ fzl-brave-temp                       Ephemeral sandbox (auto-purges on exit)"
+          - "   $ fzl-brave-tor                        Private browsing with Tor Onion routing"
+          - "   $ fzl-brave-backup                     Backup profile (Bookmarks, History, etc.)"
+          - "   $ fzl-brave-restore [archive]          Restore profile from backup"
+          - "   $ fzl-simet (or fzl-network-simet)     NIC.br SIMET quality check & App launcher"
+          - "=========================================================================="
