@@ -1,11 +1,32 @@
 ---
-- name: Setup AI Machine with Common Agents
+# ==============================================================================
+# AI Machine (IAMachine) Unified Master Provisioning Playbook
+# ==============================================================================
+# Aggregates system base setup, development runtimes/languages, AI CLI tools,
+# isolated agents, local LLM engines (Ollama, Kimi), persistent AI memory, and
+# Model Context Protocol (MCP) integrations across all agent clients.
+#
+# Selective execution via Ansible tags:
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags common
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags dev_langs
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags install_ai_tools
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags configure_agents
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags ai_memory
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags aider
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags ollama
+# ==============================================================================
+
+- name: Setup AI Machine with Unified Tooling, Agents, and MCP Architecture
   hosts: devmachines_workstations
   become: yes
   vars_files:
     - ../vars/vault.yml
   roles:
-    - common
-    - devmachine_install_dev_langs
-    - devmachine_install_ai_tools
-    - devmachine_ai_agents_mcp
+    - role: common
+      tags: [common, base]
+    - role: devmachine_install_dev_langs
+      tags: [dev_langs, languages]
+    - role: devmachine_install_ai_tools
+      tags: [ai_tools, install_ai_tools]
+    - role: devmachine_ai_agents_mcp
+      tags: [ai_agents_mcp, configure_agents, mcp]

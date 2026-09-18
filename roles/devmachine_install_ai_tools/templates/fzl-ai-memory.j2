@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# FZL Wrapper for ai-memory (Persistent Agent Memory MCP Server)
+# Managed by Ansible devmachine_install_ai_tools role
+# ==============================================================================
+
+PORT="{{ ai_memory_port | default(49374) }}"
+SERVER_URL="http://127.0.0.1:${PORT}"
+AI_MEMORY_BIN="/usr/local/bin/ai-memory"
+
+if [ ! -x "$AI_MEMORY_BIN" ]; then
+    if command -v ai-memory &>/dev/null; then
+        AI_MEMORY_BIN="$(command -v ai-memory)"
+    elif [ -x "${HOME}/.local/bin/ai-memory" ]; then
+        AI_MEMORY_BIN="${HOME}/.local/bin/ai-memory"
+    else
+        echo "Error: ai-memory binary not found in /usr/local/bin or ~/.local/bin" >&2
+        exit 1
+    fi
+fi
+
+case "$1" in
+    start)
+        echo "Starting ai-memory service in background on port ${PORT}..."
+        if systemctl --user is-active --quiet ai-memory.service 2>/dev/null; then
+            echo "Service ai-memory is already running via systemd."
+        elif systemctl --user list-unit-files ai-memory.service &>/dev/null; then
+            systemctl --user start ai-memory.service
+            echo "Started via systemctl --user start ai-memory.service"
+        else
+            nohup "$AI_MEMORY_BIN" serve --transport http --enable-web --bind "127.0.0.1:${PORT}" > /tmp/ai-memory.log 2>&1 &
+            echo "Started with PID $!"
+        fi
+        ;;
+    stop)
+        echo "Stopping ai-memory service..."
+        if systemctl --user is-active --quiet ai-memory.service 2>/dev/null; then
+            systemctl --user stop ai-memory.service
+            echo "Stopped via systemctl."
+        else
+            pkill -f "ai-memory serve" || true
+            echo "Stopped background processes."
+        fi
+        ;;
+    status)
+        echo "Checking ai-memory status on ${SERVER_URL}..."
+        if curl -sI "${SERVER_URL}/web" | grep -q "200 OK"; then
+            echo "✅ ai-memory server is UP and responding at ${SERVER_URL}"
+            echo "   MCP Endpoint: ${SERVER_URL}/mcp"
+            echo "   Web Dashboard: ${SERVER_URL}/web"
+        else
+            echo "❌ ai-memory server is DOWN or not responding on port ${PORT}."
+        fi
+        ;;
+    web)
+        echo "Opening ai-memory Web UI at ${SERVER_URL}/web ..."
+        if command -v xdg-open &>/dev/null; then
+            xdg-open "${SERVER_URL}/web"
+        else
+            echo "Navigate to: ${SERVER_URL}/web"
+        fi
+        ;;
+    *)
+        exec "$AI_MEMORY_BIN" "$@"
+        ;;
+esac

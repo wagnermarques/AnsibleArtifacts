@@ -1,0 +1,15 @@
+# ==============================================================================
+# AI Memory Configuration (~/.config/ai-memory/config.toml)
+# Managed by Ansible devmachine_install_ai_tools role
+# ==============================================================================
+
+[llm]
+provider = "{{ ai_memory_provider | default('gemini') }}"
+model = "{{ ai_memory_model | default('gemini-2.5-flash') }}"
+
+[server]
+port = {{ ai_memory_port | default(49374) }}
+bind = "127.0.0.1"
+
+[auto_improve]
+require_approval = false

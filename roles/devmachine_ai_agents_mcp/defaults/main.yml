@@ -19,6 +19,10 @@ github_personal_access_token: ""
 # MCP NPM packages to install globally
 mcp_npm_packages:
   - "@modelcontextprotocol/server-github"
+  - "@modelcontextprotocol/server-google-maps"
+  - "@modelcontextprotocol/server-brave-search"
+  - "mcp-server-fetch-typescript"
+  - "@modelcontextprotocol/server-sequential-thinking"
 
 # Client integration toggles
 configure_gemini_mcp: true
@@ -28,6 +32,16 @@ configure_vscode_cline_mcp: true
 configure_opencode_mcp: true
 configure_shell_env_mcp: true
 
+# Client settings
+claude_code_auto_updater_status: "enabled"
+opencode_default_model: "openrouter/anthropic/claude-3.5-sonnet"
+opencode_theme: "auto"
+openrouter_api_key: ""
+
 # Additional MCP server configuration placeholders
 google_maps_mcp_key: ""
 brave_search_mcp_key: ""
+
+# ai-memory Persistent Memory MCP Server
+configure_ai_memory_mcp: true
+ai_memory_server_url: "http://127.0.0.1:49374/mcp"

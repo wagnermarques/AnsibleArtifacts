@@ -1,5 +1,12 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "{{ opencode_default_model | default('openrouter/anthropic/claude-3.5-sonnet') }}",
+  "theme": "{{ opencode_theme | default('auto') }}"{% if openrouter_api_key is defined and openrouter_api_key and openrouter_api_key != 'your_openrouter_api_key_here' %},
+  "providers": {
+    "openrouter": {
+      "apiKey": "{{ openrouter_api_key }}"
+    }
+  }{% endif %},
   "mcpServers": {
     "github": {
       "command": "npx",
@@ -10,6 +17,11 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "{{ effective_github_token }}"
       }
-    }
+    }{% if configure_ai_memory_mcp | default(true) %},
+    "ai-memory": {
+      "type": "remote",
+      "url": "{{ ai_memory_server_url | default('http://127.0.0.1:49374/mcp') }}",
+      "enabled": true
+    }{% endif %}
   }
 }

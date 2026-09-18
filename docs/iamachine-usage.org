@@ -5,14 +5,36 @@
 * Introduction
 This document provides getting started instructions for all AI CLI tools, SDKs, and agents installed by the =playbooks/iamachine-setup.yml= playbook (via the =devmachine_install_ai_tools= Ansible role).
 
-* Running the Setup Playbook
-To provision or update the AI tools on your system, execute:
+* Architecture & Aggregated Playbook Structure
+The =playbooks/iamachine-setup.yml= master playbook aggregates the complete AI workstation stack:
+1. *System Base & Core Utilities* (=common=)
+2. *Development Runtimes & Languages* (=devmachine_install_dev_langs= - Node.js, Python, Rust, Go, etc.)
+3. *AI Tools & Model Engines* (=devmachine_install_ai_tools= - NPM CLIs, Pipx apps, Aider, Kimi, Ollama, AI Memory)
+4. *Cross-Agent MCP Integrations* (=devmachine_ai_agents_mcp= - Gemini, Claude Code, Claude Desktop, OpenCode, VSCode Cline/Roo-Code)
 
+* Running the Setup Playbook
+
+** Complete Provisioning
+To provision or update the entire stack on your machine:
 #+begin_src bash
-ansible-playbook playbooks/iamachine-setup.yml --ask-become-pass
+ansible-playbook playbooks/iamachine-setup.yml -K
 #+end_src
 
-This playbook installs global NPM packages, Python pipx isolated applications, system-wide binary utilities (Kimi Code, Ollama), and configures MCP server settings for Gemini CLI.
+** Selective Execution via Ansible Tags
+You can execute specific sections of the playbook using the =--tags= flag:
+
+| Tag | Purpose / Tasks Executed | Example Command |
+| :--- | :--- | :--- |
+| =common= | Core system packages, bash environment, and prerequisites | =ansible-playbook playbooks/iamachine-setup.yml -K --tags common= |
+| =dev_langs= | Programming runtimes (Node.js, Python, Go, Rust, Java, etc.) | =ansible-playbook playbooks/iamachine-setup.yml -K --tags dev_langs= |
+| =ai_tools= / =install_ai_tools= | All AI tools (NPM, Python SDKs, pipx, Aider, Ollama, Kimi, ai-memory) | =ansible-playbook playbooks/iamachine-setup.yml -K --tags install_ai_tools= |
+| =configure_agents= / =ai_agents_mcp= / =mcp= | Configure Model Context Protocol (MCP) servers across all agents | =ansible-playbook playbooks/iamachine-setup.yml -K --tags configure_agents= |
+| =ai_memory= | Provision/update AI Memory binary, service, and agent MCP bindings | =ansible-playbook playbooks/iamachine-setup.yml -K --tags ai_memory= |
+| =npm_tools= | Only install/update NPM-based AI tools (Claude Code, OpenCode, etc.) | =ansible-playbook playbooks/iamachine-setup.yml -K --tags npm_tools= |
+| =python_tools= | Only install/update Python AI SDKs and pipx apps (sgpt, interpreter) | =ansible-playbook playbooks/iamachine-setup.yml -K --tags python_tools= |
+| =aider= | Build/update Aider isolated venv and =fzl-aider= wrapper | =ansible-playbook playbooks/iamachine-setup.yml -K --tags aider= |
+| =ollama= | Install Ollama runtime and pull local LLM models | =ansible-playbook playbooks/iamachine-setup.yml -K --tags ollama= |
+| =kimi= | Install/update Kimi Code CLI assistant | =ansible-playbook playbooks/iamachine-setup.yml -K --tags kimi= |
 
 * Getting Started with Installed AI CLI Tools
 

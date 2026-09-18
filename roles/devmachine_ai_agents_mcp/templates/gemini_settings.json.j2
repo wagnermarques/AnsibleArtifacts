@@ -9,6 +9,44 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "{{ effective_github_token }}"
       }
-    }
+    },
+    "google-maps": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-google-maps"
+      ],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "{{ google_maps_mcp_key | default('') }}"
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "{{ brave_search_mcp_key | default('') }}"
+      }
+    },
+    "fetch": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-fetch-typescript"
+      ]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    }{% if configure_ai_memory_mcp | default(true) %},
+    "ai-memory": {
+      "httpUrl": "{{ ai_memory_server_url | default('http://127.0.0.1:49374/mcp') }}",
+      "timeout": 5000
+    }{% endif %}
   }
 }

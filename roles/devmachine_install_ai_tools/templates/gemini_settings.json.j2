@@ -43,6 +43,10 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
-    }
+    }{% if install_ai_memory | default(true) %},
+    "ai-memory": {
+      "httpUrl": "http://127.0.0.1:{{ ai_memory_port | default(49374) }}/mcp",
+      "timeout": 5000
+    }{% endif %}
   }
 }

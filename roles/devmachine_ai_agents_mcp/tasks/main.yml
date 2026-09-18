@@ -9,6 +9,7 @@
   set_fact:
     real_user: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
     real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
+  tags: [always]
 
 - name: Find existing .env file
   stat:
@@ -17,14 +18,17 @@
   register: dotenv_stat_results
   delegate_to: localhost
   become: no
+  tags: [always]
 
 - name: Select the first existing .env file
   set_fact:
     found_dotenv_path: "{{ (dotenv_stat_results.results | selectattr('stat.exists', 'equalto', true) | map(attribute='stat.path') | list | first) | default('') }}"
+  tags: [always]
 
 - name: Display detected .env file
   debug:
     msg: "Using .env file at: {{ found_dotenv_path if found_dotenv_path != '' else 'None found (falling back to role variables/env)' }}"
+  tags: [always]
 
 - name: Read .env file content if found
   slurp:
@@ -33,6 +37,7 @@
   when: found_dotenv_path != ''
   delegate_to: localhost
   become: no
+  tags: [always]
 
 - name: Extract GITHUB_PERSONAL_ACCESS_TOKEN from .env file
   set_fact:
@@ -42,16 +47,19 @@
     - found_dotenv_path != ''
     - dotenv_file_content is defined
     - dotenv_file_content.content is defined
+  tags: [always]
 
 - name: Set effective GITHUB_PERSONAL_ACCESS_TOKEN
   set_fact:
     effective_github_token: "{{ (dotenv_github_token | default('')) if (dotenv_github_token is defined and dotenv_github_token != '') else (github_personal_access_token if github_personal_access_token != '' else (lookup('env', 'GITHUB_PERSONAL_ACCESS_TOKEN') | default('', true))) }}"
+  tags: [always]
 
 - name: Check if npm is installed
   command: which npm
   register: npm_check
   changed_when: false
   failed_when: false
+  tags: [ai_agents_mcp, configure_agents, mcp, mcp_npm]
 
 - name: Install MCP packages globally via npm
   npm:
@@ -61,6 +69,7 @@
   loop: "{{ mcp_npm_packages }}"
   when: npm_check.rc == 0
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, mcp_npm]
 
 - name: Ensure agent configuration directories exist in user home
   file:
@@ -77,6 +86,7 @@
     - "{{ real_user_home }}/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings"
     - "{{ real_user_home }}/.config/agents"
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, ai_memory]
 
 - name: Configure Gemini CLI MCP settings (~/.gemini/settings.json)
   template:
@@ -86,6 +96,7 @@
     owner: "{{ real_user }}"
   when: configure_gemini_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, gemini_mcp, ai_memory]
 
 - name: Configure Claude Desktop MCP settings (~/.config/Claude/claude_desktop_config.json)
   template:
@@ -95,6 +106,7 @@
     owner: "{{ real_user }}"
   when: configure_claude_desktop_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, claude_desktop_mcp, ai_memory]
 
 - name: Configure Claude Code MCP settings (~/.claude.json)
   template:
@@ -104,6 +116,7 @@
     owner: "{{ real_user }}"
   when: configure_claude_code_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, claude_code_mcp, ai_memory]
 
 - name: Configure VSCode Cline extension MCP settings
   template:
@@ -113,6 +126,7 @@
     owner: "{{ real_user }}"
   when: configure_vscode_cline_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, vscode_mcp, cline_mcp, ai_memory]
 
 - name: Configure VSCode Roo-Code extension MCP settings
   template:
@@ -122,6 +136,7 @@
     owner: "{{ real_user }}"
   when: configure_vscode_cline_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, vscode_mcp, roo_code_mcp, ai_memory]
 
 - name: Configure OpenCode MCP settings (~/.config/opencode/opencode.json)
   template:
@@ -131,6 +146,7 @@
     owner: "{{ real_user }}"
   when: configure_opencode_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, opencode_mcp, ai_memory]
 
 - name: Configure MCP shell environment (~/.bashrc_ai_mcp)
   template:
@@ -140,6 +156,7 @@
     owner: "{{ real_user }}"
   when: configure_shell_env_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, shell_mcp]
 
 - name: Ensure ~/.bashrc_ai_mcp is sourced in user's ~/.bashrc
   lineinfile:
@@ -150,3 +167,4 @@
     owner: "{{ real_user }}"
   when: configure_shell_env_mcp | bool
   become: yes
+  tags: [ai_agents_mcp, configure_agents, mcp, shell_mcp]

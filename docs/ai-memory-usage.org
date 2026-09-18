@@ -1,0 +1,58 @@
+#+TITLE: AI Memory Usage Guide: Persistent Cross-Agent Context via MCP & Gemini 2.5
+#+AUTHOR: FzlSoft Automation
+#+DATE: [2026-09-17 Thu]
+
+* Overview
+=ai-memory= provides persistent, long-term memory for AI coding agents and CLI assistants.
+It operates as a lightweight local daemon and MCP (Model Context Protocol) server powered by Google Gemini 2.5 Flash for background note consolidation and synthesis.
+
+* Key Features
+- *Cross-Agent Continuity*: Handoffs and shared notes between Claude Code, Gemini CLI, Antigravity, OpenCode, and Cline.
+- *Zero Laptop Overhead*: Background summarization uses Gemini 2.5 Flash via =GEMINI_API_KEY= instead of local CPU/GPU cycles.
+- *Web UI Dashboard*: Visual wiki, knowledge graph, and session review accessible at =http://127.0.0.1:49374/web=.
+
+* Service Management
+You can manage the background service using the =fzl-ai-memory= command wrapper:
+
+** Check Status
+#+begin_src bash
+fzl-ai-memory status
+#+end_src
+
+** Start / Stop Service
+#+begin_src bash
+fzl-ai-memory start
+fzl-ai-memory stop
+#+end_src
+
+** Open Web Dashboard
+#+begin_src bash
+fzl-ai-memory web
+# Or navigate to: http://127.0.0.1:49374/web
+#+end_src
+
+* CLI Usage & Quick Commands
+
+** Save / Write a Memory Page
+#+begin_src bash
+ai-memory write-page --path "architecture/database.md" --body "PostgreSQL 16 running on port 5432 with schema 'auth'."
+#+end_src
+
+** Search Memory
+#+begin_src bash
+ai-memory search "database"
+#+end_src
+
+** Read a Memory Page
+#+begin_src bash
+ai-memory read-page architecture/database.md
+#+end_src
+
+* MCP Integration Details
+When provisioned via =devmachine-configure-ai-agents-mcp.yml=, the following endpoints are automatically configured:
+
+- *Gemini CLI / Antigravity*: =~/.gemini/settings.json= -> =http://127.0.0.1:49374/mcp=
+- *Claude Code*: =~/.claude.json= -> =http://127.0.0.1:49374/mcp=
+- *OpenCode*: =~/.config/opencode/opencode.json= -> =http://127.0.0.1:49374/mcp=
+- *VS Code Cline*: =~/.config/Code/User/.../settings.json= -> =http://127.0.0.1:49374/mcp=
+- *Claude Desktop*: =~/.config/Claude/claude_desktop_config.json= -> =ai-memory serve --transport stdio=

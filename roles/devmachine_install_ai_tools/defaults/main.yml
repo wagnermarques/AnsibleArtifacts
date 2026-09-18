@@ -62,3 +62,12 @@ ollama_models:
   - "gemma4:12b"
   - "qwen2.5:7b"
 
+# ai-memory Configuration (Persistent MCP Memory & Cross-Agent Handoff)
+install_ai_memory: true
+ai_memory_version: "2.3.0"
+ai_memory_provider: "gemini"
+ai_memory_model: "gemini-2.5-flash"
+ai_memory_port: 49374
+ai_memory_enable_web: true
+enable_ai_memory_user_service: true
+

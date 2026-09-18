@@ -1,17 +1,17 @@
 ---
+# ==============================================================================
+# Tasks for devmachine_install_ai_tools role
+# Installs AI CLI tools, SDKs, local LLM engines (Ollama, Kimi), isolated apps
+# (Aider, pipx apps), Persistent AI Memory, and base agent configurations.
+# ==============================================================================
+
 - name: Install AI CLI tools via NPM
   npm:
     name: "{{ item }}"
     global: yes
     state: present
   loop: "{{ ai_npm_packages }}"
-
-- name: Install MCP Server Packages for Gemini CLI
-  npm:
-    name: "{{ item }}"
-    global: yes
-    state: present
-  loop: "{{ mcp_npm_packages }}"
+  tags: [ai_tools, npm_tools]
 
 - name: Install Python AI SDKs (Libraries)
   pip:
@@ -19,10 +19,12 @@
     state: latest
     executable: pip3
     extra_args: "--break-system-packages"
+  tags: [ai_tools, python_tools, pip]
 
 - name: Ensure pipx is ready
   command: pipx ensurepath
   become: no
+  tags: [ai_tools, python_tools, pipx]
 
 - name: Install Python AI Apps via pipx
   command: "pipx install {{ item }} --force"
@@ -37,11 +39,13 @@
     - "'already installed' not in pipx_result.stderr"
     - "item != 'open-interpreter'"
     - "'git+' not in item or 'failed' in pipx_result.stderr"
+  tags: [ai_tools, python_tools, pipx]
 
 - name: Get the actual user and home directory
   set_fact:
     real_user: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
     real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
+  tags: [always]
 
 - name: Ensure .envs directory exists in user home
   file:
@@ -51,6 +55,7 @@
     owner: "{{ real_user }}"
   when: install_aider_venv | bool
   become: yes
+  tags: [ai_tools, aider]
 
 - name: Create isolated Python virtual environment for Aider (~/.envs/aider)
   command: "python3 -m venv {{ real_user_home }}/.envs/aider"
@@ -59,6 +64,7 @@
   when: install_aider_venv | bool
   become: yes
   become_user: "{{ real_user }}"
+  tags: [ai_tools, aider]
 
 - name: Upgrade pip, setuptools, and wheel in Aider virtual environment
   pip:
@@ -71,6 +77,7 @@
   when: install_aider_venv | bool
   become: yes
   become_user: "{{ real_user }}"
+  tags: [ai_tools, aider]
 
 - name: Install aider-chat in isolated virtual environment
   pip:
@@ -80,6 +87,7 @@
   when: install_aider_venv | bool
   become: yes
   become_user: "{{ real_user }}"
+  tags: [ai_tools, aider]
 
 - name: Create fzl-aider executable command wrapper in /usr/local/bin
   template:
@@ -90,6 +98,7 @@
     group: root
   when: install_aider_venv | bool
   become: yes
+  tags: [ai_tools, aider]
 
 - name: Ensure agent configuration directories exist in user home
   file:
@@ -103,7 +112,10 @@
     - "{{ real_user_home }}/.config/opencode"
     - "{{ real_user_home }}/.config/shell_gpt"
     - "{{ real_user_home }}/.config/agents"
+    - "{{ real_user_home }}/.config/ai-memory"
+    - "{{ real_user_home }}/.config/systemd/user"
   become: yes
+  tags: [ai_tools, config]
 
 - name: Configure Tier 1 shared AI environment in ~/.bashrc_ai_tools
   template:
@@ -112,6 +124,7 @@
     mode: '0644'
     owner: "{{ real_user }}"
   become: yes
+  tags: [ai_tools, shell_env, bashrc]
 
 - name: Source ~/.bashrc_ai_tools in user's ~/.bashrc
   lineinfile:
@@ -121,6 +134,7 @@
     create: yes
     owner: "{{ real_user }}"
   become: yes
+  tags: [ai_tools, shell_env, bashrc]
 
 - name: Configure Tier 2 Universal Agent guidelines (~/.config/agents/AGENTS.md)
   template:
@@ -130,6 +144,7 @@
     owner: "{{ real_user }}"
   when: deploy_universal_agents_md | bool
   become: yes
+  tags: [ai_tools, agents_guidelines]
 
 - name: Create global Aider config ~/.aider.conf.yml
   template:
@@ -139,32 +154,7 @@
     owner: "{{ real_user }}"
   when: install_aider_venv | bool
   become: yes
-
-- name: Configure Gemini CLI / MCP extensions (~/.gemini/settings.json)
-  template:
-    src: gemini_settings.json.j2
-    dest: "{{ real_user_home }}/.gemini/settings.json"
-    mode: '0644'
-    owner: "{{ real_user }}"
-  become: yes
-
-- name: Configure OpenCode settings (~/.config/opencode/opencode.json)
-  template:
-    src: opencode.json.j2
-    dest: "{{ real_user_home }}/.config/opencode/opencode.json"
-    mode: '0644'
-    owner: "{{ real_user }}"
-  when: configure_opencode | bool
-  become: yes
-
-- name: Configure Claude Code settings (~/.claude.json)
-  template:
-    src: claude_config.json.j2
-    dest: "{{ real_user_home }}/.claude.json"
-    mode: '0644'
-    owner: "{{ real_user }}"
-  when: configure_claude_code | bool
-  become: yes
+  tags: [ai_tools, aider]
 
 - name: Configure Shell-GPT settings (~/.config/shell_gpt/.sgptrc)
   template:
@@ -174,7 +164,7 @@
     owner: "{{ real_user }}"
   when: configure_shell_gpt | bool
   become: yes
-
+  tags: [ai_tools, shell_gpt]
 
 - name: Install Kimi Code (Terminal AI assistant)
   shell: curl -fsSL https://code.kimi.com/kimi-code/install.sh | KIMI_INSTALL_DIR=/usr/local bash
@@ -182,6 +172,7 @@
   args:
     creates: /usr/local/bin/kimi
   become: yes
+  tags: [ai_tools, kimi]
 
 - name: Install Ollama (Local LLM runner)
   shell: curl -fsSL https://ollama.com/install.sh | sh
@@ -189,6 +180,7 @@
   args:
     creates: /usr/local/bin/ollama
   become: yes
+  tags: [ai_tools, ollama]
 
 - name: Pull requested local AI models
   command: "ollama pull {{ item }}"
@@ -196,4 +188,77 @@
   when: install_ollama | bool
   register: ollama_pull
   changed_when: "'pulling' in ollama_pull.stdout"
+  tags: [ai_tools, ollama]
 
+- name: Download ai-memory release archive
+  get_url:
+    url: "https://github.com/akitaonrails/ai-memory/releases/download/v{{ ai_memory_version }}/ai-memory-linux-x86_64.tar.gz"
+    dest: "/tmp/ai-memory-{{ ai_memory_version }}-linux-x86_64.tar.gz"
+    mode: '0644'
+  when: install_ai_memory | bool
+  become: yes
+  tags: [ai_memory, ai_tools]
+
+- name: Extract ai-memory binary to /usr/local/bin
+  command: "tar -xzf /tmp/ai-memory-{{ ai_memory_version }}-linux-x86_64.tar.gz -C /usr/local/bin ./ai-memory"
+  args:
+    creates: /usr/local/bin/ai-memory
+  when: install_ai_memory | bool
+  become: yes
+  tags: [ai_memory, ai_tools]
+
+- name: Ensure correct permissions on /usr/local/bin/ai-memory
+  file:
+    path: /usr/local/bin/ai-memory
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_ai_memory | bool
+  become: yes
+  tags: [ai_memory, ai_tools]
+
+- name: Ensure ai-memory configuration directories exist in user home
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ real_user }}"
+  loop:
+    - "{{ real_user_home }}/.config/ai-memory"
+    - "{{ real_user_home }}/.config/systemd/user"
+  when: install_ai_memory | bool
+  become: yes
+  tags: [ai_memory, ai_tools]
+
+- name: Configure ai-memory settings (~/.config/ai-memory/config.toml)
+  template:
+    src: ai_memory_config.toml.j2
+    dest: "{{ real_user_home }}/.config/ai-memory/config.toml"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when: install_ai_memory | bool
+  become: yes
+  tags: [ai_memory, ai_tools]
+
+- name: Deploy ai-memory systemd user service (~/.config/systemd/user/ai-memory.service)
+  template:
+    src: ai_memory.service.j2
+    dest: "{{ real_user_home }}/.config/systemd/user/ai-memory.service"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when:
+    - install_ai_memory | bool
+    - enable_ai_memory_user_service | bool
+  become: yes
+  tags: [ai_memory, ai_tools]
+
+- name: Create fzl-ai-memory executable command wrapper in /usr/local/bin
+  template:
+    src: fzl-ai-memory.j2
+    dest: /usr/local/bin/fzl-ai-memory
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_ai_memory | bool
+  become: yes
+  tags: [ai_memory, ai_tools]

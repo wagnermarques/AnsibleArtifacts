@@ -9,6 +9,14 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "{{ effective_github_token }}"
       }
-    }
+    }{% if configure_ai_memory_mcp | default(true) %},
+    "ai-memory": {
+      "command": "ai-memory",
+      "args": [
+        "serve",
+        "--transport",
+        "stdio"
+      ]
+    }{% endif %}
   }
 }

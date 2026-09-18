@@ -1,0 +1,16 @@
+[Unit]
+Description=AI Memory MCP and Web Server (Persistent Agent Memory)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ai-memory serve --transport http{% if ai_memory_enable_web | default(true) %} --enable-web{% endif %} --bind 127.0.0.1:{{ ai_memory_port | default(49374) }}
+Restart=always
+RestartSec=5
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+{% if gemini_api_key is defined and gemini_api_key and gemini_api_key != 'your_gemini_api_key_here' %}
+Environment="GEMINI_API_KEY={{ gemini_api_key }}"
+{% endif %}
+
+[Install]
+WantedBy=default.target

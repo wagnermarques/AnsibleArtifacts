@@ -1,0 +1,18 @@
+---
+# ==============================================================================
+# AI Memory & Cross-Agent MCP Service Setup Playbook
+# ==============================================================================
+# Targeted playbook to provision/update the ai-memory daemon, fzl-ai-memory
+# wrapper, and configure persistent memory MCP bindings across all AI agents.
+# ==============================================================================
+
+- name: Setup and Configure AI Memory MCP Service
+  hosts: devmachines_workstations
+  become: yes
+  vars_files:
+    - ../vars/vault.yml
+  roles:
+    - role: devmachine_install_ai_tools
+      tags: [ai_memory, ai_tools]
+    - role: devmachine_ai_agents_mcp
+      tags: [ai_memory, ai_agents_mcp, configure_agents, mcp]
