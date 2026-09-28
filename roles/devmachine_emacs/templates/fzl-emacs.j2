@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# Command wrapper for fzl-emacs: runs custom compiled Emacs with fzl-emacs configuration
+
+EMACS_BIN="{{ emacs_install_dir }}/bin/emacs"
+DEFAULT_INIT_FILE="{{ emacs_default_init_file }}"
+FALLBACK_INIT_FILE="${HOME}/.emacs.d-fzl/init.el"
+
+show_help() {
+    cat << 'EOF'
+FZL Emacs Launcher
+==================
+Runs custom compiled GNU Emacs with isolated fzl-emacs configuration.
+
+Usage:
+  fzl-emacs [OPTIONS] [FILE_OR_INIT] [EMACS_ARGS...]
+  fzl-emacs-start [OPTIONS] [FILE_OR_INIT] [EMACS_ARGS...]
+
+Options:
+  -i, --init <path>    Specify path to init.el file or directory containing init.el
+  --validate           Check binary and configuration validity and exit
+  -h, --help           Show this help message
+
+Default init.el location:
+  {{ emacs_default_init_file }}
+
+Examples:
+  fzl-emacs-start                      # Start Emacs with default init.el in background
+  fzl-emacs                            # Start Emacs in foreground
+  fzl-emacs -nw                        # Start Emacs in terminal mode
+  fzl-emacs-start --init ~/my/init.el  # Start Emacs with a custom init.el
+  fzl-emacs path/to/file.txt           # Open a file with default init.el configuration
+EOF
+}
+
+VALIDATE_ONLY=0
+INIT_FILE=""
+PASSTHROUGH_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        --validate)
+            VALIDATE_ONLY=1
+            shift 1
+            ;;
+        -i|--init)
+            if [ -z "$2" ]; then
+                echo "Error: -i/--init requires an init file or directory path argument." >&2
+                show_help
+                exit 1
+            fi
+            INIT_FILE="$2"
+            shift 2
+            ;;
+        --init=*)
+            INIT_FILE="${1#*=}"
+            shift 1
+            ;;
+        *)
+            if [ -z "$INIT_FILE" ] && [[ "$1" == *.el ]] && [[ "$1" == *init*.el ]]; then
+                INIT_FILE="$1"
+            elif [ -z "$INIT_FILE" ] && [ -d "$1" ] && [ -f "$1/init.el" ]; then
+                INIT_FILE="$1/init.el"
+            else
+                PASSTHROUGH_ARGS+=("$1")
+            fi
+            shift 1
+            ;;
+    esac
+done
+
+# Check if Emacs binary exists
+if [ ! -x "$EMACS_BIN" ]; then
+    echo "Error: Custom compiled Emacs binary not found at $EMACS_BIN" >&2
+    echo "Run 'ansible-playbook -K playbooks/devmachine-emacs-setup.yml' to compile and install Emacs." >&2
+    exit 1
+fi
+
+# Resolve init file if not explicitly given
+if [ -z "$INIT_FILE" ]; then
+    if [ -f "$DEFAULT_INIT_FILE" ]; then
+        INIT_FILE="$DEFAULT_INIT_FILE"
+    elif [ -f "$FALLBACK_INIT_FILE" ]; then
+        INIT_FILE="$FALLBACK_INIT_FILE"
+    else
+        echo "Error: Emacs configuration init.el not found!" >&2
+        echo "Checked locations:" >&2
+        echo "  - Default:  $DEFAULT_INIT_FILE" >&2
+        echo "  - Fallback: $FALLBACK_INIT_FILE" >&2
+        echo "" >&2
+        show_help
+        exit 1
+    fi
+fi
+
+# Expand directory if a directory was passed
+if [ -d "$INIT_FILE" ] && [ -f "$INIT_FILE/init.el" ]; then
+    INIT_FILE="$INIT_FILE/init.el"
+fi
+
+if [ ! -f "$INIT_FILE" ]; then
+    echo "Error: Specified Emacs init file not found at: $INIT_FILE" >&2
+    echo "" >&2
+    show_help
+    exit 1
+fi
+
+# Resolve absolute path to init file and its directory
+INIT_FILE_ABS="$(readlink -f "$INIT_FILE")"
+INIT_DIR="$(dirname "$INIT_FILE_ABS")"
+
+if [ ! -d "$INIT_DIR" ]; then
+    echo "Error: Directory does not exist: $INIT_DIR" >&2
+    exit 1
+fi
+
+if [ $VALIDATE_ONLY -eq 1 ]; then
+    exit 0
+fi
+
+# Convert relative file paths to absolute before changing directory
+RESOLVED_ARGS=()
+for arg in "${PASSTHROUGH_ARGS[@]}"; do
+    if [[ "$arg" != -* ]]; then
+        if [[ "$arg" != /* ]]; then
+            RESOLVED_ARGS+=("$(pwd)/$arg")
+        else
+            RESOLVED_ARGS+=("$arg")
+        fi
+    else
+        RESOLVED_ARGS+=("$arg")
+    fi
+done
+
+# Change directory to init file directory so normal-top-level-add-to-load-path works
+cd "$INIT_DIR" || {
+    echo "Error: Failed to change directory to $INIT_DIR" >&2
+    exit 1
+}
+
+exec "$EMACS_BIN" -q -l "$INIT_FILE_ABS" "${RESOLVED_ARGS[@]}"

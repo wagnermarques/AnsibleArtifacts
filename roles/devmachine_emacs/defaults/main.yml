@@ -1,9 +1,15 @@
 ---
 emacs_repo_url: "https://git.savannah.gnu.org/git/emacs.git"
-emacs_version: "master"  # Or a specific branch like "emacs-29"
+emacs_version: "master"  # Or a specific branch like "emacs-30"
+emacs_source_dir: "/tmp/emacs_source"
 emacs_install_dir: "{{ ides_base_dir }}/emacs"
+
+# Configuration & Init paths
 emacs_config_repo: "https://github.com/wagnermarques/fzl-emacs"
-emacs_config_dir: "~/.emacs.d"
+emacs_config_branch: "main"
+emacs_config_dir: "{{ real_user_home | default(lookup('env', 'HOME')) }}/.emacs.d-fzl"
+emacs_default_init_dir: "{{ real_user_home | default(lookup('env', 'HOME')) }}/mnt/ext4/Projects-Srcs/Projects-Srcs-Desktop/fzl-emacs/main/src/lispsite"
+emacs_default_init_file: "{{ emacs_default_init_dir }}/init.el"
 
 # Build dependencies for Fedora
 emacs_fedora_deps:
@@ -29,8 +35,11 @@ emacs_fedora_deps:
   - texlive-scheme-basic
   - texlive-dvipng
   - texlive-dvisvgm
+  - webkit2gtk4.1-devel
+  - cairo-devel
+  - harfbuzz-devel
 
-# Compilation flags for X11 and performance
+# Compilation flags for Wayland/X11 and high performance
 emacs_configure_flags: >-
   --with-native-compilation=aot
   --with-json
@@ -38,5 +47,6 @@ emacs_configure_flags: >-
   --with-x-toolkit=gtk3
   --with-xwidgets
   --with-imagemagick
-  --with-mailutils
+  --with-cairo
+  --with-harfbuzz
   --prefix={{ emacs_install_dir }}

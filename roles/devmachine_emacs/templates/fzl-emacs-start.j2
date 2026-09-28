@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Command wrapper to launch fzl-emacs in the background (detached)
+
+WRAPPER="/usr/local/bin/fzl-emacs"
+
+# If user passes -h or --help, show help immediately
+for arg in "$@"; do
+    if [ "$arg" == "-h" ] || [ "$arg" == "--help" ]; then
+        if [ -x "$WRAPPER" ]; then
+            exec "$WRAPPER" --help
+        else
+            cat << 'EOF'
+FZL Emacs Launcher (Background)
+==============================
+Usage:
+  fzl-emacs-start [OPTIONS] [FILE_OR_INIT] [EMACS_ARGS...]
+
+Options:
+  -i, --init <path>    Specify path to init.el file or directory
+  -h, --help           Show this help message
+
+Default init.el location:
+  {{ emacs_default_init_file }}
+EOF
+            exit 0
+        fi
+    fi
+done
+
+if [ ! -x "$WRAPPER" ]; then
+    echo "Error: $WRAPPER not found or not executable." >&2
+    echo "Run 'ansible-playbook -K playbooks/devmachine-emacs-setup.yml' to install it." >&2
+    exit 1
+fi
+
+# Pre-validate arguments and configuration before backgrounding
+if ! "$WRAPPER" --validate "$@"; then
+    exit 1
+fi
+
+# Launch in background detached
+nohup "$WRAPPER" "$@" > /dev/null 2>&1 &
+PID=$!
+echo "FZL Emacs started in background (PID: $PID)"

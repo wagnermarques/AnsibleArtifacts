@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Command wrapper for fzl-emacsclient: runs emacsclient for custom compiled Emacs
+EMACSCLIENT_BIN="{{ emacs_install_dir }}/bin/emacsclient"
+
+if [ ! -x "$EMACSCLIENT_BIN" ]; then
+    echo "Error: Custom compiled emacsclient binary not found at $EMACSCLIENT_BIN" >&2
+    exit 1
+fi
+
+exec "$EMACSCLIENT_BIN" "$@"
