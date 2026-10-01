@@ -1,0 +1,254 @@
+---
+- name: Configure Inbound Remote Access on Fedora Desktop (RDP, SSH, VNC, AnyDesk, RustDesk)
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+
+    # Toggle which inbound services this playbook enables.
+    # RDP and SSH are opt-in: pass -e rdp_inbound_enabled=true / -e ssh_inbound_enabled=true to apply.
+    rdp_inbound_enabled: false
+    ssh_inbound_enabled: false
+    vnc_inbound_enabled: false
+    anydesk_lan_direct_enabled: true
+    rustdesk_lan_direct_enabled: true
+
+    # Required only when vnc_inbound_enabled is true, e.g.:
+    #   -e vnc_inbound_enabled=true -e vnc_password=yourpassword
+    vnc_password: ""
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. OS CHECK
+    # ----------------------------------------------------
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    # ----------------------------------------------------
+    # 2. FIREWALLD BASELINE
+    # ----------------------------------------------------
+    - name: Ensure firewalld package is installed
+      ansible.builtin.dnf:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld service is enabled and started
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+        state: started
+
+    # ----------------------------------------------------
+    # 3. INBOUND RDP (xrdp)
+    # ----------------------------------------------------
+    - name: Configure inbound RDP via xrdp
+      when: rdp_inbound_enabled | bool
+      block:
+        - name: Install xrdp and Xvnc backend (tigervnc-server)
+          ansible.builtin.dnf:
+            name:
+              - xrdp
+              - tigervnc-server
+            state: present
+            update_cache: yes
+
+        - name: Install xrdp SELinux policy package (if available)
+          ansible.builtin.dnf:
+            name: xrdp-selinux
+            state: present
+          ignore_errors: true
+
+        - name: Enable and start xrdp service
+          ansible.builtin.systemd:
+            name: xrdp
+            enabled: true
+            state: started
+
+        - name: Allow RDP service through firewalld
+          ansible.posix.firewalld:
+            service: rdp
+            permanent: true
+            state: enabled
+            immediate: true
+
+    # ----------------------------------------------------
+    # 4. INBOUND SSH
+    # ----------------------------------------------------
+    - name: Configure inbound SSH
+      when: ssh_inbound_enabled | bool
+      block:
+        - name: Ensure openssh-server is installed
+          ansible.builtin.dnf:
+            name: openssh-server
+            state: present
+
+        - name: Enable and start sshd service
+          ansible.builtin.systemd:
+            name: sshd
+            enabled: true
+            state: started
+
+        - name: Allow SSH service through firewalld
+          ansible.posix.firewalld:
+            service: ssh
+            permanent: true
+            state: enabled
+            immediate: true
+
+    # ----------------------------------------------------
+    # 5. INBOUND VNC (x11vnc, shares the live desktop session)
+    # ----------------------------------------------------
+    - name: Configure inbound VNC via x11vnc
+      when: vnc_inbound_enabled | bool
+      block:
+        - name: Fail if vnc_password was not provided
+          ansible.builtin.assert:
+            that:
+              - vnc_password | length > 0
+            fail_msg: "Set -e vnc_password=<password> when vnc_inbound_enabled is true."
+
+        - name: Install x11vnc
+          ansible.builtin.dnf:
+            name: x11vnc
+            state: present
+
+        - name: Ensure ~/.vnc directory exists for target user
+          ansible.builtin.file:
+            path: "{{ target_home }}/.vnc"
+            state: directory
+            owner: "{{ target_user }}"
+            mode: '0700'
+
+        - name: Store x11vnc password
+          ansible.builtin.command:
+            argv:
+              - x11vnc
+              - -storepasswd
+              - "{{ vnc_password }}"
+              - "{{ target_home }}/.vnc/passwd"
+          become: true
+          become_user: "{{ target_user }}"
+          args:
+            creates: "{{ target_home }}/.vnc/passwd"
+
+        - name: Create fzl-vnc-share-start launcher (shares the live X session on :0)
+          ansible.builtin.copy:
+            dest: "/usr/local/bin/fzl-vnc-share-start"
+            mode: '0755'
+            content: |
+              #!/usr/bin/env bash
+              # FZL x11vnc Live Desktop Share Launcher
+              mkdir -p "$HOME/.cache/x11vnc"
+              nohup x11vnc -display :0 -rfbauth "$HOME/.vnc/passwd" -forever -shared \
+                > "$HOME/.cache/x11vnc/x11vnc.log" 2>&1 &
+
+        - name: Allow VNC service through firewalld
+          ansible.posix.firewalld:
+            service: vnc-server
+            permanent: true
+            state: enabled
+            immediate: true
+
+    # ----------------------------------------------------
+    # 6. ANYDESK / RUSTDESK: ENSURE SERVICES + LAN DIRECT PORTS
+    # ----------------------------------------------------
+    - name: Check whether AnyDesk is installed
+      ansible.builtin.stat:
+        path: /usr/bin/anydesk
+      register: anydesk_bin
+
+    - name: Ensure AnyDesk service is enabled and started
+      when: anydesk_bin.stat.exists
+      ansible.builtin.systemd:
+        name: anydesk
+        enabled: true
+        state: started
+      ignore_errors: true
+
+    - name: Allow AnyDesk direct LAN connection port through firewalld
+      when: anydesk_lan_direct_enabled | bool and anydesk_bin.stat.exists
+      ansible.posix.firewalld:
+        port: "7070/tcp"
+        permanent: true
+        state: enabled
+        immediate: true
+
+    - name: Check whether RustDesk is installed
+      ansible.builtin.stat:
+        path: /usr/bin/rustdesk
+      register: rustdesk_bin
+
+    - name: Ensure RustDesk service is enabled and started
+      when: rustdesk_bin.stat.exists
+      ansible.builtin.systemd:
+        name: rustdesk
+        enabled: true
+        state: started
+      ignore_errors: true
+
+    - name: Allow RustDesk direct LAN connection ports through firewalld
+      when: rustdesk_lan_direct_enabled | bool and rustdesk_bin.stat.exists
+      ansible.posix.firewalld:
+        port: "21115-21119/tcp"
+        permanent: true
+        state: enabled
+        immediate: true
+      register: rustdesk_tcp_ports
+
+    - name: Allow RustDesk direct LAN connection UDP port through firewalld
+      when: rustdesk_lan_direct_enabled | bool and rustdesk_bin.stat.exists
+      ansible.posix.firewalld:
+        port: "21116/udp"
+        permanent: true
+        state: enabled
+        immediate: true
+
+    # ----------------------------------------------------
+    # 7. STATUS LAUNCHER
+    # ----------------------------------------------------
+    - name: Create fzl-remote-access-status launcher
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-remote-access-status"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Inbound Remote Access Status Check
+          echo "-- Services --"
+          for svc in sshd xrdp anydesk rustdesk; do
+            printf "%-10s %s\n" "$svc" "$(systemctl is-active "$svc" 2>/dev/null || echo not-installed)"
+          done
+          echo ""
+          echo "-- Firewalld (default zone) --"
+          firewall-cmd --list-services
+          firewall-cmd --list-ports
+
+    # ----------------------------------------------------
+    # 8. SUMMARY
+    # ----------------------------------------------------
+    - name: Display Inbound Remote Access Setup Summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Fedora Desktop Inbound Remote Access Setup Completed!"
+          - "=========================================================================="
+          - " Local IP address: {{ ansible_facts['default_ipv4']['address'] | default('unknown') }}"
+          - ""
+          - " RDP (xrdp):   {{ 'enabled, port 3389/tcp' if rdp_inbound_enabled | bool else 'skipped' }}"
+          - " SSH (sshd):   {{ 'enabled, port 22/tcp' if ssh_inbound_enabled | bool else 'skipped' }}"
+          - " VNC (x11vnc): {{ 'enabled, start with fzl-vnc-share-start' if vnc_inbound_enabled | bool else 'skipped (set -e vnc_inbound_enabled=true -e vnc_password=...)' }}"
+          - " AnyDesk:      {{ 'service active, LAN port 7070/tcp open' if anydesk_bin.stat.exists else 'not installed - run desktop-fedora-remote-access-tools-setup.yml first' }}"
+          - " RustDesk:     {{ 'service active, LAN ports 21115-21119/tcp + 21116/udp open' if rustdesk_bin.stat.exists else 'not installed - run desktop-fedora-remote-access-tools-setup.yml first' }}"
+          - ""
+          - " Check status anytime with: fzl-remote-access-status"
+          - ""
+          - " SECURITY NOTE: these rules only open the local firewall. Do not forward"
+          - " these ports on your router to the public internet; prefer a VPN or a"
+          - " tunnel (see servermachine-fedora-nginx-public--cloudflared.yml) for"
+          - " access from outside your LAN."
+          - "=========================================================================="
