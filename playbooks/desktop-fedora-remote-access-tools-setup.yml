@@ -200,9 +200,9 @@
             echo "Usage: fzl-rdp-connect <host-or-ip> [username]"
             echo ""
             echo "Examples:"
-            echo "  Internal: fzl-rdp-connect 192.168.30.178"
-            echo "  External: fzl-rdp-connect hjr0ah6z7cj.sn.mynetname.net"
-            echo "  With user: fzl-rdp-connect 192.168.30.178 Administrator"
+            echo "  Internal: fzl-rdp-connect 192.168.1.100"
+            echo "  External: fzl-rdp-connect your-host.ddns-provider.example"
+            echo "  With user: fzl-rdp-connect 192.168.1.100 Administrator"
             exit 1
           fi
 
@@ -266,10 +266,10 @@
           - ""
           - " Quick RDP Access Commands:"
           - "   Internal Access (Local Network):"
-          - "     $ fzl-rdp 192.168.30.178 [username]"
-          - "     OR: xfreerdp /v:192.168.30.178 /cert:ignore /dynamic-resolution +clipboard"
+          - "     $ fzl-rdp <local-ip> [username]"
+          - "     OR: xfreerdp /v:<local-ip> /cert:ignore /dynamic-resolution +clipboard"
           - ""
           - "   External Access (DDNS):"
-          - "     $ fzl-rdp hjr0ah6z7cj.sn.mynetname.net [username]"
-          - "     OR: xfreerdp /v:hjr0ah6z7cj.sn.mynetname.net /cert:ignore /dynamic-resolution +clipboard"
+          - "     $ fzl-rdp <your-ddns-hostname> [username]"
+          - "     OR: xfreerdp /v:<your-ddns-hostname> /cert:ignore /dynamic-resolution +clipboard"
           - "=========================================================================="
