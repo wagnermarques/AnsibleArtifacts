@@ -1,0 +1,91 @@
+---
+- name: Configure Static IP on Fedora 44 Desktop Machine
+  hosts: devmachines_workstations
+  become: true
+  gather_facts: true
+
+  vars:
+    # Override these via --extra-vars, e.g.:
+    #   ansible-playbook playbooks/desktop-fedora-config-static-ip.yml \
+    #     -e static_ip_address=192.168.1.50/24 \
+    #     -e static_ip_gateway=192.168.1.1
+    #
+    # Interface to configure. Defaults to the interface currently holding the default route.
+    static_ip_interface: "{{ ansible_facts['default_ipv4']['interface'] | default('') }}"
+
+    # NetworkManager connection type bound to the interface above (use "wifi" for wireless).
+    static_ip_connection_type: ethernet
+
+    # IPv4 address in CIDR notation, e.g. "192.168.1.50/24"
+    static_ip_address: ""
+
+    # IPv4 gateway, e.g. "192.168.1.1"
+    static_ip_gateway: ""
+
+    # DNS servers to use
+    static_ip_dns_servers:
+      - 1.1.1.1
+      - 8.8.8.8
+
+  tasks:
+    - name: Ensure target OS is Fedora
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora Linux."
+
+    - name: Ensure required static IP settings are provided
+      ansible.builtin.assert:
+        that:
+          - static_ip_interface | length > 0
+          - static_ip_address | length > 0
+          - static_ip_gateway | length > 0
+        fail_msg: >-
+          static_ip_interface, static_ip_address and static_ip_gateway must be set, e.g.
+          -e static_ip_interface=eno1 -e static_ip_address=192.168.1.50/24 -e static_ip_gateway=192.168.1.1
+
+    - name: Find NetworkManager connection profile bound to the target interface
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - -t
+          - -g
+          - GENERAL.CONNECTION
+          - device
+          - show
+          - "{{ static_ip_interface }}"
+      register: nm_connection_lookup
+      changed_when: false
+
+    - name: Set fact with the resolved connection name
+      ansible.builtin.set_fact:
+        static_ip_connection_name: "{{ nm_connection_lookup.stdout | trim }}"
+
+    - name: Fail if no active connection profile was found for the interface
+      ansible.builtin.assert:
+        that:
+          - static_ip_connection_name | length > 0
+          - static_ip_connection_name != "--"
+        fail_msg: "No active NetworkManager connection profile found for interface {{ static_ip_interface }}."
+
+    - name: Configure static IPv4 address on {{ static_ip_interface }}
+      community.general.nmcli:
+        type: "{{ static_ip_connection_type }}"
+        conn_name: "{{ static_ip_connection_name }}"
+        ifname: "{{ static_ip_interface }}"
+        ip4: "{{ static_ip_address }}"
+        gw4: "{{ static_ip_gateway }}"
+        dns4: "{{ static_ip_dns_servers }}"
+        method4: manual
+        state: present
+      notify: Reactivate connection
+
+  handlers:
+    - name: Reactivate connection
+      ansible.builtin.command:
+        argv:
+          - nmcli
+          - con
+          - up
+          - "{{ static_ip_connection_name }}"
+      changed_when: true
