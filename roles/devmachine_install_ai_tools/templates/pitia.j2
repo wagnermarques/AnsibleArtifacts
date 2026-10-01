@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Utilitario de consulta e execucao de modelos do Pitia UNESP
+# Gerenciado pelo Ansible (devmachine_install_ai_tools)
+set -euo pipefail
+
+PITIA_URL="${PITIA_URL:-{{ pitia_url | default('https://pitia.unesp.br') }}}"
+PITIA_TOKEN_FILE="${PITIA_TOKEN_FILE:-{{ real_user_home }}/.config/pitia/token}"
+DEFAULT_MODEL="{{ pitia_default_model | default('gpt-5.6-Luna') }}"
+
+[[ -s "$PITIA_TOKEN_FILE" ]] || { echo "Sem token do Pitia. Execute: pitia-token login" >&2; exit 1; }
+TOKEN="$(cat "$PITIA_TOKEN_FILE")"
+
+cmd_models() {
+  python3 - "$PITIA_URL" "$TOKEN" <<'EOF'
+import json, sys, urllib.request, socket
+orig = socket.getaddrinfo
+socket.getaddrinfo = lambda h, p, f=0, t=0, pr=0, fl=0: orig(h, p, socket.AF_INET, t, pr, fl)
+
+req = urllib.request.Request(sys.argv[1] + "/api/models", headers={"Authorization": f"Bearer {sys.argv[2]}"})
+try:
+    with urllib.request.urlopen(req, timeout=15) as r:
+        data = json.loads(r.read().decode())
+        print(f"{'ID do Modelo':<35} {'Nome':<35}")
+        print("-" * 70)
+        for m in data.get("data", []):
+            mid = m.get("id", "")
+            name = m.get("name", mid)
+            print(f"{mid:<35} {name:<35}")
+except Exception as e:
+    print(f"Erro ao listar modelos: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+}
+
+cmd_ask() {
+  local model="$DEFAULT_MODEL"
+  if [[ "${1:-}" == "-m" ]]; then model="$2"; shift 2; fi
+  local prompt="$*" input=""
+  [[ -t 0 ]] || input="$(cat)"
+  [[ -n "$prompt$input" ]] || { echo "Uso: pitia ask [-m modelo] \"pergunta\"" >&2; exit 1; }
+
+  python3 - "$PITIA_URL" "$TOKEN" "$model" "$prompt" "$input" <<'EOF'
+import json, sys, urllib.request, socket
+orig = socket.getaddrinfo
+socket.getaddrinfo = lambda h, p, f=0, t=0, pr=0, fl=0: orig(h, p, socket.AF_INET, t, pr, fl)
+
+url, token, model, prompt, extra_input = sys.argv[1:6]
+content = (prompt + "\n\n" + extra_input).strip() if extra_input else prompt
+
+payload = {
+    "model": model,
+    "stream": False,
+    "messages": [{"role": "user", "content": content}]
+}
+req = urllib.request.Request(url + "/api/chat/completions",
+                             data=json.dumps(payload).encode(),
+                             headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+try:
+    with urllib.request.urlopen(req, timeout=180) as r:
+        res = json.loads(r.read().decode())
+        choices = res.get("choices", [])
+        if choices:
+            print(choices[0].get("message", {}).get("content", ""))
+        else:
+            print(json.dumps(res))
+except Exception as e:
+    print(f"Erro na requisicao: {e}", file=sys.stderr)
+    sys.exit(1)
+EOF
+}
+
+case "${1:-}" in
+  models|list|-l) cmd_models ;;
+  ask) shift; cmd_ask "$@" ;;
+  *) echo "Uso: pitia {models|ask [-m modelo] \"pergunta\"}" ; exit 1 ;;
+esac

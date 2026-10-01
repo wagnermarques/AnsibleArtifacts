@@ -43,7 +43,7 @@ Guide for modular =~/.bashrc.d/= shell tuning, dynamic prompt switchers (=fzl-ba
 Enterprise managed policy automation for Brave, bloat cleanup (rewards/crypto/VPN), pre-installed extensions (Bitwarden, uBlock, Dark Reader, Vimium, Sider AI), developer bookmarks, and FZL workflow launchers (=fzl-brave-dev=, =fzl-brave-ai=, =fzl-brave-temp=, =fzl-brave-app=, =fzl-brave-backup=).
 
 ** [[file:desktop-fedora-multimedia-converters-usage.org][Multimedia & Document Converters Guide (PDF, Images, Video, Audio, Office)]]
-Comprehensive guide and CLI reference for the FZL converter suite (=fzl-convert-pdf-file=, =fzl-convert-image=, =fzl-convert-video=, =fzl-convert-audio=, =fzl-convert-doc=, and universal =fzl-convert= dispatcher) on Fedora Linux.
+Comprehensive guide and CLI reference for the FZL converter suite (=fzl-convert-pdf-file=, =fzl-pdf-merge=, =fzl-convert-image=, =fzl-img-merge=, =fzl-convert-video=, =fzl-convert-audio=, =fzl-convert-doc=, and universal =fzl-convert= dispatcher) on Fedora Linux.
 
 
 

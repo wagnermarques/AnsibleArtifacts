@@ -3,6 +3,10 @@
   hosts: localhost
   become: true
 
+  vars:
+    real_user: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) | default(lookup('env', 'USER')) }}"
+    real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
+
   tasks:
     # ----------------------------------------------------
     # 1. PLATFORM INDEPENDENT / STANDARD REPO BROWSERS
@@ -251,4 +255,156 @@
         - name: Display warning about proprietary browsers on Alpine
           ansible.builtin.debug:
             msg: "Notice: Google Chrome, Brave, Opera, and Microsoft Edge do not natively support Alpine (musl libc). Installed Open-Source 'Chromium' as the structural alternative."
+
+    # ----------------------------------------------------
+    # 6. BUKUBROW NATIVE HOST & EXTENSION INTEGRATION
+    # ----------------------------------------------------
+    - name: Setup Buku and Bukubrow Native Messaging Host
+      block:
+        - name: Ensure Buku bookmark manager CLI is installed
+          ansible.builtin.package:
+            name: buku
+            state: present
+          ignore_errors: true
+
+        - name: Download Bukubrow Native Messaging Host binary
+          ansible.builtin.get_url:
+            url: "https://github.com/samhh/bukubrow-host/releases/download/v5.4.0/bukubrow-linux-amd64"
+            dest: "/usr/local/bin/bukubrow"
+            mode: '0755'
+            owner: root
+            group: root
+
+        - name: Ensure system-wide native messaging hosts directories exist
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+          loop:
+            - /etc/opt/chrome/native-messaging-hosts
+            - /etc/chromium/native-messaging-hosts
+            - /etc/brave/native-messaging-hosts
+            - /etc/opt/edge/native-messaging-hosts
+            - /usr/lib64/mozilla/native-messaging-hosts
+            - /usr/lib/mozilla/native-messaging-hosts
+
+        - name: Deploy Bukubrow native messaging manifest for Chromium browsers
+          ansible.builtin.copy:
+            dest: "{{ item }}/com.samhh.bukubrow.json"
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              {
+                "name": "com.samhh.bukubrow",
+                "description": "Bukubrow is a WebExtension for Buku, a command-line bookmark manager. This is the corresponding host that facilitates interfacing with the Buku database via native messaging.",
+                "path": "/usr/local/bin/bukubrow",
+                "type": "stdio",
+                "allowed_origins": [
+                  "chrome-extension://ghniladkapjacfajiooekgkfopkjblpn/"
+                ]
+              }
+          loop:
+            - /etc/opt/chrome/native-messaging-hosts
+            - /etc/chromium/native-messaging-hosts
+            - /etc/brave/native-messaging-hosts
+            - /etc/opt/edge/native-messaging-hosts
+
+        - name: Deploy Bukubrow native messaging manifest for Mozilla browsers
+          ansible.builtin.copy:
+            dest: "{{ item }}/com.samhh.bukubrow.json"
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              {
+                "name": "com.samhh.bukubrow",
+                "description": "Bukubrow is a WebExtension for Buku, a command-line bookmark manager. This is the corresponding host that facilitates interfacing with the Buku database via native messaging.",
+                "path": "/usr/local/bin/bukubrow",
+                "type": "stdio",
+                "allowed_extensions": [
+                  "bukubrow@samhh.com"
+                ]
+              }
+          loop:
+            - /usr/lib64/mozilla/native-messaging-hosts
+            - /usr/lib/mozilla/native-messaging-hosts
+
+        - name: Ensure browser external extension directories exist
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+          loop:
+            - /usr/share/google-chrome/extensions
+            - /usr/share/chromium/extensions
+            - /opt/google/chrome/extensions
+
+        - name: Configure automatic installation of Bukubrow WebExtension in Chromium browsers
+          ansible.builtin.copy:
+            dest: "{{ item }}/ghniladkapjacfajiooekgkfopkjblpn.json"
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              {
+                "external_update_url": "https://clients2.google.com/service/update2/crx"
+              }
+          loop:
+            - /usr/share/google-chrome/extensions
+            - /usr/share/chromium/extensions
+            - /opt/google/chrome/extensions
+
+        - name: Ensure user-level native messaging directories exist
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: "{{ real_user }}"
+            mode: '0755'
+          loop:
+            - "{{ real_user_home }}/.mozilla/native-messaging-hosts"
+            - "{{ real_user_home }}/.config/google-chrome/NativeMessagingHosts"
+            - "{{ real_user_home }}/.config/chromium/NativeMessagingHosts"
+            - "{{ real_user_home }}/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+          ignore_errors: true
+
+        - name: Deploy Chromium native messaging manifest to user profile
+          ansible.builtin.copy:
+            src: "/etc/chromium/native-messaging-hosts/com.samhh.bukubrow.json"
+            dest: "{{ item }}/com.samhh.bukubrow.json"
+            owner: "{{ real_user }}"
+            mode: '0644'
+            remote_src: true
+          loop:
+            - "{{ real_user_home }}/.config/google-chrome/NativeMessagingHosts"
+            - "{{ real_user_home }}/.config/chromium/NativeMessagingHosts"
+            - "{{ real_user_home }}/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+          ignore_errors: true
+
+        - name: Deploy Firefox native messaging manifest to user profile
+          ansible.builtin.copy:
+            src: "/usr/lib64/mozilla/native-messaging-hosts/com.samhh.bukubrow.json"
+            dest: "{{ real_user_home }}/.mozilla/native-messaging-hosts/com.samhh.bukubrow.json"
+            owner: "{{ real_user }}"
+            mode: '0644'
+            remote_src: true
+          ignore_errors: true
+
+        - name: Display Bukubrow setup summary
+          ansible.builtin.debug:
+            msg:
+              - "=========================================================================="
+              - " Bukubrow Native Messaging Host & Extension Configuration Complete!"
+              - "=========================================================================="
+              - " Native Host Binary: /usr/local/bin/bukubrow"
+              - " Chrome Web Store Extension ID: ghniladkapjacfajiooekgkfopkjblpn"
+              - " Manifests registered for: Chrome, Chromium, Brave, Edge, Firefox, LibreWolf"
+              - " WebExtension will auto-install on Chromium browsers via external extensions."
+              - " For Firefox, install from: https://addons.mozilla.org/en-US/firefox/addon/bukubrow/"
+              - "=========================================================================="
+
 

@@ -1,0 +1,49 @@
+---
+- name: Install PWA Desktop Shortcuts
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    pwa_apps:
+      - name: "X (Twitter)"
+        url: "https://x.com"
+        icon: "twitter" # Uses system icon theme or we can leave it generic, typically 'twitter' or 'browser'
+        filename: "x-twitter"
+      - name: "Spotify"
+        url: "https://open.spotify.com"
+        icon: "spotify"
+        filename: "spotify-pwa"
+      - name: "YouTube"
+        url: "https://www.youtube.com"
+        icon: "youtube"
+        filename: "youtube-pwa"
+    
+    # We can use google-chrome or brave. The desktop-brave-configuration provides fzl-browser-brave--app
+    # but google-chrome-stable --app is standard if Chrome is installed.
+    browser_command: "google-chrome-stable --app="
+
+  tasks:
+    - name: Ensure local applications directory exists
+      ansible.builtin.file:
+        path: "{{ lookup('env', 'HOME') }}/.local/share/applications"
+        state: directory
+        mode: '0755'
+
+    - name: Create desktop entries for PWAs
+      ansible.builtin.copy:
+        dest: "{{ lookup('env', 'HOME') }}/.local/share/applications/{{ item.filename }}.desktop"
+        content: |
+          [Desktop Entry]
+          Version=1.0
+          Name={{ item.name }}
+          Exec={{ browser_command }}"{{ item.url }}"
+          Terminal=false
+          Type=Application
+          Icon={{ item.icon | default('application-default-icon') }}
+          Categories=Network;WebBrowser;
+        mode: '0644'
+      loop: "{{ pwa_apps }}"
+
+    - name: Update desktop database
+      ansible.builtin.command: update-desktop-database "{{ lookup('env', 'HOME') }}/.local/share/applications"
+      ignore_errors: true

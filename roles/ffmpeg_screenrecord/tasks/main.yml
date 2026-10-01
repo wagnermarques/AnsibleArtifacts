@@ -1,0 +1,39 @@
+---
+- name: Install ffmpeg
+  ansible.builtin.package:
+    name: ffmpeg
+    state: present
+
+- name: Install X11 utils for resolution detection (Debian/Ubuntu)
+  ansible.builtin.package:
+    name: x11-utils
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+
+- name: Install X11 utils for resolution detection (Fedora/RedHat)
+  ansible.builtin.package:
+    name: xdpyinfo
+    state: present
+  when: ansible_facts['os_family'] == "RedHat"
+
+- name: Install X11 utils for resolution detection (Alpine)
+  ansible.builtin.package:
+    name: xdpyinfo
+    state: present
+  when: ansible_facts['os_family'] == "Alpine"
+
+- name: Create fzl-screenrecord-x11 command
+  ansible.builtin.template:
+    src: fzl-screenrecord-x11.j2
+    dest: /usr/local/bin/fzl-screenrecord-x11
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Create fzl-screenrecord-wayland command
+  ansible.builtin.template:
+    src: fzl-screenrecord-wayland.j2
+    dest: /usr/local/bin/fzl-screenrecord-wayland
+    mode: '0755'
+    owner: root
+    group: root

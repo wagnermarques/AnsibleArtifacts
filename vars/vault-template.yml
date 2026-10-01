@@ -26,6 +26,8 @@ openrouter_api_key: "your_openrouter_api_key_here"
 anthropic_api_key: "your_anthropic_api_key_here"
 gemini_api_key: "your_gemini_api_key_here"
 openai_api_key: "your_openai_api_key_here"
+pitia_access_token: "your_pitia_jwt_token_here"
+
 
 # Gemini CLI MCP Extensions
 github_mcp_token: "your_github_pat_here"

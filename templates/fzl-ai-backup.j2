@@ -1,0 +1,60 @@
+#!/bin/bash
+{% raw %}
+# fzl-ai-backup
+# Creates a compressed archive of all AI tool configurations in $HOME
+
+if [ "$#" -eq 0 ]; then
+    BACKUP_FILE="$HOME/ai_config_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
+else
+    BACKUP_FILE="$1"
+fi
+
+echo "Starting AI configuration backup..."
+
+# Define the list of AI configuration directories/files to backup relative to $HOME
+# (Only include files that exist to prevent tar errors)
+BACKUP_PATHS=()
+
+# Array of potential config paths based on the tools installed in the environment
+POTENTIAL_PATHS=(
+    ".gemini"
+    ".claude"
+    ".claude.json"
+    ".config/claude"
+    ".config/github-copilot"
+    ".config/github-copilot-cli"
+    ".config/shell_gpt"
+    ".config/open-interpreter"
+    ".config/opencode"
+    ".opencode"
+    ".config/kimi"
+    ".kimi"
+    ".v0"
+    ".config/v0"
+    ".aider.conf.yml"
+    ".aider.chat.history.md"
+    ".env" # Local API keys if stored here
+)
+
+for path in "${POTENTIAL_PATHS[@]}"; do
+    if [ -e "$HOME/$path" ]; then
+        BACKUP_PATHS+=("$path")
+    fi
+done
+
+if [ ${#BACKUP_PATHS[@]} -eq 0 ]; then
+    echo "No AI configurations found to backup."
+    exit 0
+fi
+
+# We intentionally exclude heavy runtime folders and large logs
+tar -czvf "$BACKUP_FILE" \
+    --exclude=".gemini/antigravity-cli/brain" \
+    --exclude=".gemini/antigravity-cli/logs" \
+    -C "$HOME" "${BACKUP_PATHS[@]}"
+
+echo "---------------------------------------------------"
+echo "Backup successfully created at: $BACKUP_FILE"
+echo "WARNING: This backup contains sensitive API keys and tokens."
+echo "Keep it secure! Do not commit it to version control."
+{% endraw %}

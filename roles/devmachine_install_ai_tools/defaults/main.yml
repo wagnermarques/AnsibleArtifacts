@@ -2,7 +2,7 @@
 # AI Tools configuration
 ai_npm_packages:
   - "@google/gemini-cli"
-  - "@anthropic-ai/claude-code"
+  # - "@anthropic-ai/claude-code" # Now installed natively via devmachine_install_claude_code role
   - "@gitlawb/openclaude"
   - "@github/copilot"
   - "v0"
@@ -70,4 +70,12 @@ ai_memory_model: "gemini-2.5-flash"
 ai_memory_port: 49374
 ai_memory_enable_web: true
 enable_ai_memory_user_service: true
+
+# Pitia UNESP Configuration (~/.config/pitia/token and pitia-proxy)
+install_pitia: true
+pitia_url: "https://pitia.unesp.br"
+pitia_proxy_port: 8787
+pitia_default_model: "gpt-5.6-Luna"
+enable_pitia_user_service: true
+
 

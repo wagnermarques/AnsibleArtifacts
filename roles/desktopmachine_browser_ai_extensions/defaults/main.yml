@@ -52,5 +52,10 @@ browser_ai_extensions:
     name: "GitHub Copilot / Developer AI helper"
     enabled: false
 
+  # Bukubrow (Buku CLI Bookmark Manager WebExtension)
+  - id: "ghniladkapjacfajiooekgkfopkjblpn"
+    name: "Bukubrow (Buku Bookmark Manager)"
+    enabled: true
+
 # Custom extra extension IDs list (strings)
 browser_extra_extension_ids: []

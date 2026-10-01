@@ -1,0 +1,30 @@
+#!/bin/bash
+{% raw %}
+# FZL PDF Union Command
+# Merges multiple PDF files into a single PDF.
+
+if [ "$#" -eq 0 ]; then
+    shopt -s nullglob
+    PDFS=(*.pdf)
+    shopt -u nullglob
+    
+    if [ "${#PDFS[@]}" -eq 0 ]; then
+        echo "No PDF files found in the current directory."
+        exit 1
+    fi
+    
+    OUTPUT="merged_output_$(date +%Y%m%d_%H%M%S).pdf"
+    echo "Merging ${#PDFS[@]} PDF(s) into $OUTPUT..."
+    pdfunite "${PDFS[@]}" "$OUTPUT"
+    echo "Done."
+    exit 0
+elif [ "$#" -lt 3 ]; then
+    echo "Usage: fzl-pdf-union <input1.pdf> <input2.pdf> ... <output.pdf>"
+    echo "Example: fzl-pdf-union doc1.pdf doc2.pdf doc3.pdf merged_output.pdf"
+    echo "If no parameters are provided, merges all PDFs in the current directory."
+    exit 1
+fi
+
+# Uses pdfunite from poppler-utils
+pdfunite "$@"
+{% endraw %}

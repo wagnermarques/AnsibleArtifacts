@@ -1,0 +1,36 @@
+---
+# Tasks for devmachine_install_claude_code role
+# Installs Claude Code natively and creates fzl-claude wrapper.
+
+- name: Get the actual user and home directory
+  set_fact:
+    real_user: "{{ ansible_facts['env']['SUDO_USER'] | default(ansible_facts['user_id']) }}"
+    real_user_home: "{{ ansible_facts['env']['HOME'] if ansible_facts['env']['SUDO_USER'] is not defined else '/home/' + ansible_facts['env']['SUDO_USER'] }}"
+  tags: [always]
+
+- name: Ensure .claude directory exists in user home
+  file:
+    path: "{{ real_user_home }}/.claude"
+    state: directory
+    mode: '0755'
+    owner: "{{ real_user }}"
+  become: yes
+  tags: [claude_code, config]
+
+- name: Install Claude Code (native CLI)
+  shell: curl -fsSL https://claude.ai/install.sh | bash
+  args:
+    creates: "{{ real_user_home }}/.local/bin/claude"
+  become: yes
+  become_user: "{{ real_user }}"
+  tags: [claude_code, install]
+
+- name: Create fzl-claude executable command wrapper in /usr/local/bin
+  template:
+    src: fzl-claude.j2
+    dest: /usr/local/bin/fzl-claude
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+  tags: [claude_code, wrapper]

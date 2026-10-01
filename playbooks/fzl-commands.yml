@@ -1,0 +1,12 @@
+---
+- name: Setup FZL Commands
+  hosts: all
+  become: yes
+  tasks:
+    - name: Create fzl-docker--mount-var-lib-docker command
+      ansible.builtin.template:
+        src: ../templates/fzl-docker--mount-var-lib-docker.j2
+        dest: /usr/local/bin/fzl-docker--mount-var-lib-docker
+        owner: root
+        group: root
+        mode: '0755'

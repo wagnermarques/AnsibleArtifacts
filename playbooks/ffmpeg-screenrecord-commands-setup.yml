@@ -1,0 +1,6 @@
+---
+- name: Setup FFmpeg Screenrecord Commands
+  hosts: all
+  become: yes
+  roles:
+    - ffmpeg_screenrecord

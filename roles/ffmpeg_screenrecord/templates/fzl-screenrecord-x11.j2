@@ -1,0 +1,43 @@
+#!/bin/bash
+# FZL command: fzl-screenrecord-x11
+# Description: Record screen on X11 using ffmpeg
+
+display="${DISPLAY:-:0.0}"
+framerate=30
+default_ext=".mp4"
+output="screencast_$(date +%Y%m%d_%H%M%S)${default_ext}"
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: $(basename "$0") [output_file]"
+    echo "Records the X11 screen using ffmpeg."
+    echo ""
+    echo "Defaults:"
+    echo "  Display:   $display"
+    echo "  Framerate: $framerate fps"
+    echo "  Output:    $output (if not specified)"
+    echo ""
+    echo "If you specify an output file, the extension (e.g., .mkv, .mp4) will determine the format."
+    echo "The path can be absolute or relative."
+    echo ""
+    echo "Example:"
+    echo "  $(basename "$0") ~/Videos/my_record.mkv"
+    exit 0
+fi
+
+if [[ -n "$1" ]]; then
+    output="$1"
+fi
+
+# Detect resolution
+if command -v xdpyinfo >/dev/null 2>&1; then
+    res=$(xdpyinfo | grep 'dimensions:' | awk '{print $2}')
+else
+    res="1920x1080" # Fallback
+fi
+
+echo "=> Starting X11 screen recording..."
+echo "=> Resolution: $res"
+echo "=> Output file: $output"
+echo "=> Press 'q' to stop recording."
+
+ffmpeg -y -f x11grab -video_size "$res" -framerate "$framerate" -i "$display" "$output"

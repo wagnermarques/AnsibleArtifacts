@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# FZL command to mount an external disk to /var/lib/docker
+
+if [ "$EUID" -ne 0 ]; then
+  echo "Error: Please run as root (or use sudo)."
+  exit 1
+fi
+
+if [ -z "$1" ]; then
+  echo "Usage: $(basename "$0") /dev/sdX"
+  echo "Description: Mounts the specified block device to /var/lib/docker."
+  exit 1
+fi
+
+DEVICE="$1"
+
+if [ ! -b "$DEVICE" ]; then
+  echo "Error: Device $DEVICE does not exist or is not a block device."
+  exit 1
+fi
+
+echo "=> Stopping docker and containerd services..."
+systemctl stop docker.service docker.socket containerd.service || true
+
+echo "=> Ensuring /var/lib/docker directory exists..."
+mkdir -p /var/lib/docker
+
+# Check if already mounted
+if mountpoint -q /var/lib/docker; then
+    echo "=> /var/lib/docker is already a mountpoint."
+    # We could unmount, but maybe it's safer to just warn
+    echo "=> Warning: another device is already mounted there."
+fi
+
+echo "=> Mounting $DEVICE to /var/lib/docker..."
+mount "$DEVICE" /var/lib/docker
+
+if [ $? -eq 0 ]; then
+    echo "=> Mount successful."
+    echo "=> Starting docker service..."
+    systemctl start docker.service
+    echo "=> Docker successfully started with $DEVICE mounted at /var/lib/docker."
+else
+    echo "=> Error: Failed to mount $DEVICE to /var/lib/docker."
+    exit 1
+fi

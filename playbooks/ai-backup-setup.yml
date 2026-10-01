@@ -1,0 +1,20 @@
+---
+- name: Setup AI Configuration Backup & Restore Commands
+  hosts: all
+  become: yes
+  tasks:
+    - name: Create fzl-ai-backup command
+      ansible.builtin.template:
+        src: ../templates/fzl-ai-backup.j2
+        dest: /usr/local/bin/fzl-ai-backup
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create fzl-ai-restore command
+      ansible.builtin.template:
+        src: ../templates/fzl-ai-restore.j2
+        dest: /usr/local/bin/fzl-ai-restore
+        owner: root
+        group: root
+        mode: '0755'

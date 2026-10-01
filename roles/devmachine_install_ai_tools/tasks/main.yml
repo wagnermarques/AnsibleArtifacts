@@ -262,3 +262,101 @@
   when: install_ai_memory | bool
   become: yes
   tags: [ai_memory, ai_tools]
+
+# ==============================================================================
+# Pitia UNESP Integration (Token, Proxy & Helper CLI tools)
+# ==============================================================================
+
+- name: Ensure Pitia configuration directory exists (~/.config/pitia)
+  file:
+    path: "{{ real_user_home }}/.config/pitia"
+    state: directory
+    mode: '0700'
+    owner: "{{ real_user }}"
+  when: install_pitia | bool
+  become: yes
+  tags: [pitia, ai_tools]
+
+- name: Save Pitia JWT access token (~/.config/pitia/token)
+  copy:
+    content: "{{ pitia_access_token }}"
+    dest: "{{ real_user_home }}/.config/pitia/token"
+    mode: '0600'
+    owner: "{{ real_user }}"
+  when:
+    - install_pitia | bool
+    - pitia_access_token is defined
+    - pitia_access_token
+    - pitia_access_token != 'your_pitia_jwt_token_here'
+  become: yes
+  tags: [pitia, ai_tools]
+
+- name: Install pitia-proxy executable in /usr/local/bin
+  template:
+    src: pitia-proxy.j2
+    dest: /usr/local/bin/pitia-proxy
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_pitia | bool
+  become: yes
+  tags: [pitia, ai_tools]
+
+- name: Install pitia-token management tool in /usr/local/bin
+  template:
+    src: pitia-token.j2
+    dest: /usr/local/bin/pitia-token
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_pitia | bool
+  become: yes
+  tags: [pitia, ai_tools]
+
+- name: Install pitia CLI query tool in /usr/local/bin
+  template:
+    src: pitia.j2
+    dest: /usr/local/bin/pitia
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_pitia | bool
+  become: yes
+  tags: [pitia, ai_tools]
+
+- name: Create fzl-aider-pitia symlink in /usr/local/bin
+  file:
+    src: /usr/local/bin/fzl-aider
+    dest: /usr/local/bin/fzl-aider-pitia
+    state: link
+    force: yes
+  when:
+    - install_pitia | bool
+    - install_aider_venv | bool
+  become: yes
+  tags: [pitia, aider, ai_tools]
+
+- name: Deploy pitia-proxy systemd user service (~/.config/systemd/user/pitia-proxy.service)
+  template:
+    src: pitia-proxy.service.j2
+    dest: "{{ real_user_home }}/.config/systemd/user/pitia-proxy.service"
+    mode: '0644'
+    owner: "{{ real_user }}"
+  when:
+    - install_pitia | bool
+    - enable_pitia_user_service | bool
+  become: yes
+  tags: [pitia, ai_tools]
+
+- name: Enable and start pitia-proxy systemd user service
+  command: "systemctl --user enable --now pitia-proxy.service"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ real_user_uid | default('1000') }}"
+  become: yes
+  become_user: "{{ real_user }}"
+  when:
+    - install_pitia | bool
+    - enable_pitia_user_service | bool
+  failed_when: false
+  tags: [pitia, ai_tools]
+

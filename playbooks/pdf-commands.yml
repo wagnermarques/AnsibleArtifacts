@@ -1,0 +1,36 @@
+---
+- name: Setup PDF Commands
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure PDF dependencies are installed (poppler-utils, ImageMagick)
+      ansible.builtin.package:
+        name:
+          - poppler-utils
+          - ImageMagick
+        state: present
+      ignore_errors: yes
+
+    - name: Create fzl-pdf-union command
+      ansible.builtin.template:
+        src: ../templates/fzl-pdf-union.j2
+        dest: /usr/local/bin/fzl-pdf-union
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create fzl-pdf-split command
+      ansible.builtin.template:
+        src: ../templates/fzl-pdf-split.j2
+        dest: /usr/local/bin/fzl-pdf-split
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Create fzl-pdf-convert-to command
+      ansible.builtin.template:
+        src: ../templates/fzl-pdf-convert-to.j2
+        dest: /usr/local/bin/fzl-pdf-convert-to
+        owner: root
+        group: root
+        mode: '0755'

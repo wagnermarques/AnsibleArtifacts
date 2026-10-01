@@ -1,0 +1,10 @@
+---
+- name: Install and configure Claude Code agent for terminal use
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Include devmachine_install_claude_code role
+      include_role:
+        name: devmachine_install_claude_code

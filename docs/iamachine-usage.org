@@ -176,6 +176,22 @@ Aider is a git-integrated pair programming CLI tool installed in an isolated Pyt
   #+begin_src bash
   fzl-aider --model ollama/qwen2.5:7b
   #+end_src
+- *Start Aider with UNESP Pitia (default model gpt-5.6-Luna):*
+  #+begin_src bash
+  fzl-aider --pitia      # or fzl-aider-pitia
+  #+end_src
+- *Interactively select from UNESP Pitia models:*
+  #+begin_src bash
+  fzl-aider --pitia -s   # or fzl-aider-pitia -s
+  #+end_src
+- *List available UNESP Pitia models:*
+  #+begin_src bash
+  fzl-aider --pitia -l   # or fzl-aider-pitia -l
+  #+end_src
+- *Start Aider with specific UNESP Pitia model:*
+  #+begin_src bash
+  fzl-aider-pitia --model "openai/claude 4.6 Sonnet"
+  #+end_src
 - *Start Aider with Anthropic Claude:*
   #+begin_src bash
   export ANTHROPIC_API_KEY="your-key"
@@ -186,7 +202,30 @@ Aider is a git-integrated pair programming CLI tool installed in an isolated Pyt
   fzl-aider main.py utils.py
   #+end_src
 
-** 9. Shell-GPT (=sgpt=)
+** 9. Pitia UNESP CLI (=pitia= / =pitia-token= / =pitia-proxy=)
+Pitia is the institutional AI platform of UNESP (Open WebUI). A local OpenAI-compatible proxy (=pitia-proxy= on port =8787=) and CLI tools are integrated into the workstation.
+
+*** Common Usage Examples
+- *Check token status and expiration:*
+  #+begin_src bash
+  pitia-token status
+  #+end_src
+- *Authenticate with UNESP institutional credentials:*
+  #+begin_src bash
+  pitia-token login
+  #+end_src
+- *List all available models in Pitia:*
+  #+begin_src bash
+  pitia models
+  #+end_src
+- *Ask quick questions directly from terminal:*
+  #+begin_src bash
+  pitia ask "Como listar arquivos ordenados por tamanho no Linux?"
+  git diff | pitia ask "Faca um code-review deste diff"
+  #+end_src
+
+
+** 10. Shell-GPT (=sgpt=)
 Shell-GPT is a command-line productivity tool powered by AI.
 
 *** Common Usage Examples
@@ -203,7 +242,7 @@ Shell-GPT is a command-line productivity tool powered by AI.
   sgpt --code "python function to calculate Fibonacci series using memoization"
   #+end_src
 
-** 10. Open Interpreter (=interpreter=)
+** 11. Open Interpreter (=interpreter=)
 Open Interpreter allows LLMs to run code (Python, JavaScript, Shell) locally on your computer under user supervision.
 
 *** Common Usage Examples
@@ -216,7 +255,7 @@ Open Interpreter allows LLMs to run code (Python, JavaScript, Shell) locally on 
   interpreter --local --model qwen2.5:7b
   #+end_src
 
-** 11. Ollama Local LLM Runner (=ollama=)
+** 12. Ollama Local LLM Runner (=ollama=)
 Ollama runs local LLMs directly on your GPU/CPU without needing cloud APIs.
 
 *** Pre-pulled Models
@@ -249,7 +288,9 @@ The playbook automatically installs and pulls:
 | **OpenClaude** | =openclaude= | Global NPM Package | Anthropic API Key |
 | **OpenCode** | =opencode= | Global NPM Package (=opencode-ai=) | Provider Auth / API Keys |
 | **v0 CLI** | =v0= | Global NPM Package | Vercel Account |
-| **Aider** | =fzl-aider= / =aider= | Isolated Venv (=~/.envs/aider=) | API Key or Local Ollama |
+| **Aider** | =fzl-aider= / =fzl-aider-pitia= / =aider= | Isolated Venv (=~/.envs/aider=) | Pitia UNESP / Local Ollama / API Key |
+| **Pitia UNESP** | =pitia= / =pitia-token= / =pitia-proxy= | Systemd Service & CLI (=/usr/local/bin=) | UNESP LDAP (=pitia-token login=) |
 | **Shell-GPT** | =sgpt= | Isolated Python (=pipx=) | =OPENAI_API_KEY= or Local API |
 | **Open Interpreter**| =interpreter= | Isolated Python (=pipx=) | API Key or =--local= mode |
 | **Ollama** | =ollama= | Official Installer (=/usr/local/bin/ollama=) | None (Local execution) |
+

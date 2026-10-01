@@ -1,0 +1,37 @@
+#!/bin/bash
+# FZL command: fzl-screenrecord-wayland
+# Description: Record screen on Wayland using ffmpeg (kmsgrab)
+
+framerate=30
+default_ext=".mp4"
+output="screencast_$(date +%Y%m%d_%H%M%S)${default_ext}"
+
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: $(basename "$0") [output_file]"
+    echo "Records the Wayland screen using ffmpeg (kmsgrab)."
+    echo ""
+    echo "Defaults:"
+    echo "  Framerate: $framerate fps"
+    echo "  Output:    $output (if not specified)"
+    echo ""
+    echo "Note: kmsgrab usually requires root privileges (sudo) or CAP_SYS_ADMIN capabilities."
+    echo "If you specify an output file, the extension (e.g., .mkv, .mp4) will determine the format."
+    echo "The path can be absolute or relative."
+    echo ""
+    echo "Example:"
+    echo "  sudo $(basename "$0") ~/Videos/my_wayland_record.mkv"
+    exit 0
+fi
+
+if [[ -n "$1" ]]; then
+    output="$1"
+fi
+
+echo "=> Starting Wayland screen recording via kmsgrab..."
+echo "=> Output file: $output"
+echo "=> Press 'q' to stop recording."
+
+# You may need to adjust the device (e.g. /dev/dri/card0) based on your hardware
+device="${KMS_DEVICE:-/dev/dri/card0}"
+
+ffmpeg -y -device "$device" -f kmsgrab -i - -vf "hwdownload,format=bgr0" -framerate "$framerate" "$output"

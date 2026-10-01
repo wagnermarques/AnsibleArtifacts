@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Gerencia o token de sessao do Pitia (UNESP Open WebUI)
+# Gerenciado pelo Ansible (devmachine_install_ai_tools)
+set -euo pipefail
+
+PITIA_URL="${PITIA_URL:-{{ pitia_url | default('https://pitia.unesp.br') }}}"
+PITIA_TOKEN_FILE="${PITIA_TOKEN_FILE:-{{ real_user_home }}/.config/pitia/token}"
+
+seconds_left() {
+  [[ -s "$PITIA_TOKEN_FILE" ]] || { echo -1; return; }
+  python3 - "$PITIA_TOKEN_FILE" <<'EOF'
+import base64, json, sys, time
+try:
+    tok = open(sys.argv[1]).read().strip()
+    payload = tok.split(".")[1]
+    payload += "=" * (-len(payload) % 4)
+    exp = json.loads(base64.urlsafe_b64decode(payload)).get("exp")
+    print(int(exp - time.time()) if exp else 10**9)
+except Exception:
+    print(-1)
+EOF
+}
+
+cmd_status() {
+  if [[ ! -s "$PITIA_TOKEN_FILE" ]]; then
+    echo "Nenhum token encontrado em $PITIA_TOKEN_FILE."
+    echo "Execute: pitia-token login"
+    return 1
+  fi
+  local left days
+  left=$(seconds_left)
+  if [[ "$left" -le 0 ]]; then
+    echo "Token expirado. Execute: pitia-token login"
+    return 1
+  fi
+  days=$(( left / 86400 ))
+  echo "Token valido. Expira em aproximadamente $days dias ($left segundos)."
+}
+
+cmd_login() {
+  local user pass resp token
+  read -rp "Usuario UNESP (e-mail): " user
+  read -rsp "Senha: " pass
+  echo
+  resp=$(python3 -c '
+import json, sys, urllib.request, socket
+orig = socket.getaddrinfo
+socket.getaddrinfo = lambda h, p, f=0, t=0, pr=0, fl=0: orig(h, p, socket.AF_INET, t, pr, fl)
+
+url = sys.argv[1] + "/api/v1/auths/ldap"
+req = urllib.request.Request(url, data=json.dumps({"user": sys.argv[2], "password": sys.argv[3]}).encode(),
+                             headers={"Content-Type": "application/json"})
+try:
+    with urllib.request.urlopen(req, timeout=30) as r:
+        print(r.read().decode())
+except Exception as e:
+    print(json.dumps({"error": str(e)}))
+' "$PITIA_URL" "$user" "$pass")
+
+  token=$(python3 -c 'import json, sys; d = json.loads(sys.argv[1]); print(d.get("token", ""))' "$resp" 2>/dev/null || true)
+  if [[ -z "$token" ]]; then
+    echo "Erro ao autenticar no Pitia: $resp" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$PITIA_TOKEN_FILE")"
+  chmod 700 "$(dirname "$PITIA_TOKEN_FILE")"
+  ( umask 077; printf '%s' "$token" > "$PITIA_TOKEN_FILE" )
+  echo "Login realizado com sucesso! Token gravado em $PITIA_TOKEN_FILE"
+}
+
+cmd_logout() {
+  if [[ -f "$PITIA_TOKEN_FILE" ]]; then
+    rm -f "$PITIA_TOKEN_FILE"
+    echo "Token removido de $PITIA_TOKEN_FILE."
+  else
+    echo "Nenhum token ativo."
+  fi
+}
+
+case "${1:-status}" in
+  login) cmd_login ;;
+  logout) cmd_logout ;;
+  status) cmd_status ;;
+  *) echo "Uso: pitia-token {login|logout|status}" ;;
+esac

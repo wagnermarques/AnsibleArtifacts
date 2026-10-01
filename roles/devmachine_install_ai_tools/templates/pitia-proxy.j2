@@ -1,0 +1,100 @@
+#!/usr/bin/env python3
+"""Proxy local para o Pitia (Open WebUI da UNESP), compativel com OpenAI API.
+Gerenciado pelo Ansible (devmachine_install_ai_tools).
+
+Escuta em 127.0.0.1:{{ pitia_proxy_port | default(8787) }} e repassa para {{ pitia_url | default('https://pitia.unesp.br') }}:
+  GET  /models            -> /api/models
+  POST /chat/completions  -> /api/chat/completions
+(rotas /v1/ tambem suportadas).
+
+Le o token JWT de {{ real_user_home }}/.config/pitia/token dinamicamente.
+Forca resolucao IPv4 para contornar problemas de rota IPv6 da UNESP.
+"""
+import http.client
+import os
+import socket
+import ssl
+import sys
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
+
+# Forca resolucao IPv4 para contornar lentidao/timeout em rotas IPv6 da UNESP
+_orig_getaddrinfo = socket.getaddrinfo
+def _getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+    return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = _getaddrinfo_ipv4
+
+PITIA_URL = os.environ.get("PITIA_URL", "{{ pitia_url | default('https://pitia.unesp.br') }}")
+TOKEN_FILE = os.path.expanduser(os.environ.get("PITIA_TOKEN_FILE", "{{ real_user_home }}/.config/pitia/token"))
+PORT = int(os.environ.get("PITIA_PROXY_PORT", "{{ pitia_proxy_port | default(8787) }}"))
+
+ALLOWED = {("GET", "/models"), ("POST", "/chat/completions")}
+FORWARD_HEADERS = {"content-type", "accept", "accept-encoding"}
+HOST = urlsplit(PITIA_URL).hostname
+TLS = ssl.create_default_context()
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "pitia-proxy"
+
+    def _route(self):
+        path = urlsplit(self.path).path.rstrip("/")
+        if path.startswith("/v1/"):
+            path = path[3:]
+        return path
+
+    def _proxy(self):
+        path = self._route()
+        if (self.command, path) not in ALLOWED:
+            self.send_error(403, "Rota nao permitida pelo pitia-proxy")
+            return
+        try:
+            with open(TOKEN_FILE) as f:
+                token = f.read().strip()
+        except OSError:
+            self.send_error(503, "Sem token do Pitia. Execute: pitia-token login")
+            return
+
+        length = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(length) if length else None
+        headers = {k: v for k, v in self.headers.items() if k.lower() in FORWARD_HEADERS}
+        headers["Authorization"] = f"Bearer {token}"
+
+        upstream = http.client.HTTPSConnection(HOST, 443, context=TLS, timeout=600)
+        try:
+            upstream.request(self.command, "/api" + path, body=body, headers=headers)
+            resp = upstream.getresponse()
+            self.send_response(resp.status)
+            for k, v in resp.getheaders():
+                if k.lower() in ("content-type", "cache-control"):
+                    self.send_header(k, v)
+            self.send_header("Connection", "close")
+            self.end_headers()
+            while chunk := resp.read1(65536):
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        except (OSError, http.client.HTTPException) as e:
+            self.log_message("Erro no upstream Pitia: %s", e)
+            try:
+                self.send_error(502, "Falha na comunicacao com o servidor Pitia")
+            except OSError:
+                pass
+        finally:
+            upstream.close()
+
+    do_GET = _proxy
+    do_POST = _proxy
+
+    def do_OTHER(self):
+        self.send_error(403, "Metodo nao permitido pelo pitia-proxy")
+
+    do_PUT = do_DELETE = do_PATCH = do_OTHER
+
+    def log_message(self, fmt, *args):
+        sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
+
+
+if __name__ == "__main__":
+    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    print(f"pitia-proxy em http://127.0.0.1:{PORT} -> {PITIA_URL}/api", file=sys.stderr)
+    server.serve_forever()

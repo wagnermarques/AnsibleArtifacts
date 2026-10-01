@@ -1,0 +1,15 @@
+[Unit]
+Description=Pitia UNESP Local OpenAI-Compatible Proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pitia-proxy
+Restart=on-failure
+RestartSec=3s
+Environment="PITIA_URL={{ pitia_url | default('https://pitia.unesp.br') }}"
+Environment="PITIA_PROXY_PORT={{ pitia_proxy_port | default(8787) }}"
+Environment="PITIA_TOKEN_FILE={{ real_user_home }}/.config/pitia/token"
+
+[Install]
+WantedBy=default.target

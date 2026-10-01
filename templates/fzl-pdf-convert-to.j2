@@ -1,0 +1,106 @@
+#!/bin/bash
+{% raw %}
+# FZL PDF Convert To Command
+# Converts documents to PDF, or PDF to other formats.
+
+if [ "$#" -eq 0 ] || [ "$#" -eq 1 ]; then
+    FORMAT="${1:-txt}"
+    
+    if [ "$FORMAT" == "pdf" ]; then
+        shopt -s nullglob
+        FILES=(*.jpg *.jpeg *.png *.docx *.doc *.odt)
+        shopt -u nullglob
+        if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "No supported files (jpg, png, docx, etc.) found in the current directory to convert to PDF."
+            exit 1
+        fi
+        echo "Converting ${#FILES[@]} file(s) to PDF..."
+        for file in "${FILES[@]}"; do
+            EXT="${file##*.}"
+            if [[ "$EXT" =~ ^(jpg|jpeg|png|gif|bmp)$ ]] && command -v convert &> /dev/null; then
+                convert "$file" "${file%.*}.pdf"
+            elif command -v libreoffice &> /dev/null; then
+                libreoffice --headless --convert-to pdf "$file"
+            fi
+        done
+        echo "Done."
+        exit 0
+    else
+        shopt -s nullglob
+        PDFS=(*.pdf)
+        shopt -u nullglob
+        
+        if [ "${#PDFS[@]}" -eq 0 ]; then
+            echo "No PDF files found in the current directory."
+            exit 1
+        fi
+        
+        echo "Converting ${#PDFS[@]} PDF(s) to $FORMAT..."
+        for pdf in "${PDFS[@]}"; do
+            if [ "$FORMAT" == "txt" ]; then
+                pdftotext "$pdf"
+            elif [ "$FORMAT" == "png" ]; then
+                pdftoppm -png "$pdf" "${pdf%.pdf}"
+            elif [ "$FORMAT" == "jpg" ] || [ "$FORMAT" == "jpeg" ]; then
+                pdftoppm -jpeg "$pdf" "${pdf%.pdf}"
+            else
+                echo "Error: Unsupported target format from PDF: $FORMAT"
+                exit 1
+            fi
+        done
+        echo "Done."
+        exit 0
+    fi
+elif [ "$#" -lt 2 ]; then
+    echo "Usage: fzl-pdf-convert-to <format> [input_file]"
+    echo "If no input file is provided, it processes all applicable files in the current directory."
+    echo "If no arguments are provided, it defaults to converting all PDFs to 'txt'."
+    echo ""
+    echo "Convert TO PDF:"
+    echo "  fzl-pdf-convert-to pdf document.docx  (requires LibreOffice)"
+    echo "  fzl-pdf-convert-to pdf image.jpg      (requires ImageMagick)"
+    echo "Convert FROM PDF:"
+    echo "  fzl-pdf-convert-to txt document.pdf   (requires poppler-utils)"
+    echo "  fzl-pdf-convert-to png document.pdf   (requires poppler-utils)"
+    echo "  fzl-pdf-convert-to jpg document.pdf   (requires poppler-utils)"
+    exit 1
+fi
+
+FORMAT="$1"
+INPUT="$2"
+INPUT_EXT="${INPUT##*.}"
+
+if [ "$FORMAT" == "pdf" ]; then
+    if [[ "$INPUT_EXT" =~ ^(jpg|jpeg|png|gif|bmp)$ ]]; then
+        # Image to PDF
+        if command -v convert &> /dev/null; then
+            convert "$INPUT" "${INPUT%.*}.pdf"
+        else
+            echo "Error: ImageMagick (convert) is not installed."
+            exit 1
+        fi
+    else
+        # Document to PDF
+        if command -v libreoffice &> /dev/null; then
+            libreoffice --headless --convert-to pdf "$INPUT"
+        else
+            echo "Error: LibreOffice is not installed."
+            exit 1
+        fi
+    fi
+elif [ "${INPUT_EXT,,}" == "pdf" ]; then
+    if [ "$FORMAT" == "txt" ]; then
+        pdftotext "$INPUT"
+    elif [ "$FORMAT" == "png" ]; then
+        pdftoppm -png "$INPUT" "${INPUT%.pdf}"
+    elif [ "$FORMAT" == "jpg" ] || [ "$FORMAT" == "jpeg" ]; then
+        pdftoppm -jpeg "$INPUT" "${INPUT%.pdf}"
+    else
+        echo "Error: Unsupported target format from PDF: $FORMAT"
+        exit 1
+    fi
+else
+    echo "Error: Unsupported conversion."
+    exit 1
+fi
+{% endraw %}

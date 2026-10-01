@@ -1,0 +1,36 @@
+#!/bin/bash
+{% raw %}
+# FZL PDF Split Command
+# Splits a PDF into individual pages.
+
+if [ "$#" -eq 0 ]; then
+    shopt -s nullglob
+    PDFS=(*.pdf)
+    shopt -u nullglob
+    
+    if [ "${#PDFS[@]}" -eq 0 ]; then
+        echo "No PDF files found in the current directory."
+        exit 1
+    fi
+    
+    for pdf in "${PDFS[@]}"; do
+        OUTPUT="${pdf%.pdf}_page_%d.pdf"
+        echo "Splitting $pdf into $OUTPUT..."
+        pdfseparate "$pdf" "$OUTPUT"
+    done
+    echo "Done."
+    exit 0
+elif [ "$#" -lt 1 ]; then
+    echo "Usage: fzl-pdf-split <input.pdf> [output_pattern_%d.pdf]"
+    echo "Example: fzl-pdf-split document.pdf page_%d.pdf"
+    echo "If no parameters are provided, splits all PDFs in the current directory."
+    exit 1
+fi
+
+INPUT="$1"
+OUTPUT="${2:-${INPUT%.pdf}_page_%d.pdf}"
+
+# Uses pdfseparate from poppler-utils
+pdfseparate "$INPUT" "$OUTPUT"
+echo "Split $INPUT into $OUTPUT"
+{% endraw %}

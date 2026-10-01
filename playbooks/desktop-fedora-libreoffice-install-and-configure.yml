@@ -1,0 +1,56 @@
+---
+- name: Install and Configure LibreOffice with pt-BR Support on Fedora
+  hosts: localhost
+  connection: local
+  become: true
+  gather_facts: true
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. OS CHECK
+    # ----------------------------------------------------
+    - name: Ensure target OS is Fedora / RedHat family
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora / RedHat Linux distributions."
+
+    # ----------------------------------------------------
+    # 2. INSTALL LIBREOFFICE AND LANGUAGE PACKS
+    # ----------------------------------------------------
+    - name: Install LibreOffice and pt-BR language packs
+      ansible.builtin.dnf:
+        name:
+          - libreoffice
+          - libreoffice-langpack-pt-BR
+          - hunspell-pt-BR
+          - hyphen-pt
+          - mythes-pt
+        state: present
+        update_cache: true
+
+    # ----------------------------------------------------
+    # 3. POST-INSTALLATION INSTRUCTIONS
+    # ----------------------------------------------------
+    - name: Display LibreOffice configuration instructions
+      ansible.builtin.debug:
+        msg: |
+          ======================================================================
+          LibreOffice and pt-BR language packs have been installed successfully!
+          
+          To manually configure LibreOffice settings for pt-BR:
+          1. Completely close and reopen LibreOffice Writer.
+          2. Go to Tools > Options (or press Alt + F12).
+          3. In the left sidebar, expand Languages and Locales and select General:
+             - User interface: Change to Portuguese (Brazil)
+             - Locale setting: Select Portuguese (Brazil)
+             - Default Languages for Documents -> Western: Select Portuguese (Brazil)
+               (ensure it has a checkmark indicating the spell checker is active).
+          4. Click Apply, then OK.
+          5. Restart LibreOffice when prompted.
+          
+          To verify document spell checking:
+          - Select all text (Ctrl + A), click the language indicator in the bottom
+            status bar, and select Portuguese (Brazil).
+          - Ensure auto spellcheck is on (Shift + F7).
+          ======================================================================

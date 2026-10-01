@@ -22,7 +22,9 @@ Conversion failed!
 | Command | Symlink / Alias | Purpose / Engine | Key Features |
 |---------+-----------------+------------------+--------------|
 | =fzl-convert-pdf-file= | =fzl-convert-pdf=, =fzl-pdf-to-img= | PDF to PNG/JPG/WebP/TIFF/TXT (=pdftoppm=, =poppler=) | 300+ DPI, single/multi-page, text extraction, embedded image extraction |
+| =fzl-pdf-merge= | =fzl-merge-pdf= | PDF Merger & Optimizer (=pdfunite=, =gs=, =qpdf=) | Merge 2+ PDFs, automatic naming, compression presets (ebook/screen/printer), collision safe |
 | =fzl-convert-image= | =fzl-convert-img=, =fzl-img= | Image conversion & optimization (=ImageMagick=, =cwebp=) | PNG, JPG, WebP, AVIF, TIFF, SVG, ICO, PDF, batch mode, scaling, metadata strip |
+| =fzl-img-merge= | =fzl-merge-img=, =fzl-image-merge= | Image Merger & PDF Creator (=ImageMagick=) | Merge 2+ images side-by-side (-H) or stacked (-V); combine images into multi-page PDF |
 | =fzl-convert-video= | =fzl-convert-vid=, =fzl-vid= | Video transcode & GIF builder (=FFmpeg=) | MP4, MKV, WebM, MOV, high-quality 2-pass palette GIFs, resolution presets, trimming |
 | =fzl-convert-audio= | =fzl-convert-aud=, =fzl-aud= | Audio transcode & normalizer (=FFmpeg=) | MP3, FLAC, WAV, AAC, M4A, OGG, OPUS, 320kbps, EBU R128 loudness normalization |
 | =fzl-convert-doc= | =fzl-convert-document=, =fzl-doc= | Office & Markdown documents (=LibreOffice=, =Pandoc=) | DOCX, PPTX, XLSX, ODT to PDF/HTML/TXT; Markdown to PDF/HTML/DOCX |
@@ -53,7 +55,22 @@ fzl-convert-pdf-file documento.pdf ./imagens_extraidas/ -e
 fzl-convert-pdf-file documento.pdf texto.txt -t
 #+END_SRC
 
-** 2. Image Conversion & Optimization (=fzl-convert-image= / =fzl-convert-img=)
+** 2. PDF Merging (=fzl-pdf-merge= / =fzl-merge-pdf=)
+#+BEGIN_SRC bash
+# Merge two PDF files into a new document:
+fzl-pdf-merge doc1.pdf doc2.pdf relatorio_completo.pdf
+
+# Merge all chapter PDFs into a single document:
+fzl-pdf-merge capitulo*.pdf -o livro.pdf
+
+# Merge two PDFs with automatic output naming (creates doc1_merged.pdf):
+fzl-pdf-merge doc1.pdf doc2.pdf
+
+# Merge and compress/downsample for email or web sharing:
+fzl-pdf-merge contrato_p1.pdf contrato_p2.pdf -o contrato.pdf --compress ebook
+#+END_SRC
+
+** 3. Image Conversion & Optimization (=fzl-convert-image= / =fzl-convert-img=)
 #+BEGIN_SRC bash
 # Convert PNG to WebP (90% quality):
 fzl-convert-image foto.png foto.webp
@@ -68,7 +85,25 @@ fzl-convert-image *.png --to webp
 fzl-convert-image pagina1.png pagina2.png documento_completo.pdf
 #+END_SRC
 
-** 3. Video Transcoding & High-Quality GIF Builder (=fzl-convert-video= / =fzl-convert-vid=)
+** 4. Image Merging (=fzl-img-merge= / =fzl-merge-img=)
+#+BEGIN_SRC bash
+# Merge two images horizontally (side-by-side):
+fzl-img-merge antes.png depois.png comparativo.png
+
+# Merge two images vertically (stacked top-to-bottom):
+fzl-img-merge banner_topo.png banner_corpo.png banner_completo.png --vertical
+
+# Merge multiple images into a single multi-page PDF document:
+fzl-img-merge pagina1.png pagina2.png documento.pdf
+
+# Merge images with automatic naming (creates foto1_merged.png):
+fzl-img-merge foto1.png foto2.png
+
+# Merge and compress to WebP:
+fzl-img-merge img1.png img2.png resultado.webp -q 85
+#+END_SRC
+
+** 5. Video Transcoding & High-Quality GIF Builder (=fzl-convert-video= / =fzl-convert-vid=)
 #+BEGIN_SRC bash
 # Transcode MKV or MOV recording to web-compatible MP4 (H.264 + AAC):
 fzl-convert-video gravacao.mkv video.mp4
@@ -83,7 +118,7 @@ fzl-convert-video aula_4k.mp4 aula_720p.mp4 -s 720p
 fzl-convert-video palestra.mp4 --extract-audio mp3
 #+END_SRC
 
-** 4. Audio Transcoding & Loudness Normalization (=fzl-convert-audio= / =fzl-convert-aud=)
+** 6. Audio Transcoding & Loudness Normalization (=fzl-convert-audio= / =fzl-convert-aud=)
 #+BEGIN_SRC bash
 # Convert WAV or FLAC to 320kbps MP3:
 fzl-convert-audio musica.wav musica.mp3
@@ -95,7 +130,7 @@ fzl-convert-audio podcast.m4a podcast_normalizado.mp3 --normalize
 fzl-convert-audio gravacao.wav gravacao.flac
 #+END_SRC
 
-** 5. Office & Markdown Document Conversion (=fzl-convert-doc= / =fzl-convert-document=)
+** 7. Office & Markdown Document Conversion (=fzl-convert-doc= / =fzl-convert-document=)
 #+BEGIN_SRC bash
 # Convert DOCX / ODT to PDF:
 fzl-convert-doc relatorio.docx relatorio.pdf
@@ -107,10 +142,13 @@ fzl-convert-doc anotacoes.md anotacoes.html
 fzl-convert-doc README.md manual.docx
 #+END_SRC
 
-** 6. Universal Converter Dispatcher (=fzl-convert=)
+** 8. Universal Converter Dispatcher (=fzl-convert=)
 The unified =fzl-convert= CLI automatically detects input and output formats and delegates to the right tool:
 #+BEGIN_SRC bash
 fzl-convert CNHWgn.pdf CNHWgn.png
+fzl-convert doc1.pdf doc2.pdf merged.pdf
+fzl-convert antes.png depois.png comparativo.png
+fzl-convert pagina1.png pagina2.png documento.pdf
 fzl-convert gravacao.mov gravacao.mp4
 fzl-convert demo.mp4 demo.gif
 fzl-convert musica.wav musica.mp3
