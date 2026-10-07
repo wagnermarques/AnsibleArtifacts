@@ -1,0 +1,5 @@
+---
+- name: Setup Version Control System CLIs (GitHub, GitLab, Bitbucket)
+  hosts: devmachines_workstations
+  roles:
+    - devmachine_vcs_clis

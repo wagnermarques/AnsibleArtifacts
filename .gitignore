@@ -29,3 +29,7 @@ isos/Fedora-LXQt-Live-44-1.7.x86_64.iso
 .env
 .env.*
 !.env.template
+
+# Media and screenshots
+*.png
+

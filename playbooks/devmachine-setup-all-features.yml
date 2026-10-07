@@ -8,6 +8,7 @@
     - devmachine_fonts
     - docker
     - devmachine_install_dev_langs
+    - devmachine_vcs_clis
     - devmachine_install_ai_tools
     - devmachine_ides
     - devmachine_install_tools

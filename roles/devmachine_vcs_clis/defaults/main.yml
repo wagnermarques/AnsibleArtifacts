@@ -1,0 +1,52 @@
+---
+# ==============================================================================
+# VCS Command Line Interfaces (GitHub, GitLab, Bitbucket) Defaults
+# ==============================================================================
+
+# Feature toggles
+install_github_cli: true
+install_gitlab_cli: true
+install_bitbucket_cli: true
+
+# Package definitions
+github_cli_package_fedora: "gh"
+github_cli_package_debian: "gh"
+github_cli_package_alpine: "github-cli"
+
+gitlab_cli_package_fedora: "glab"
+gitlab_cli_package_debian: "glab"
+gitlab_cli_package_alpine: "glab"
+
+# Bitbucket CLI (bkt by avivsinai) configuration
+# Standalone CLI targeting Bitbucket Cloud and Data Center, mirroring gh ergonomics
+bitbucket_cli_version: "0.16.4"
+bitbucket_cli_base_dir: "/opt/bitbucket-cli"
+bitbucket_cli_install_dir: "/usr/local/bin"
+
+# Architecture mapping for bkt release binaries
+bitbucket_cli_arch_map:
+  x86_64: "x86_64"
+  amd64: "x86_64"
+  aarch64: "arm64"
+  arm64: "arm64"
+
+bitbucket_cli_arch: "{{ bitbucket_cli_arch_map[ansible_facts['architecture']] | default('x86_64') }}"
+bitbucket_cli_archive_name: "bkt_{{ bitbucket_cli_version }}_linux_{{ bitbucket_cli_arch }}.tar.gz"
+bitbucket_cli_download_url: "https://github.com/avivsinai/bitbucket-cli/releases/download/v{{ bitbucket_cli_version }}/{{ bitbucket_cli_archive_name }}"
+
+# Optional GitLab instances authentication list
+# Provide tokens via vars/vault.yml
+# Example:
+# gitlab_auth_instances:
+#   - hostname: "git.unesp.br"
+gitlab_auth_instances: []
+
+# Search paths for .env file (checked in order)
+vcs_dotenv_paths:
+  - "{{ playbook_dir }}/../.env"
+  - "{{ playbook_dir }}/.env"
+  - "{{ inventory_dir }}/../.env"
+  - "{{ inventory_dir }}/.env"
+  - "./.env"
+
+

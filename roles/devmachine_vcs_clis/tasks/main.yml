@@ -1,0 +1,328 @@
+---
+# ==============================================================================
+# Tasks: Version Control System CLIs (gh, glab, bkt/bitbucket)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 0. User facts and .env loading
+# ------------------------------------------------------------------------------
+- name: Determine real target user and home directory
+  set_fact:
+    vcs_target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    vcs_target_home: "{{ '/home/' + (ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER')))) if (ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER')))) != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+  tags: [always]
+
+- name: Search for existing .env file
+  stat:
+    path: "{{ item }}"
+  loop: "{{ vcs_dotenv_paths }}"
+  register: vcs_dotenv_stat_results
+  delegate_to: localhost
+  become: no
+  tags: [always]
+
+- name: Select first existing .env file
+  set_fact:
+    vcs_found_dotenv_path: "{{ (vcs_dotenv_stat_results.results | selectattr('stat.exists', 'equalto', true) | map(attribute='stat.path') | list | first) | default('') }}"
+  tags: [always]
+
+- name: Read .env file content if found
+  slurp:
+    src: "{{ vcs_found_dotenv_path }}"
+  register: vcs_dotenv_file_content
+  when: vcs_found_dotenv_path != ''
+  delegate_to: localhost
+  become: no
+  tags: [always]
+
+- name: Extract GitLab parameters from .env
+  set_fact:
+    dotenv_gitlab_token: "{{ (vcs_dotenv_file_content.content | b64decode | regex_findall('^\\s*(?:GITLAB_TOKEN|GLAB_CLI_ACCESS_TOKEN|GITLAB_ACCESS_TOKEN|GLAB_TOKEN)\\s*=\\s*[\"\\']?(.*?)[\"\\']?\\s*$', multiline=True) | first) | default('') }}"
+    dotenv_gitlab_host: "{{ (vcs_dotenv_file_content.content | b64decode | regex_findall('^\\s*(?:GITLAB_HOST|GLAB_HOST)\\s*=\\s*[\"\\']?(.*?)[\"\\']?\\s*$', multiline=True) | first) | default('git.unesp.br') }}"
+    dotenv_gitlab_protocol: "{{ (vcs_dotenv_file_content.content | b64decode | regex_findall('^\\s*(?:GITLAB_GIT_PROTOCOL|GLAB_GIT_PROTOCOL)\\s*=\\s*[\"\\']?(.*?)[\"\\']?\\s*$', multiline=True) | first) | default('ssh') }}"
+  when:
+    - vcs_found_dotenv_path != ''
+    - vcs_dotenv_file_content is defined
+    - vcs_dotenv_file_content.content is defined
+  tags: [always]
+
+# ------------------------------------------------------------------------------
+# 1. GitHub CLI (gh)
+# ------------------------------------------------------------------------------
+- name: Install GitHub CLI on Fedora / RHEL
+  ansible.builtin.dnf:
+    name: "{{ github_cli_package_fedora }}"
+    state: present
+  when:
+    - install_github_cli | bool
+    - ansible_facts['os_family'] == "RedHat"
+  become: yes
+
+- name: Ensure APT keyrings directory exists (Debian/Ubuntu)
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  when:
+    - install_github_cli | bool
+    - ansible_facts['os_family'] == "Debian"
+  become: yes
+
+- name: Download GitHub CLI GPG keyring (Debian/Ubuntu)
+  ansible.builtin.get_url:
+    url: "https://cli.github.com/packages/githubcli-archive-keyring.gpg"
+    dest: "/etc/apt/keyrings/githubcli-archive-keyring.gpg"
+    mode: '0644'
+  when:
+    - install_github_cli | bool
+    - ansible_facts['os_family'] == "Debian"
+  become: yes
+
+- name: Add GitHub CLI APT repository (Debian/Ubuntu)
+  ansible.builtin.apt_repository:
+    repo: "deb [arch={{ 'amd64' if ansible_facts['architecture'] in ['x86_64', 'amd64'] else ansible_facts['architecture'] }} signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main"
+    filename: "github-cli"
+    state: present
+  when:
+    - install_github_cli | bool
+    - ansible_facts['os_family'] == "Debian"
+  become: yes
+
+- name: Install GitHub CLI on Debian / Ubuntu
+  ansible.builtin.apt:
+    name: "{{ github_cli_package_debian }}"
+    state: present
+    update_cache: yes
+  when:
+    - install_github_cli | bool
+    - ansible_facts['os_family'] == "Debian"
+  become: yes
+
+- name: Install GitHub CLI on Alpine
+  ansible.builtin.apk:
+    name: "{{ github_cli_package_alpine }}"
+    state: present
+  when:
+    - install_github_cli | bool
+    - ansible_facts['os_family'] == "Alpine"
+  become: yes
+
+# ------------------------------------------------------------------------------
+# 2. GitLab CLI (glab)
+# ------------------------------------------------------------------------------
+- name: Install GitLab CLI on Fedora / RHEL
+  ansible.builtin.dnf:
+    name: "{{ gitlab_cli_package_fedora }}"
+    state: present
+  when:
+    - install_gitlab_cli | bool
+    - ansible_facts['os_family'] == "RedHat"
+  become: yes
+
+- name: Install GitLab CLI on Debian / Ubuntu
+  ansible.builtin.package:
+    name: "{{ gitlab_cli_package_debian }}"
+    state: present
+  when:
+    - install_gitlab_cli | bool
+    - ansible_facts['os_family'] == "Debian"
+  become: yes
+
+- name: Install GitLab CLI on Alpine
+  ansible.builtin.apk:
+    name: "{{ gitlab_cli_package_alpine }}"
+    state: present
+  when:
+    - install_gitlab_cli | bool
+    - ansible_facts['os_family'] == "Alpine"
+  become: yes
+
+# ------------------------------------------------------------------------------
+# 3. Bitbucket CLI (bkt by avivsinai)
+# ------------------------------------------------------------------------------
+- name: Ensure Bitbucket CLI base directory exists
+  ansible.builtin.file:
+    path: "{{ bitbucket_cli_base_dir }}/{{ bitbucket_cli_version }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_bitbucket_cli | bool
+  become: yes
+
+- name: Download and extract Bitbucket CLI (bkt) archive
+  ansible.builtin.unarchive:
+    src: "{{ bitbucket_cli_download_url }}"
+    dest: "{{ bitbucket_cli_base_dir }}/{{ bitbucket_cli_version }}"
+    remote_src: yes
+    creates: "{{ bitbucket_cli_base_dir }}/{{ bitbucket_cli_version }}/bkt"
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_bitbucket_cli | bool
+  become: yes
+
+- name: Ensure target install directory exists
+  ansible.builtin.file:
+    path: "{{ bitbucket_cli_install_dir }}"
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  when: install_bitbucket_cli | bool
+  become: yes
+
+- name: Symlink bkt to install directory
+  ansible.builtin.file:
+    src: "{{ bitbucket_cli_base_dir }}/{{ bitbucket_cli_version }}/bkt"
+    dest: "{{ bitbucket_cli_install_dir }}/bkt"
+    state: link
+    force: yes
+    owner: root
+    group: root
+  when: install_bitbucket_cli | bool
+  become: yes
+
+- name: Create convenience symlinks for Bitbucket CLI (bitbucket, bb)
+  ansible.builtin.file:
+    src: "{{ bitbucket_cli_install_dir }}/bkt"
+    dest: "{{ bitbucket_cli_install_dir }}/{{ item }}"
+    state: link
+    force: yes
+    owner: root
+    group: root
+  loop:
+    - bitbucket
+    - bb
+  when: install_bitbucket_cli | bool
+  become: yes
+
+# ------------------------------------------------------------------------------
+# 4. FZL Launchers (fzl-gh, fzl-glab, fzl-bitbucket)
+# ------------------------------------------------------------------------------
+- name: Install fzl-gh launcher script
+  ansible.builtin.copy:
+    dest: "/usr/local/bin/fzl-gh"
+    content: |
+      #!/usr/bin/env bash
+      # FZL GitHub CLI Launcher
+      if [ -z "$GITHUB_TOKEN" ] && [ -n "$GITHUB_PERSONAL_ACCESS_TOKEN" ]; then
+          export GITHUB_TOKEN="$GITHUB_PERSONAL_ACCESS_TOKEN"
+      fi
+      exec gh "$@"
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: Install fzl-glab launcher script
+  ansible.builtin.copy:
+    dest: "/usr/local/bin/fzl-glab"
+    content: |
+      #!/usr/bin/env bash
+      # FZL GitLab CLI Launcher
+      if [ -z "$GITLAB_TOKEN" ] && [ -z "$GLAB_CLI_ACCESS_TOKEN" ]; then
+          for envfile in "./.env" "$(git rev-parse --show-toplevel 2>/dev/null)/.env" "$HOME/.env"; do
+              if [ -f "$envfile" ]; then
+                  set -a
+                  source <(grep -E '^\s*(GITLAB_|GLAB_)' "$envfile") 2>/dev/null
+                  set +a
+                  break
+              fi
+          done
+      fi
+      if [ -z "$GITLAB_TOKEN" ] && [ -n "$GLAB_CLI_ACCESS_TOKEN" ]; then
+          export GITLAB_TOKEN="$GLAB_CLI_ACCESS_TOKEN"
+      fi
+      if [ -z "$GITLAB_HOST" ] && [ -n "$GLAB_HOST" ]; then
+          export GITLAB_HOST="$GLAB_HOST"
+      fi
+      exec glab "$@"
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: Install fzl-bitbucket launcher script
+  ansible.builtin.copy:
+    dest: "/usr/local/bin/fzl-bitbucket"
+    content: |
+      #!/usr/bin/env bash
+      # FZL Bitbucket CLI Launcher
+      exec bkt "$@"
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+# ------------------------------------------------------------------------------
+# 5. Bash Shell Completions
+# ------------------------------------------------------------------------------
+- name: Ensure bash completion directory exists
+  ansible.builtin.file:
+    path: /usr/share/bash-completion/completions
+    state: directory
+    mode: '0755'
+    owner: root
+    group: root
+  become: yes
+
+- name: Generate Bitbucket CLI (bkt) bash completion
+  ansible.builtin.shell: "{{ bitbucket_cli_install_dir }}/bkt completion bash > /usr/share/bash-completion/completions/bkt"
+  args:
+    creates: /usr/share/bash-completion/completions/bkt
+  when: install_bitbucket_cli | bool
+  failed_when: false
+  become: yes
+
+- name: Symlink Bitbucket CLI bash completion for aliases
+  ansible.builtin.file:
+    src: /usr/share/bash-completion/completions/bkt
+    dest: "/usr/share/bash-completion/completions/{{ item }}"
+    state: link
+    force: yes
+  loop:
+    - bitbucket
+    - bb
+  when: install_bitbucket_cli | bool
+  failed_when: false
+  become: yes
+
+# ------------------------------------------------------------------------------
+# 6. Optional GitLab Instance Authentication
+# ------------------------------------------------------------------------------
+- name: Authenticate GitLab from .env via glab
+  ansible.builtin.shell:
+    cmd: "printf '%s' '{{ dotenv_gitlab_token }}' | glab auth login --hostname {{ dotenv_gitlab_host }} --git-protocol {{ dotenv_gitlab_protocol }} --stdin"
+  when:
+    - install_gitlab_cli | bool
+    - dotenv_gitlab_token is defined
+    - dotenv_gitlab_token != ''
+  no_log: true
+  become: true
+  become_user: "{{ vcs_target_user }}"
+
+- name: Set default glab host to configured GitLab instance from .env
+  ansible.builtin.command:
+    cmd: "glab config set host {{ dotenv_gitlab_host }}"
+  when:
+    - install_gitlab_cli | bool
+    - dotenv_gitlab_token is defined
+    - dotenv_gitlab_token != ''
+  become: true
+  become_user: "{{ vcs_target_user }}"
+  changed_when: false
+
+- name: Authenticate configured GitLab instances from inventory/vault via glab
+  ansible.builtin.shell:
+    cmd: "printf '%s' '{{ item.token }}' | glab auth login --hostname {{ item.hostname }} --stdin"
+  loop: "{{ gitlab_auth_instances }}"
+  when:
+    - install_gitlab_cli | bool
+    - gitlab_auth_instances is defined
+    - gitlab_auth_instances | length > 0
+  no_log: true
+  become: true
+  become_user: "{{ vcs_target_user }}"
+
+
