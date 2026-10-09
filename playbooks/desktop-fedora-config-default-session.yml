@@ -1,0 +1,76 @@
+---
+- name: Configure Default Login Session (X11 vs Wayland) on Fedora Desktop
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+
+    # Session name to default to, matching the stem of a file in
+    # /usr/share/xsessions/ (X11) or /usr/share/wayland-sessions/ (Wayland).
+    # Override via -e target_session=<name>, e.g.:
+    #   -e target_session=lxqt            # X11 LXQt
+    #   -e target_session=lxqt-wayland    # Wayland LXQt
+    #   -e target_session=gnome
+    target_session: "lxqt"
+
+  tasks:
+    - name: Ensure target OS is Fedora
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == "Fedora"
+        fail_msg: "This playbook is designed for Fedora Linux."
+
+    - name: Ensure required vars are provided
+      ansible.builtin.assert:
+        that:
+          - target_user | length > 0
+          - target_session | length > 0
+        fail_msg: "target_user and target_session must be resolvable/set."
+
+    - name: Check that the requested session exists (X11)
+      ansible.builtin.stat:
+        path: "/usr/share/xsessions/{{ target_session }}.desktop"
+      register: x11_session_file
+
+    - name: Check that the requested session exists (Wayland)
+      ansible.builtin.stat:
+        path: "/usr/share/wayland-sessions/{{ target_session }}.desktop"
+      register: wayland_session_file
+
+    - name: Fail if the requested session was not found
+      ansible.builtin.assert:
+        that:
+          - x11_session_file.stat.exists or wayland_session_file.stat.exists
+        fail_msg: >-
+          No session named '{{ target_session }}' found under /usr/share/xsessions/
+          or /usr/share/wayland-sessions/. List available sessions with:
+          ls /usr/share/xsessions/ /usr/share/wayland-sessions/
+
+    - name: Set default session for {{ target_user }} in AccountsService
+      community.general.ini_file:
+        path: "/var/lib/AccountsService/users/{{ target_user }}"
+        section: User
+        option: "{{ item }}"
+        value: "{{ target_session }}"
+        create: true
+        mode: '0604'
+        owner: root
+        group: root
+      loop:
+        - XSession
+        - Session
+
+    - name: Display summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - " Default login session updated for {{ target_user }}"
+          - "=========================================================================="
+          - " Session set to: {{ target_session }} ({{ 'X11' if x11_session_file.stat.exists else 'Wayland' }})"
+          - " File: /var/lib/AccountsService/users/{{ target_user }}"
+          - ""
+          - " This takes effect on the NEXT login. Log out and log back in"
+          - " (no reboot needed) to switch sessions."
+          - "=========================================================================="

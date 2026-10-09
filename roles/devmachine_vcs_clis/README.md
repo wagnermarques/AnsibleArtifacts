@@ -46,3 +46,22 @@ When the playbook runs, it automatically detects `.env`, logs in non-interactive
 
 Additionally, the installed **`fzl-glab`** launcher automatically sources `GITLAB_HOST` and `GITLAB_TOKEN` from any local or `$HOME/.env` file before executing `glab`.
 
+Likewise, you can define a GitHub token in the same `.env` file:
+
+```env
+GITHUB_HOST="github.com"          # or your GitHub Enterprise hostname
+GITHUB_TOKEN="ghp_your_personal_access_token_here"
+GITHUB_GIT_PROTOCOL="ssh" # or https
+```
+
+When the playbook runs, it automatically detects the token and logs in non-interactively (`gh auth login --with-token`) against `GITHUB_HOST` (defaults to `github.com`).
+
+For additional GitHub Enterprise instances, define `github_auth_instances` in `vars/vault.yml` (mirrors `gitlab_auth_instances`):
+
+```yaml
+github_auth_instances:
+  - hostname: "github.mycompany.com"
+    token: "{{ vault_github_enterprise_token }}"
+    git_protocol: "ssh"
+```
+

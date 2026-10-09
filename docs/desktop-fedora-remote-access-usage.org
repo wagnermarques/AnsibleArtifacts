@@ -49,3 +49,17 @@ fzl-remmina-start
 - Choose protocol *RDP*.
 - Enter Server address: ~192.168.30.178~ (Internal) or ~hjr0ah6z7cj.sn.mynetname.net~ (External).
 - Save profile for quick reconnects.
+
+* Orientation: What Can Connect Into This Machine Right Now
+Installed by =desktop-fedora-remote-access-inbound-setup.yml=, =fzl-remote-control-info= inspects the
+local machine and prints every inbound alternative (SSH, RDP, VNC, AnyDesk, RustDesk), whether each is
+currently active or just installed-but-idle, and the exact command to use from another machine to
+connect to it. Unlike =fzl-remote-access-status= (raw =systemctl=/=firewall-cmd= dump), this command is
+meant as a quick "how do I get in" cheat sheet.
+
+#+BEGIN_SRC bash
+fzl-remote-control-info
+#+END_SRC
+
+Run it on the machine you want to reach (the one that just had inbound access configured), not on the
+client you're connecting from.

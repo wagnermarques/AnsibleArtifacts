@@ -46,6 +46,17 @@
     - vcs_dotenv_file_content.content is defined
   tags: [always]
 
+- name: Extract GitHub parameters from .env
+  set_fact:
+    dotenv_github_token: "{{ (vcs_dotenv_file_content.content | b64decode | regex_findall('^\\s*(?:GITHUB_TOKEN|GH_TOKEN|GITHUB_PERSONAL_ACCESS_TOKEN|GITHUB_ACCESS_TOKEN)\\s*=\\s*[\"\\']?(.*?)[\"\\']?\\s*$', multiline=True) | first) | default('') }}"
+    dotenv_github_host: "{{ (vcs_dotenv_file_content.content | b64decode | regex_findall('^\\s*(?:GITHUB_HOST|GH_HOST)\\s*=\\s*[\"\\']?(.*?)[\"\\']?\\s*$', multiline=True) | first) | default('github.com') }}"
+    dotenv_github_protocol: "{{ (vcs_dotenv_file_content.content | b64decode | regex_findall('^\\s*(?:GITHUB_GIT_PROTOCOL|GH_GIT_PROTOCOL)\\s*=\\s*[\"\\']?(.*?)[\"\\']?\\s*$', multiline=True) | first) | default('ssh') }}"
+  when:
+    - vcs_found_dotenv_path != ''
+    - vcs_dotenv_file_content is defined
+    - vcs_dotenv_file_content.content is defined
+  tags: [always]
+
 # ------------------------------------------------------------------------------
 # 1. GitHub CLI (gh)
 # ------------------------------------------------------------------------------
@@ -302,7 +313,33 @@
   become: yes
 
 # ------------------------------------------------------------------------------
-# 6. Optional GitLab Instance Authentication
+# 6. Optional GitHub Authentication
+# ------------------------------------------------------------------------------
+- name: Authenticate GitHub from .env via gh
+  ansible.builtin.shell:
+    cmd: "printf '%s' '{{ dotenv_github_token }}' | gh auth login --hostname {{ dotenv_github_host }} --git-protocol {{ dotenv_github_protocol }} --with-token"
+  when:
+    - install_github_cli | bool
+    - dotenv_github_token is defined
+    - dotenv_github_token != ''
+  no_log: true
+  become: true
+  become_user: "{{ vcs_target_user }}"
+
+- name: Authenticate configured GitHub instances from inventory/vault via gh
+  ansible.builtin.shell:
+    cmd: "printf '%s' '{{ item.token }}' | gh auth login --hostname {{ item.hostname }} --git-protocol {{ item.git_protocol | default('ssh') }} --with-token"
+  loop: "{{ github_auth_instances }}"
+  when:
+    - install_github_cli | bool
+    - github_auth_instances is defined
+    - github_auth_instances | length > 0
+  no_log: true
+  become: true
+  become_user: "{{ vcs_target_user }}"
+
+# ------------------------------------------------------------------------------
+# 7. Optional GitLab Instance Authentication
 # ------------------------------------------------------------------------------
 - name: Authenticate GitLab from .env via glab
   ansible.builtin.shell:

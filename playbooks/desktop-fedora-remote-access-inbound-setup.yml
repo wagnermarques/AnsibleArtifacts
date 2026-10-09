@@ -50,10 +50,11 @@
     - name: Configure inbound RDP via xrdp
       when: rdp_inbound_enabled | bool
       block:
-        - name: Install xrdp and Xvnc backend (tigervnc-server)
+        - name: Install xrdp, Xorg backend driver (xorgxrdp), and Xvnc backend (tigervnc-server)
           ansible.builtin.dnf:
             name:
               - xrdp
+              - xorgxrdp
               - tigervnc-server
             state: present
             update_cache: yes
@@ -229,7 +230,89 @@
           firewall-cmd --list-ports
 
     # ----------------------------------------------------
-    # 8. SUMMARY
+    # 8. ORIENTATION LAUNCHER
+    # ----------------------------------------------------
+    - name: Create fzl-remote-control-info launcher
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-remote-control-info"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL Remote Control Info - orientation guide for connecting into this machine
+          set -u
+
+          LOCAL_IPS="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^$' | grep -v '^127\.' | paste -sd ' ' -)"
+          [ -z "$LOCAL_IPS" ] && LOCAL_IPS="unknown"
+
+          status_of() {
+            systemctl is-active "$1" 2>/dev/null || echo "not-installed"
+          }
+
+          echo "=========================================================================="
+          echo " FZL Remote Control Info - $(hostname)"
+          echo "=========================================================================="
+          echo " Local IP address(es): ${LOCAL_IPS}"
+          echo ""
+          echo " Available inbound alternatives on this machine:"
+          echo ""
+
+          ssh_status=$(status_of sshd)
+          printf " %-10s %-14s" "SSH:" "$ssh_status"
+          if [ "$ssh_status" = "active" ]; then
+            echo " -> ssh ${USER}@<ip-above>"
+          else
+            echo " -> enable: ansible-playbook -K playbooks/desktop-fedora-remote-access-inbound-setup.yml -e ssh_inbound_enabled=true"
+          fi
+
+          rdp_status=$(status_of xrdp)
+          printf " %-10s %-14s" "RDP:" "$rdp_status"
+          if [ "$rdp_status" = "active" ]; then
+            echo " -> fzl-rdp-connect <ip-above> [username]   (or Remmina/xfreerdp)"
+          else
+            echo " -> enable: ansible-playbook -K playbooks/desktop-fedora-remote-access-inbound-setup.yml -e rdp_inbound_enabled=true"
+          fi
+
+          if command -v x11vnc >/dev/null 2>&1; then
+            if pgrep -x x11vnc >/dev/null 2>&1; then
+              echo " VNC:       running        -> vncviewer <ip-above>::5900  (started via fzl-vnc-share-start)"
+            else
+              echo " VNC:       installed,idle -> start: fzl-vnc-share-start, then vncviewer <ip-above>::5900"
+            fi
+          else
+            echo " VNC:       not-installed  -> enable: ansible-playbook -K playbooks/desktop-fedora-remote-access-inbound-setup.yml -e vnc_inbound_enabled=true -e vnc_password=<pwd>"
+          fi
+
+          if [ -x /usr/bin/anydesk ]; then
+            ad_status=$(status_of anydesk)
+            ad_id="$(anydesk --get-id 2>/dev/null || echo unknown)"
+            echo " AnyDesk:   ${ad_status}        -> connect using AnyDesk ID: ${ad_id}"
+          else
+            echo " AnyDesk:   not-installed  -> install: ansible-playbook -K playbooks/desktop-fedora-remote-access-tools-setup.yml"
+          fi
+
+          if [ -x /usr/bin/rustdesk ]; then
+            rd_status=$(status_of rustdesk)
+            rd_id="$(rustdesk --get-id 2>/dev/null || echo unknown)"
+            echo " RustDesk:  ${rd_status}        -> connect using RustDesk ID: ${rd_id}"
+          else
+            echo " RustDesk:  not-installed  -> install: ansible-playbook -K playbooks/desktop-fedora-remote-access-tools-setup.yml"
+          fi
+
+          echo ""
+          echo " Firewall ports currently open (default zone):"
+          firewall-cmd --list-services 2>/dev/null | sed 's/^/   services: /'
+          firewall-cmd --list-ports 2>/dev/null | sed 's/^/   ports:    /'
+          echo ""
+          echo " SECURITY NOTE: the alternatives above work from this LAN only. For access"
+          echo " from outside your network prefer a VPN or tunnel (see"
+          echo " servermachine-fedora-nginx-public--cloudflared.yml) instead of forwarding"
+          echo " ports on your router."
+          echo ""
+          echo " Full raw status: fzl-remote-access-status"
+          echo "=========================================================================="
+
+    # ----------------------------------------------------
+    # 9. SUMMARY
     # ----------------------------------------------------
     - name: Display Inbound Remote Access Setup Summary
       ansible.builtin.debug:
@@ -246,6 +329,7 @@
           - " RustDesk:     {{ 'service active, LAN ports 21115-21119/tcp + 21116/udp open' if rustdesk_bin.stat.exists else 'not installed - run desktop-fedora-remote-access-tools-setup.yml first' }}"
           - ""
           - " Check status anytime with: fzl-remote-access-status"
+          - " Orientation / how-to-connect guide: fzl-remote-control-info"
           - ""
           - " SECURITY NOTE: these rules only open the local firewall. Do not forward"
           - " these ports on your router to the public internet; prefer a VPN or a"

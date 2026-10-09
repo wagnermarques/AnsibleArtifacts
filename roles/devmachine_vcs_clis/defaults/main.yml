@@ -34,6 +34,15 @@ bitbucket_cli_arch: "{{ bitbucket_cli_arch_map[ansible_facts['architecture']] | 
 bitbucket_cli_archive_name: "bkt_{{ bitbucket_cli_version }}_linux_{{ bitbucket_cli_arch }}.tar.gz"
 bitbucket_cli_download_url: "https://github.com/avivsinai/bitbucket-cli/releases/download/v{{ bitbucket_cli_version }}/{{ bitbucket_cli_archive_name }}"
 
+# Optional GitHub instances authentication list (e.g. GitHub Enterprise)
+# Provide tokens via vars/vault.yml
+# Example:
+# github_auth_instances:
+#   - hostname: "github.mycompany.com"
+#     token: "{{ vault_github_enterprise_token }}"
+#     git_protocol: "ssh"
+github_auth_instances: []
+
 # Optional GitLab instances authentication list
 # Provide tokens via vars/vault.yml
 # Example:
