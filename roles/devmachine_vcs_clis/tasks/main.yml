@@ -221,22 +221,35 @@
     content: |
       #!/usr/bin/env bash
       # FZL GitLab CLI Launcher
-      if [ -z "$GITLAB_TOKEN" ] && [ -z "$GLAB_CLI_ACCESS_TOKEN" ]; then
-          for envfile in "./.env" "$(git rev-parse --show-toplevel 2>/dev/null)/.env" "$HOME/.env"; do
-              if [ -f "$envfile" ]; then
-                  set -a
-                  source <(grep -E '^\s*(GITLAB_|GLAB_)' "$envfile") 2>/dev/null
-                  set +a
-                  break
-              fi
-          done
+      
+      echo "Which GitLab instance do you want to connect to?" >&2
+      echo "1) git.unesp.br (default)" >&2
+      echo "2) gitlab.com" >&2
+      read -p "Select option [1/2]: " choice < /dev/tty
+      case "$choice" in
+          2) export GITLAB_HOST="gitlab.com" ;;
+          *) export GITLAB_HOST="git.unesp.br" ;;
+      esac
+
+      for envfile in "./.env" "$(git rev-parse --show-toplevel 2>/dev/null)/.env" "$HOME/.env"; do
+          if [ -f "$envfile" ]; then
+              set -a
+              source <(grep -E '^\s*(GITLAB_|GLAB_)' "$envfile") 2>/dev/null
+              set +a
+              break
+          fi
+      done
+      
+      if [ "$GITLAB_HOST" = "gitlab.com" ]; then
+          if [ -n "$GITLAB_COM_TOKEN" ]; then
+              export GITLAB_TOKEN="$GITLAB_COM_TOKEN"
+          fi
+      else
+          if [ -z "$GITLAB_TOKEN" ] && [ -n "$GLAB_CLI_ACCESS_TOKEN" ]; then
+              export GITLAB_TOKEN="$GLAB_CLI_ACCESS_TOKEN"
+          fi
       fi
-      if [ -z "$GITLAB_TOKEN" ] && [ -n "$GLAB_CLI_ACCESS_TOKEN" ]; then
-          export GITLAB_TOKEN="$GLAB_CLI_ACCESS_TOKEN"
-      fi
-      if [ -z "$GITLAB_HOST" ] && [ -n "$GLAB_HOST" ]; then
-          export GITLAB_HOST="$GLAB_HOST"
-      fi
+      
       exec glab "$@"
     mode: '0755'
     owner: root
