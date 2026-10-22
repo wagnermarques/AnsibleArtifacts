@@ -10,8 +10,6 @@
     - "{{ pycharm_dir }}"
     - "{{ webstorm_dir }}"
     - "{{ vscode_dir }}"
-    - "{{ dbeaver_dir }}"
-    - "{{ datagrip_dir }}"
     - "{{ antigravity_dir }}"
     - "{{ cursor_dir }}"
     - "{{ eclipse_modeling_dir }}"
@@ -29,7 +27,6 @@
     - { url: "{{ intellij_url }}", dest: "{{ intellij_dir }}" }
     - { url: "{{ pycharm_url }}", dest: "{{ pycharm_dir }}" }
     - { url: "{{ webstorm_url }}", dest: "{{ webstorm_dir }}" }
-    - { url: "{{ datagrip_url }}", dest: "{{ datagrip_dir }}" }
     - { url: "{{ antigravity_url }}", dest: "{{ antigravity_dir }}" }
   become: yes
 
@@ -54,16 +51,6 @@
     owner: "{{ tools_owner }}"
   become: yes
 
-- name: Install DBeaver
-  unarchive:
-    src: "{{ dbeaver_url }}"
-    dest: "{{ dbeaver_dir }}"
-    remote_src: yes
-    extra_opts: ["--strip-components=1"]
-    creates: "{{ dbeaver_dir }}/dbeaver"
-    owner: "{{ tools_owner }}"
-  become: yes
-
 - name: Install Cursor
   get_url:
     url: "{{ cursor_url }}"
@@ -73,16 +60,15 @@
   become: yes
 
 - name: Create shell integration for Tools PATH
-  copy:
-    dest: "~/.bashrc_dev_tools"
-    content: |
+  blockinfile:
+    path: "~/.bashrc_dev_tools"
+    marker: "# {mark} DEV IDES ALIASES"
+    block: |
       # Dev Tools Path Configuration
       export PATH="$PATH:{{ intellij_dir }}/bin"
       export PATH="$PATH:{{ pycharm_dir }}/bin"
       export PATH="$PATH:{{ webstorm_dir }}/bin"
       export PATH="$PATH:{{ vscode_dir }}/bin"
-      export PATH="$PATH:{{ dbeaver_dir }}"
-      export PATH="$PATH:{{ datagrip_dir }}/bin"
       export PATH="$PATH:{{ antigravity_dir }}/bin"
       export PATH="$PATH:{{ cursor_dir }}"
       export PATH="$PATH:{{ eclipse_modeling_dir }}"
@@ -92,12 +78,10 @@
       alias fzl-pycharm-start='nohup {{ pycharm_dir }}/bin/pycharm.sh > /dev/null 2>&1 &'
       alias fzl-webstorm-start='nohup {{ webstorm_dir }}/bin/webstorm.sh > /dev/null 2>&1 &'
       alias fzl-vscode-start='nohup {{ vscode_dir }}/bin/code > /dev/null 2>&1 &'
-      alias fzl-dbeaver-start='nohup {{ dbeaver_dir }}/dbeaver > /dev/null 2>&1 &'
-      alias fzl-datagrip-start='nohup {{ datagrip_dir }}/bin/datagrip.sh > /dev/null 2>&1 &'
       alias fzl-antigravity-start='nohup {{ antigravity_dir }}/bin/antigravity > /dev/null 2>&1 &'
       alias fzl-cursor-start='nohup {{ cursor_dir }}/cursor.AppImage > /dev/null 2>&1 &'
       alias fzl-eclipse-modeling-start='nohup {{ eclipse_modeling_dir }}/eclipse > /dev/null 2>&1 &'
-
+    create: yes
     mode: '0644'
   become: no
 

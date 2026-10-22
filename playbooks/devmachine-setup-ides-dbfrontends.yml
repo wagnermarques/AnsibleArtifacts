@@ -1,0 +1,182 @@
+---
+- name: Setup Database Frontend IDEs and Tools
+  hosts: devmachines_workstations
+  gather_facts: yes
+  vars:
+    tools_owner: "{{ lookup('env', 'USER') }}"
+    tools_basedir: "/home/wgn/WORKING"
+    progsativos_dir: "{{ tools_basedir }}/Progsativos"
+    db_tools_base_dir: "{{ progsativos_dir }}/db_tools"
+
+    # DB Frontend Specific Paths
+    dbeaver_dir: "{{ db_tools_base_dir }}/dbeaver"
+    datagrip_dir: "{{ db_tools_base_dir }}/datagrip"
+    squirrelsql_version: "5.1.0"
+    squirrelsql_extracted_dir: "{{ db_tools_base_dir }}/squirrelsql-{{ squirrelsql_version }}-standard"
+    squirrelsql_dir: "{{ db_tools_base_dir }}/squirrelsql"
+
+    # Feature Toggles
+    install_dbeaver: true
+    install_datagrip: true
+    install_squirrelsql: true
+
+    # Download URLs
+    dbeaver_url: "https://dbeaver.io/files/dbeaver-ce-latest-linux.gtk.x86_64.tar.gz"
+    datagrip_url: "https://download.jetbrains.com/datagrip/datagrip-2024.1.2.tar.gz"
+    squirrelsql_url: "https://github.com/squirrel-sql-client/squirrel-sql-stable-releases/releases/download/{{ squirrelsql_version }}-a_plainzip/squirrelsql-{{ squirrelsql_version }}-standard.zip"
+
+    # Optional JDBC Drivers for SQuirreL SQL (placed in lib/ so they load automatically)
+    mysql_jdbc_version: "9.1.0"
+    mysql_jdbc_url: "https://repo1.maven.org/maven2/com/mysql/mysql-connector-j/{{ mysql_jdbc_version }}/mysql-connector-j-{{ mysql_jdbc_version }}.jar"
+    postgresql_jdbc_version: "42.7.4"
+    postgresql_jdbc_url: "https://repo1.maven.org/maven2/org/postgresql/postgresql/{{ postgresql_jdbc_version }}/postgresql-{{ postgresql_jdbc_version }}.jar"
+
+  tasks:
+    - name: Ensure target directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ tools_owner }}"
+      loop:
+        - "{{ db_tools_base_dir }}"
+        - "{{ dbeaver_dir }}"
+        - "{{ datagrip_dir }}"
+      become: yes
+
+    # 1. DBeaver Community Edition
+    - name: Install DBeaver Community Edition
+      unarchive:
+        src: "{{ dbeaver_url }}"
+        dest: "{{ dbeaver_dir }}"
+        remote_src: yes
+        extra_opts: ["--strip-components=1"]
+        creates: "{{ dbeaver_dir }}/dbeaver"
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_dbeaver | default(true) | bool
+
+    # 2. JetBrains DataGrip
+    - name: Install JetBrains DataGrip
+      unarchive:
+        src: "{{ datagrip_url }}"
+        dest: "{{ datagrip_dir }}"
+        remote_src: yes
+        extra_opts: ["--strip-components=1"]
+        creates: "{{ datagrip_dir }}/bin"
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_datagrip | default(true) | bool
+
+    # 3. SQuirreL SQL Client
+    - name: Ensure unzip is installed for SQuirreL SQL extraction
+      package:
+        name: unzip
+        state: present
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    - name: Download and extract SQuirreL SQL Client (plainzip)
+      unarchive:
+        src: "{{ squirrelsql_url }}"
+        dest: "{{ db_tools_base_dir }}"
+        remote_src: yes
+        creates: "{{ squirrelsql_extracted_dir }}/squirrel-sql.jar"
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    - name: Symlink SQuirreL SQL versioned directory to {{ squirrelsql_dir }}
+      file:
+        src: "{{ squirrelsql_extracted_dir }}"
+        dest: "{{ squirrelsql_dir }}"
+        state: link
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    - name: Ensure SQuirreL SQL launch script is executable
+      file:
+        path: "{{ squirrelsql_extracted_dir }}/squirrel-sql.sh"
+        mode: '0755'
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    - name: Download MySQL and PostgreSQL JDBC drivers into SQuirreL SQL lib directory
+      get_url:
+        url: "{{ item.url }}"
+        dest: "{{ squirrelsql_extracted_dir }}/lib/{{ item.name }}"
+        mode: '0644'
+        owner: "{{ tools_owner }}"
+      loop:
+        - { url: "{{ mysql_jdbc_url }}", name: "mysql-connector-j-{{ mysql_jdbc_version }}.jar" }
+        - { url: "{{ postgresql_jdbc_url }}", name: "postgresql-{{ postgresql_jdbc_version }}.jar" }
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    # 4. System-wide FZL Launcher Commands in /usr/local/bin
+    - name: Create /usr/local/bin/fzl-dbeaver-start executable command
+      copy:
+        dest: "/usr/local/bin/fzl-dbeaver-start"
+        content: |
+          #!/usr/bin/env bash
+          nohup "{{ dbeaver_dir }}/dbeaver" "$@" > /dev/null 2>&1 &
+        mode: '0755'
+      become: yes
+      when: install_dbeaver | default(true) | bool
+
+    - name: Create /usr/local/bin/fzl-datagrip-start executable command
+      copy:
+        dest: "/usr/local/bin/fzl-datagrip-start"
+        content: |
+          #!/usr/bin/env bash
+          nohup "{{ datagrip_dir }}/bin/datagrip.sh" "$@" > /dev/null 2>&1 &
+        mode: '0755'
+      become: yes
+      when: install_datagrip | default(true) | bool
+
+    - name: Create /usr/local/bin/fzl-squirreldb-start executable command
+      copy:
+        dest: "/usr/local/bin/fzl-squirreldb-start"
+        content: |
+          #!/usr/bin/env bash
+          nohup "{{ squirrelsql_dir }}/squirrel-sql.sh" "$@" > /dev/null 2>&1 &
+        mode: '0755'
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    - name: Create /usr/local/bin/fzl-squirrelsql-start symlink
+      file:
+        src: "/usr/local/bin/fzl-squirreldb-start"
+        dest: "/usr/local/bin/fzl-squirrelsql-start"
+        state: link
+      become: yes
+      when: install_squirrelsql | default(true) | bool
+
+    # 5. Shell Integration and Aliases
+    - name: Add DB Frontend Tools to ~/.bashrc_dev_tools
+      blockinfile:
+        path: "~/.bashrc_dev_tools"
+        marker: "# {mark} DB FRONTENDS ALIASES"
+        block: |
+          # DB Tools Path Configuration
+          export PATH="$PATH:{{ dbeaver_dir }}"
+          export PATH="$PATH:{{ datagrip_dir }}/bin"
+          export PATH="$PATH:{{ squirrelsql_dir }}"
+
+          # FZL DB Frontend Start Aliases
+          alias fzl-dbeaver-start='nohup {{ dbeaver_dir }}/dbeaver > /dev/null 2>&1 &'
+          alias fzl-datagrip-start='nohup {{ datagrip_dir }}/bin/datagrip.sh > /dev/null 2>&1 &'
+          alias fzl-squirreldb-start='nohup {{ squirrelsql_dir }}/squirrel-sql.sh > /dev/null 2>&1 &'
+          alias fzl-squirrelsql-start='nohup {{ squirrelsql_dir }}/squirrel-sql.sh > /dev/null 2>&1 &'
+        create: yes
+        mode: '0644'
+      become: no
+
+    - name: Source Dev Tools in .bashrc
+      lineinfile:
+        path: "~/.bashrc"
+        line: "source ~/.bashrc_dev_tools"
+        state: present
+      become: no

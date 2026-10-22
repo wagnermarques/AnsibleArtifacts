@@ -1,0 +1,142 @@
+---
+- name: Setup Database CLI Clients (MySQL/MariaDB, PostgreSQL, SQL Server, SQLite)
+  hosts: devmachines_workstations
+  gather_facts: yes
+  vars:
+    tools_owner: "{{ lookup('env', 'USER') }}"
+    tools_basedir: "/home/wgn/WORKING"
+    progsativos_dir: "{{ tools_basedir }}/Progsativos"
+    db_tools_base_dir: "{{ progsativos_dir }}/db_tools"
+    sqlcmd_dir: "{{ db_tools_base_dir }}/sqlcmd"
+
+    # Feature Toggles
+    install_enhanced_tui_clients: true
+    install_mssql_sqlcmd: true
+
+    # Microsoft go-sqlcmd (Official cross-distro SQL Server CLI client)
+    sqlcmd_version: "1.10.0"
+    sqlcmd_url: "https://github.com/microsoft/go-sqlcmd/releases/download/v{{ sqlcmd_version }}/sqlcmd-linux-amd64.tar.bz2"
+
+    # Standard CLI Clients (Client-only packages, no database servers)
+    db_client_packages_fedora:
+      - mariadb          # Provides mysql, mariadb, mysqldump client binaries
+      - postgresql       # Provides psql, pg_dump, pg_restore client binaries
+      - sqlite           # Provides sqlite3 CLI binary
+      - freetds          # Provides tsql, bsqldb (SQL Server / TDS CLI client)
+      - unixODBC         # Provides isql ODBC CLI tool
+      - bzip2            # Required to extract sqlcmd.tar.bz2
+
+    db_client_packages_debian:
+      - default-mysql-client
+      - postgresql-client
+      - sqlite3
+      - freetds-bin
+      - unixodbc
+      - bzip2
+
+    # Optional Enhanced Interactive TUI Clients (auto-completion & syntax highlighting)
+    db_tui_packages_fedora:
+      - mycli
+      - pgcli
+      - litecli
+
+    db_tui_packages_debian:
+      - mycli
+      - pgcli
+      - litecli
+
+  tasks:
+    - name: Install Core Database CLI Clients (Fedora / RedHat)
+      dnf:
+        name: "{{ db_client_packages_fedora }}"
+        state: present
+      become: yes
+      when: ansible_facts['os_family'] == "RedHat"
+
+    - name: Install Core Database CLI Clients (Debian / Ubuntu)
+      apt:
+        name: "{{ db_client_packages_debian }}"
+        state: present
+        update_cache: yes
+      become: yes
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: Install Enhanced TUI Database Clients - mycli, pgcli, litecli (Fedora / RedHat)
+      dnf:
+        name: "{{ db_tui_packages_fedora }}"
+        state: present
+      become: yes
+      when:
+        - ansible_facts['os_family'] == "RedHat"
+        - install_enhanced_tui_clients | default(true) | bool
+
+    - name: Install Enhanced TUI Database Clients - mycli, pgcli, litecli (Debian / Ubuntu)
+      apt:
+        name: "{{ db_tui_packages_debian }}"
+        state: present
+      become: yes
+      when:
+        - ansible_facts['os_family'] == "Debian"
+        - install_enhanced_tui_clients | default(true) | bool
+
+    # Microsoft SQL Server Official CLI Client (go-sqlcmd)
+    - name: Ensure target directory for Microsoft sqlcmd exists
+      file:
+        path: "{{ sqlcmd_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_mssql_sqlcmd | default(true) | bool
+
+    - name: Download and extract Microsoft sqlcmd (SQL Server CLI)
+      unarchive:
+        src: "{{ sqlcmd_url }}"
+        dest: "{{ sqlcmd_dir }}"
+        remote_src: yes
+        creates: "{{ sqlcmd_dir }}/sqlcmd"
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_mssql_sqlcmd | default(true) | bool
+
+    - name: Ensure sqlcmd binary is executable
+      file:
+        path: "{{ sqlcmd_dir }}/sqlcmd"
+        mode: '0755'
+        owner: "{{ tools_owner }}"
+      become: yes
+      when: install_mssql_sqlcmd | default(true) | bool
+
+    - name: Create /usr/local/bin/sqlcmd symlink
+      file:
+        src: "{{ sqlcmd_dir }}/sqlcmd"
+        dest: "/usr/local/bin/sqlcmd"
+        state: link
+      become: yes
+      when: install_mssql_sqlcmd | default(true) | bool
+
+    # Shell Integration and FZL Aliases
+    - name: Add Database CLI Clients to ~/.bashrc_dev_tools
+      blockinfile:
+        path: "~/.bashrc_dev_tools"
+        marker: "# {mark} DB CLI CLIENTS ALIASES"
+        block: |
+          # DB CLI Tools Path Configuration
+          export PATH="$PATH:{{ sqlcmd_dir }}"
+
+          # FZL Database CLI Wrapper Aliases
+          alias fzl-mysql='mysql --protocol=tcp'
+          alias fzl-psql='psql'
+          alias fzl-sqlcmd='sqlcmd'
+          alias fzl-tsql='tsql'
+          alias fzl-sqlite='sqlite3'
+        create: yes
+        mode: '0644'
+      become: no
+
+    - name: Source Dev Tools in .bashrc
+      lineinfile:
+        path: "~/.bashrc"
+        line: "source ~/.bashrc_dev_tools"
+        state: present
+      become: no
