@@ -1,0 +1,129 @@
+---
+- name: Install scrcpy (Android Screen Mirroring & Control)
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. PACKAGE INSTALLATION (FEDORA / RHEL / CENTOS)
+    # ----------------------------------------------------
+    - name: Enable zeno/scrcpy COPR repository on Fedora
+      when: ansible_facts['distribution'] == "Fedora"
+      ansible.builtin.command: dnf copr enable -y zeno/scrcpy
+      changed_when: false
+      failed_when: false
+
+    - name: Install scrcpy and android-tools on Fedora / RedHat
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+      ansible.builtin.dnf:
+        name:
+          - scrcpy
+          - android-tools
+        state: present
+        update_cache: yes
+
+    # ----------------------------------------------------
+    # 2. PACKAGE INSTALLATION (DEBIAN / UBUNTU)
+    # ----------------------------------------------------
+    - name: Install scrcpy and adb on Debian / Ubuntu
+      when: ansible_facts['os_family'] == "Debian"
+      ansible.builtin.apt:
+        name:
+          - scrcpy
+          - adb
+        state: present
+        update_cache: yes
+
+    # ----------------------------------------------------
+    # 3. FZL LAUNCH SCRIPTS (/usr/local/bin)
+    # ----------------------------------------------------
+    - name: Create fzl-scrcpy-start background launcher script
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-scrcpy-start"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL scrcpy Background Launcher
+          mkdir -p "$HOME/.cache/scrcpy"
+          nohup scrcpy --stay-awake "$@" > "$HOME/.cache/scrcpy/scrcpy.log" 2>&1 &
+
+    - name: Create fzl-scrcpy foreground launcher script
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-scrcpy"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL scrcpy Foreground Launcher
+          exec scrcpy --stay-awake "$@"
+
+    - name: Create fzl-scrcpy-tcpip wireless connection helper script
+      ansible.builtin.copy:
+        dest: "/usr/local/bin/fzl-scrcpy-tcpip"
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          # FZL scrcpy Wireless (TCP/IP) Mode Setup
+          set -e
+          echo "=== Setting up Wireless scrcpy over TCP/IP ==="
+          echo "1. Ensuring ADB device is connected via USB..."
+          adb devices
+          echo ""
+          PORT="${1:-5555}"
+          echo "2. Restarting ADB in TCP/IP mode on port $PORT..."
+          adb tcpip "$PORT"
+          echo ""
+          echo "3. Querying device IP address..."
+          DEVICE_IP=$(adb shell ip route | awk '{print $9}' | head -n 1)
+          if [ -z "$DEVICE_IP" ]; then
+            DEVICE_IP=$(adb shell ip -f inet addr show wlan0 | grep -Po 'inet \K[\d.]+' || true)
+          fi
+          if [ -n "$DEVICE_IP" ]; then
+            echo "Device IP detected: $DEVICE_IP"
+            echo "You can now disconnect USB and connect wirelessly using:"
+            echo "  adb connect $DEVICE_IP:$PORT"
+            echo "  fzl-scrcpy --tcpip=$DEVICE_IP:$PORT"
+          else
+            echo "Could not auto-detect IP address. Check your device Wi-Fi settings for its IP,"
+            echo "then run: adb connect <DEVICE_IP>:$PORT && fzl-scrcpy"
+          fi
+
+    # ----------------------------------------------------
+    # 4. FZL ALIASES IN USER BASH CONFIGURATION
+    # ----------------------------------------------------
+    - name: Ensure ~/.bashrc_android or ~/.bashrc contains scrcpy aliases
+      ansible.builtin.lineinfile:
+        path: "{{ target_home }}/.bashrc"
+        line: "{{ item }}"
+        state: present
+        create: true
+        owner: "{{ target_user }}"
+        mode: '0644'
+      loop:
+        - "alias fzl-scrcpy-start='nohup scrcpy --stay-awake > /dev/null 2>&1 &'"
+        - "alias fzl-scrcpy='scrcpy --stay-awake'"
+      when: target_user != 'root'
+
+    # ----------------------------------------------------
+    # 5. POST-INSTALLATION STATUS & INFO
+    # ----------------------------------------------------
+    - name: Display scrcpy installation completion summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - " scrcpy installation completed successfully!"
+          - "========================================================="
+          - " - Binary: /usr/bin/scrcpy"
+          - " - FZL Foreground Launcher: fzl-scrcpy (or /usr/local/bin/fzl-scrcpy)"
+          - " - FZL Background Launcher: fzl-scrcpy-start"
+          - " - FZL Wireless Helper:     fzl-scrcpy-tcpip"
+          - "========================================================="
+          - "Quick Start:"
+          - " 1. Enable 'USB Debugging' on your Android device (Settings -> Developer options)."
+          - " 2. Connect device via USB and accept the authorization prompt."
+          - " 3. Run: fzl-scrcpy"
+          - "========================================================="

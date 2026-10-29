@@ -1,0 +1,234 @@
+---
+# ==============================================================================
+# Playbook: devmachine-configure-antigravity-permissions.yml
+# Description: Configures Antigravity CLI (~/.gemini/antigravity-cli/settings.json)
+#              with a tri-layer security policy across all sessions:
+#              1. Deny: Hard blocks critical destructive commands (rm -rf, mkfs, dd,
+#                 force push, reboot, shutdown, etc.)
+#              2. Ask: Prompts for confirmation on privileged/mutating actions
+#                 (sudo, git push, standard rm, docker prune, etc.)
+#              3. Allow: Auto-approves safe read-only and inspection commands
+#                 (cat, ls, grep, find, head, tail, git status, read_file(*), etc.)
+# ==============================================================================
+
+- name: Configure Antigravity CLI Global Permissions
+  hosts: devmachines_workstations:localhost
+  become: false
+  gather_facts: true
+
+  vars:
+    target_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
+    target_home: "{{ lookup('env', 'HOME') if (lookup('env', 'SUDO_USER') == '') else ('/home/' + lookup('env', 'SUDO_USER')) }}"
+    agy_config_dir: "{{ target_home }}/.gemini/antigravity-cli"
+    agy_settings_path: "{{ agy_config_dir }}/settings.json"
+
+    blocked_commands:
+      # Severe disk & filesystem destruction
+      - "command(rm -rf)"
+      - "command(mkfs)"
+      - "command(wipefs)"
+      - "command(dd)"
+      - "command(fdisk)"
+      - "command(gdisk)"
+      - "command(parted)"
+      - "command(shred)"
+      # System power & halting
+      - "command(shutdown)"
+      - "command(reboot)"
+      - "command(poweroff)"
+      - "command(init 0)"
+      - "command(init 6)"
+      - "command(halt)"
+      - "command(systemctl poweroff)"
+      - "command(systemctl reboot)"
+      - "command(systemctl halt)"
+      # Account & group deletion
+      - "command(userdel)"
+      - "command(groupdel)"
+      # Irreversible Git remote/history destruction
+      - "command(git push --force)"
+      - "command(git push -f)"
+      - "command(git reset --hard)"
+      - "command(git clean -fdx)"
+      - "command(git clean -f)"
+      - "command(git branch -D)"
+      # Network / firewall wipe
+      - "command(iptables -F)"
+      - "command(nft flush)"
+      - "command(ufw reset)"
+      # Critical path write protection
+      - "write_file(.git/*)"
+      - "write_file(~/.ssh/*)"
+      - "write_file(/etc/*)"
+      - "write_file(/boot/*)"
+
+    ask_commands:
+      # Elevated privileges & shell switching
+      - "command(sudo)"
+      - "command(su)"
+      # Standard file removal & git mutations
+      - "command(rm)"
+      - "command(git push)"
+      - "command(git reset)"
+      - "command(git checkout -f)"
+      # Container removal / pruning
+      - "command(docker rm)"
+      - "command(docker rmi)"
+      - "command(docker system prune)"
+      - "command(podman rm)"
+      - "command(podman rmi)"
+      - "command(podman system prune)"
+
+    inoffensive_commands:
+      # File content & directory inspection
+      - "command(cat)"
+      - "command(ls)"
+      - "command(find)"
+      - "command(grep)"
+      - "command(egrep)"
+      - "command(fgrep)"
+      - "command(head)"
+      - "command(tail)"
+      - "command(wc)"
+      - "command(less)"
+      - "command(more)"
+      - "command(tree)"
+      - "command(stat)"
+      - "command(file)"
+      - "command(readlink)"
+      - "command(realpath)"
+      - "command(basename)"
+      - "command(dirname)"
+      - "command(diff)"
+      - "command(cmp)"
+      # Environment & system inspection
+      - "command(pwd)"
+      - "command(whoami)"
+      - "command(id)"
+      - "command(groups)"
+      - "command(uname)"
+      - "command(uptime)"
+      - "command(date)"
+      - "command(which)"
+      - "command(whereis)"
+      - "command(type)"
+      - "command(echo)"
+      - "command(printf)"
+      - "command(env)"
+      - "command(printenv)"
+      # Process & resource inspection
+      - "command(ps)"
+      - "command(pstree)"
+      - "command(free)"
+      - "command(df)"
+      - "command(du)"
+      - "command(lsof)"
+      - "command(netstat)"
+      - "command(ss)"
+      - "command(ip)"
+      - "command(nmcli)"
+      - "command(hostname)"
+      - "command(hostnamectl)"
+      - "command(systemctl status)"
+      - "command(systemctl is-active)"
+      - "command(systemctl is-enabled)"
+      - "command(journalctl)"
+      - "command(dmesg)"
+      - "command(crontab -l)"
+      # Version inspection & syntax checking
+      - "command(python3 --version)"
+      - "command(python --version)"
+      - "command(node --version)"
+      - "command(npm --version)"
+      - "command(git --version)"
+      - "command(ansible --version)"
+      - "command(ansible-playbook --version)"
+      - "command(ansible-playbook --syntax-check)"
+      - "command(ansible-lint)"
+      - "command(docker --version)"
+      - "command(docker ps)"
+      - "command(podman --version)"
+      - "command(podman ps)"
+      # Git read-only operations
+      - "command(git status)"
+      - "command(git diff)"
+      - "command(git log)"
+      - "command(git show)"
+      - "command(git branch)"
+      - "command(git tag)"
+      - "command(git remote)"
+      - "command(git rev-parse)"
+      - "command(git ls-files)"
+      - "command(git describe)"
+      - "command(git check-ignore)"
+      # File tool access
+      - "read_file(*)"
+      - "read_url(*)"
+
+  tasks:
+    - name: Ensure Antigravity CLI config directory exists
+      ansible.builtin.file:
+        path: "{{ agy_config_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: '0755'
+
+    - name: Check if settings.json already exists
+      ansible.builtin.stat:
+        path: "{{ agy_settings_path }}"
+      register: agy_settings_stat
+
+    - name: Read existing settings.json if present
+      ansible.builtin.slurp:
+        path: "{{ agy_settings_path }}"
+      register: agy_settings_slurp
+      when: agy_settings_stat.stat.exists
+
+    - name: Set current settings data
+      ansible.builtin.set_fact:
+        current_settings: >-
+          {{
+            (agy_settings_slurp.content | b64decode | from_json)
+            if (agy_settings_stat.stat.exists and agy_settings_slurp.content is defined)
+            else {
+              'allowNonWorkspaceAccess': true,
+              'permissions': {'allow': [], 'ask': [], 'deny': []}
+            }
+          }}
+
+    - name: Calculate merged permissions lists
+      ansible.builtin.set_fact:
+        merged_allow_list: >-
+          {{
+            ((current_settings.permissions.allow | default([])) + inoffensive_commands) | unique
+          }}
+        merged_ask_list: >-
+          {{
+            ((current_settings.permissions.ask | default([])) + ask_commands) | unique
+          }}
+        merged_deny_list: >-
+          {{
+            ((current_settings.permissions.deny | default([])) + blocked_commands) | unique
+          }}
+
+    - name: Assemble final settings dictionary
+      ansible.builtin.set_fact:
+        final_settings: >-
+          {{
+            current_settings | combine({
+              'allowNonWorkspaceAccess': current_settings.allowNonWorkspaceAccess | default(true),
+              'permissions': (current_settings.permissions | default({})) | combine({
+                'allow': merged_allow_list,
+                'ask': merged_ask_list,
+                'deny': merged_deny_list
+              })
+            }, recursive=True)
+          }}
+
+    - name: Write merged configuration to settings.json
+      ansible.builtin.copy:
+        dest: "{{ agy_settings_path }}"
+        content: "{{ final_settings | to_nice_json(indent=2) }}\n"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        backup: true

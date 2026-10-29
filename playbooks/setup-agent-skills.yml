@@ -1,0 +1,89 @@
+---
+- name: Setup Centralized AI Agent Skills
+  hosts: devmachines_workstations:localhost
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    repo_skills_root: "{{ playbook_dir }}/../skills"
+    gemini_global_skills_dir: "{{ target_home }}/.gemini/config/skills"
+
+  tasks:
+    # ----------------------------------------------------
+    # 1. ENSURE DESTINATION DIRECTORIES EXIST
+    # ----------------------------------------------------
+    - name: Ensure Antigravity/Gemini global skills directory exists
+      ansible.builtin.file:
+        path: "{{ gemini_global_skills_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: '0755'
+
+    # ----------------------------------------------------
+    # 2. DISCOVER ALL SKILLS IN REPOSITORY
+    # ----------------------------------------------------
+    - name: Find all SKILL.md definition files in repository
+      ansible.builtin.find:
+        paths: "{{ repo_skills_root }}"
+        recurse: yes
+        patterns: "SKILL.md"
+      register: discovered_skills
+
+    - name: Extract skill directories to link
+      ansible.builtin.set_fact:
+        skills_to_link: "{{ discovered_skills.files | map(attribute='path') | map('dirname') | list }}"
+
+    # ----------------------------------------------------
+    # 3. SYMLINK SKILLS TO GLOBAL AGENT DIRECTORIES
+    # ----------------------------------------------------
+    - name: Symlink skills to ~/.gemini/config/skills/ (Antigravity Global)
+      ansible.builtin.file:
+        src: "{{ item }}"
+        dest: "{{ gemini_global_skills_dir }}/{{ item | basename }}"
+        state: link
+        owner: "{{ target_user }}"
+        force: yes
+      loop: "{{ skills_to_link }}"
+
+    # ----------------------------------------------------
+    # 4. CONFIGURE INTEGRATION FOR CLAUDE CODE & AIDER
+    # ----------------------------------------------------
+    - name: Ensure ~/.claude directory exists
+      ansible.builtin.file:
+        path: "{{ target_home }}/.claude"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: '0755'
+
+    - name: Create or update global agent skills reference for Claude Code
+      ansible.builtin.copy:
+        dest: "{{ target_home }}/.claude/agent-skills-reference.md"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # Centralized Agent Skills (Managed by AnsibleArtifacts)
+          Repository path: {{ repo_skills_root }}
+
+          Available skills:
+          {% for skill_dir in skills_to_link %}
+          - {{ skill_dir | basename }}: {{ skill_dir }}/SKILL.md
+          {% endfor %}
+
+    # ----------------------------------------------------
+    # 5. COMPLETION SUMMARY
+    # ----------------------------------------------------
+    - name: Display Agent Skills setup summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - " Centralized AI Agent Skills Configured Successfully!"
+          - "========================================================="
+          - " Repository Source: {{ repo_skills_root }}"
+          - " Antigravity Global: {{ gemini_global_skills_dir }}"
+          - " Claude Reference:   {{ target_home }}/.claude/agent-skills-reference.md"
+          - " Active Skills Linked:"
+          {% for skill_dir in skills_to_link %}
+          - "   * {{ skill_dir | basename }} -> {{ skill_dir }}"
+          {% endfor %}
+          - "========================================================="

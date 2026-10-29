@@ -197,6 +197,20 @@ Installs the official AnyDesk client across Fedora/RedHat and Debian/Ubuntu dist
 ansible-playbook playbooks/install-anydesk.yml --ask-become-pass
 ```
 
+### 16. Install scrcpy (Android Screen Mirroring & Control)
+Installs `scrcpy` and `android-tools` (ADB) portably across Fedora/RedHat (via DNF) and Debian/Ubuntu (via APT). Sets up `fzl-scrcpy` (foreground), `fzl-scrcpy-start` (background with `nohup`), and `fzl-scrcpy-tcpip` (wireless over Wi-Fi helper).
+
+```bash
+ansible-playbook playbooks/install-scrcpy.yml --ask-become-pass
+```
+
+### 17. Setup Centralized AI Agent Skills
+Distributes and links centralized AI agent skills (`skills/global`, `skills/devops-infra`, `skills/mobile-tools`) from this repository to global agent directories (such as `~/.gemini/config/skills/` for Antigravity/Gemini and `~/.claude/` for Claude Code).
+
+```bash
+ansible-playbook playbooks/setup-agent-skills.yml
+```
+
 
 
 
@@ -256,6 +270,7 @@ This project implements a custom pattern for starting manually installed applica
 | **Cursor** | `devmachine-setup.yml` | `fzl-cursor-start` |
 | **Eclipse Modeling** | `devmachine-setup-ides.yml` | `fzl-eclipse-modeling-start` |
 | **AnyDesk** | `install-anydesk.yml` | `fzl-anydesk-start` |
+| **scrcpy** | `install-scrcpy.yml` | `fzl-scrcpy-start`, `fzl-scrcpy`, `fzl-scrcpy-tcpip` |
 
 
 ### How to use
