@@ -75,15 +75,15 @@
     # ----------------------------------------------------
     - name: Display Agent Skills setup summary
       ansible.builtin.debug:
-        msg:
-          - "========================================================="
-          - " Centralized AI Agent Skills Configured Successfully!"
-          - "========================================================="
-          - " Repository Source: {{ repo_skills_root }}"
-          - " Antigravity Global: {{ gemini_global_skills_dir }}"
-          - " Claude Reference:   {{ target_home }}/.claude/agent-skills-reference.md"
-          - " Active Skills Linked:"
+        msg: |
+          =========================================================
+           Centralized AI Agent Skills Configured Successfully!
+          =========================================================
+           Repository Source: {{ repo_skills_root }}
+           Antigravity Global: {{ gemini_global_skills_dir }}
+           Claude Reference:   {{ target_home }}/.claude/agent-skills-reference.md
+           Active Skills Linked:
           {% for skill_dir in skills_to_link %}
-          - "   * {{ skill_dir | basename }} -> {{ skill_dir }}"
+             * {{ skill_dir | basename }} -> {{ skill_dir }}
           {% endfor %}
-          - "========================================================="
+          =========================================================
