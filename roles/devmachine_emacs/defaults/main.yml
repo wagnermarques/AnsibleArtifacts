@@ -1,5 +1,8 @@
 ---
-emacs_repo_url: "https://git.savannah.gnu.org/git/emacs.git"
+# GNU Savannah HTTP frequently returns 500 / redirect issues during git clone.
+# Using the official Emacs git mirror on GitHub:
+emacs_repo_url: "https://github.com/emacs-mirror/emacs.git"
+# Savannah native protocol alternative: "git://git.savannah.gnu.org/emacs.git"
 emacs_version: "master"  # Or a specific branch like "emacs-30"
 emacs_source_dir: "/tmp/emacs_source"
 emacs_install_dir: "{{ ides_base_dir }}/emacs"
