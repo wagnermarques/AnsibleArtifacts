@@ -71,8 +71,43 @@
           - {{ skill_dir | basename }}: {{ skill_dir }}/SKILL.md
           {% endfor %}
 
+    - name: Create or update global CLAUDE.md for Claude Code
+      ansible.builtin.copy:
+        dest: "{{ target_home }}/.claude/CLAUDE.md"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # Global Claude Code Guidelines
+
+          ## Skills Reference
+          Consult centralized skills documented in `~/.claude/agent-skills-reference.md`.
+
+          ## Feature Implementation Workflow
+          Whenever the user requests a new feature, enhancement, or capability in any project:
+          1. **Feature Document**: Create a dedicated document (default: `docs/features/<feature-name>.md`) containing the feature Goal, Scope, and Task Breakdown.
+          2. **Task Justifications**: Every single task must include an explicit justification explaining why it is needed.
+          3. **Live Progress Tracking**: Update the document incrementally with "What Was Done" (files modified, commands executed, verification output) as each task completes.
+
     # ----------------------------------------------------
-    # 5. COMPLETION SUMMARY
+    # 5. CONFIGURE GLOBAL ANTIGRAVITY RULES
+    # ----------------------------------------------------
+    - name: Ensure Antigravity global GEMINI.md exists with core workflow rules
+      ansible.builtin.copy:
+        dest: "{{ target_home }}/.gemini/config/GEMINI.md"
+        owner: "{{ target_user }}"
+        mode: '0644'
+        content: |
+          # Global Antigravity Agent Guidelines
+
+          ## Feature Implementation Workflow
+          Whenever the user requests a new feature, enhancement, or capability in any project:
+          1. **Activate Skill**: Activate the `feature-lifecycle` skill.
+          2. **Feature Document**: Create a dedicated document (default: `docs/features/<feature-name>.md`) containing the feature Goal, Scope, and Task Breakdown.
+          3. **Task Justifications**: Every single task must include an explicit justification explaining why it is needed.
+          4. **Live Progress Tracking**: Update the document incrementally with "What Was Done" (files modified, commands executed, verification output) as each task completes.
+
+    # ----------------------------------------------------
+    # 6. COMPLETION SUMMARY
     # ----------------------------------------------------
     - name: Display Agent Skills setup summary
       ansible.builtin.debug:
