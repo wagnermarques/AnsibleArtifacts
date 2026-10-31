@@ -1,0 +1,252 @@
+---
+# ==============================================================================
+# Playbook: Install AI Desktop GUI Applications (ChatGPT, Claude Desktop)
+# ==============================================================================
+# Automates installation of official native Linux desktop GUI apps for AI:
+# - ChatGPT Desktop (OpenAI official native RPM/DEB release)
+# - Claude Desktop (Anthropic official release via COPR on Fedora / APT on Debian)
+# - FZL standard launchers (/usr/local/bin/fzl-chatgpt*, /usr/local/bin/fzl-claude*)
+# - Desktop application shortcuts (.desktop)
+#
+# Execution:
+#   ansible-playbook -i "localhost," -c local playbooks/install-ai-desktop-apps.yml -K
+#   ansible-playbook playbooks/install-ai-desktop-apps.yml -K --tags chatgpt
+#   ansible-playbook playbooks/install-ai-desktop-apps.yml -K --tags claude
+# ==============================================================================
+
+- name: Install AI Desktop GUI Applications (ChatGPT & Claude)
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+
+    # Flags to toggle individual apps
+    install_chatgpt: true
+    install_claude: true
+
+    # ChatGPT Official Download URLs
+    chatgpt_rpm_url_x86_64: "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.x86_64.rpm"
+    chatgpt_rpm_url_aarch64: "https://persistent.oaistatic.com/codex-app-prod/linux/rpm/latest/chatgpt.aarch64.rpm"
+    chatgpt_deb_url_amd64: "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_amd64.deb"
+    chatgpt_deb_url_arm64: "https://persistent.oaistatic.com/codex-app-prod/linux/deb/latest/chatgpt_arm64.deb"
+
+    # Claude Desktop Repository Info
+    claude_copr_repo: "dewzor/claude-desktop"
+    claude_apt_key_url: "https://downloads.claude.ai/claude-desktop/key.asc"
+    claude_apt_repo: "deb [signed-by=/usr/share/keyrings/claude-desktop-archive-keyring.asc] https://downloads.claude.ai/claude-desktop/apt/stable stable main"
+
+  tasks:
+    # ==============================================================================
+    # 1. PREREQUISITES & COMMON DEPENDENCIES
+    # ==============================================================================
+    - name: Ensure desktop utilities and core libraries are installed (Fedora)
+      when: ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+      ansible.builtin.dnf:
+        name:
+          - desktop-file-utils
+          - curl
+          - libsecret
+          - bubblewrap
+        state: present
+      tags: [always, prerequisites]
+
+    - name: Ensure desktop utilities and core libraries are installed (Debian/Ubuntu)
+      when: ansible_facts['os_family'] == "Debian"
+      ansible.builtin.apt:
+        name:
+          - desktop-file-utils
+          - curl
+          - libsecret-1-0
+          - bubblewrap
+        state: present
+        update_cache: yes
+      tags: [always, prerequisites]
+
+    # ==============================================================================
+    # 2. CHATGPT DESKTOP (OPENAI OFFICIAL NATIVE RELEASE)
+    # ==============================================================================
+    - name: Set ChatGPT download URL based on OS and architecture
+      when: install_chatgpt | bool
+      ansible.builtin.set_fact:
+        chatgpt_download_url: >-
+          {{
+            (chatgpt_rpm_url_x86_64 if ansible_facts['architecture'] == 'x86_64' else chatgpt_rpm_url_aarch64)
+            if (ansible_facts['os_family'] == 'RedHat' or ansible_facts['distribution'] == 'Fedora')
+            else
+            (chatgpt_deb_url_amd64 if ansible_facts['architecture'] in ['x86_64', 'amd64'] else chatgpt_deb_url_arm64)
+          }}
+        chatgpt_local_pkg: >-
+          {{
+            '/tmp/chatgpt.' + ('rpm' if (ansible_facts['os_family'] == 'RedHat' or ansible_facts['distribution'] == 'Fedora') else 'deb')
+          }}
+      tags: [chatgpt]
+
+    - name: Download official ChatGPT package
+      when: install_chatgpt | bool
+      ansible.builtin.get_url:
+        url: "{{ chatgpt_download_url }}"
+        dest: "{{ chatgpt_local_pkg }}"
+        mode: '0644'
+      tags: [chatgpt]
+
+    - name: Install ChatGPT RPM on Fedora / RedHat
+      when:
+        - install_chatgpt | bool
+        - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+      ansible.builtin.dnf:
+        name: "{{ chatgpt_local_pkg }}"
+        state: present
+        disable_gpg_check: yes
+      tags: [chatgpt]
+
+    - name: Install ChatGPT DEB on Debian / Ubuntu
+      when:
+        - install_chatgpt | bool
+        - ansible_facts['os_family'] == "Debian"
+      ansible.builtin.apt:
+        deb: "{{ chatgpt_local_pkg }}"
+        state: present
+      tags: [chatgpt]
+
+    - name: Create fzl-chatgpt foreground launcher
+      when: install_chatgpt | bool
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-chatgpt
+        mode: '0755'
+        owner: root
+        group: root
+        content: |
+          #!/usr/bin/env bash
+          # FZL Foreground Launcher: ChatGPT Desktop
+          exec /usr/bin/chatgpt "$@"
+      tags: [chatgpt, fzl_launchers]
+
+    - name: Create fzl-chatgpt-start background launcher
+      when: install_chatgpt | bool
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-chatgpt-start
+        mode: '0755'
+        owner: root
+        group: root
+        content: |
+          #!/usr/bin/env bash
+          # FZL Background Launcher: ChatGPT Desktop
+          mkdir -p "${HOME}/.cache/chatgpt"
+          nohup /usr/bin/chatgpt "$@" > "${HOME}/.cache/chatgpt/chatgpt-runtime.log" 2>&1 &
+      tags: [chatgpt, fzl_launchers]
+
+    # ==============================================================================
+    # 3. CLAUDE DESKTOP (ANTHROPIC NATIVE BETA RELEASE)
+    # ==============================================================================
+    - name: Enable dewzor/claude-desktop COPR repository on Fedora
+      when:
+        - install_claude | bool
+        - ansible_facts['distribution'] == "Fedora"
+      ansible.builtin.command: "dnf copr enable -y {{ claude_copr_repo }}"
+      args:
+        creates: "/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:dewzor:claude-desktop.repo"
+      tags: [claude]
+
+    - name: Install claude-desktop via DNF on Fedora
+      when:
+        - install_claude | bool
+        - ansible_facts['os_family'] == "RedHat" or ansible_facts['distribution'] == "Fedora"
+      ansible.builtin.dnf:
+        name: claude-desktop
+        state: present
+      tags: [claude]
+
+    - name: Ensure apt keyrings directory exists (Debian / Ubuntu)
+      when:
+        - install_claude | bool
+        - ansible_facts['os_family'] == "Debian"
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        mode: '0755'
+      tags: [claude]
+
+    - name: Download Anthropic APT GPG key (Debian / Ubuntu)
+      when:
+        - install_claude | bool
+        - ansible_facts['os_family'] == "Debian"
+      ansible.builtin.get_url:
+        url: "{{ claude_apt_key_url }}"
+        dest: /usr/share/keyrings/claude-desktop-archive-keyring.asc
+        mode: '0644'
+      tags: [claude]
+
+    - name: Configure Anthropic APT repository (Debian / Ubuntu)
+      when:
+        - install_claude | bool
+        - ansible_facts['os_family'] == "Debian"
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/claude-desktop.list
+        content: "{{ claude_apt_repo }}\n"
+        mode: '0644'
+      tags: [claude]
+
+    - name: Install claude-desktop via APT (Debian / Ubuntu)
+      when:
+        - install_claude | bool
+        - ansible_facts['os_family'] == "Debian"
+      ansible.builtin.apt:
+        name: claude-desktop
+        state: present
+        update_cache: yes
+      tags: [claude]
+
+    - name: Create fzl-claude foreground launcher
+      when: install_claude | bool
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-claude
+        mode: '0755'
+        owner: root
+        group: root
+        content: |
+          #!/usr/bin/env bash
+          # FZL Foreground Launcher: Claude Desktop
+          exec claude-desktop "$@"
+      tags: [claude, fzl_launchers]
+
+    - name: Create fzl-claude-start background launcher
+      when: install_claude | bool
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-claude-start
+        mode: '0755'
+        owner: root
+        group: root
+        content: |
+          #!/usr/bin/env bash
+          # FZL Background Launcher: Claude Desktop
+          mkdir -p "${HOME}/.cache/claude-desktop"
+          nohup claude-desktop "$@" > "${HOME}/.cache/claude-desktop/claude-desktop-runtime.log" 2>&1 &
+      tags: [claude, fzl_launchers]
+
+    # ==============================================================================
+    # 4. DESKTOP INTEGRATIONS & DATABASE UPDATE
+    # ==============================================================================
+    - name: Update system desktop database
+      ansible.builtin.command: update-desktop-database /usr/share/applications
+      changed_when: false
+      failed_when: false
+      tags: [always, desktop_database]
+
+    - name: Display AI Desktop Apps setup summary
+      ansible.builtin.debug:
+        msg: |
+          =========================================================
+           AI Desktop GUI Applications Configured Successfully!
+          =========================================================
+           Target User: {{ target_user }}
+           ChatGPT Desktop:
+             * Command: /usr/bin/chatgpt
+             * FZL CLI: fzl-chatgpt (fg) | fzl-chatgpt-start (bg)
+           Claude Desktop:
+             * Command: claude-desktop
+             * FZL CLI: fzl-claude (fg) | fzl-claude-start (bg)
+          =========================================================
+      tags: [always]

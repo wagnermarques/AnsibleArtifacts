@@ -14,6 +14,7 @@
 #   ansible-playbook playbooks/iamachine-setup.yml -K --tags ai_memory
 #   ansible-playbook playbooks/iamachine-setup.yml -K --tags aider
 #   ansible-playbook playbooks/iamachine-setup.yml -K --tags ollama
+#   ansible-playbook playbooks/iamachine-setup.yml -K --tags ai_gui
 # ==============================================================================
 
 - name: Setup AI Machine with Unified Tooling, Agents, and MCP Architecture
@@ -30,3 +31,7 @@
       tags: [ai_tools, install_ai_tools]
     - role: devmachine_ai_agents_mcp
       tags: [ai_agents_mcp, configure_agents, mcp]
+
+- name: Setup Native AI Desktop GUI Applications (ChatGPT, Claude Desktop)
+  ansible.builtin.import_playbook: install-ai-desktop-apps.yml
+  tags: [ai_gui, chatgpt, claude, desktop_ai]

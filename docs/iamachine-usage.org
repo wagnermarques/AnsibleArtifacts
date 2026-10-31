@@ -35,6 +35,7 @@ You can execute specific sections of the playbook using the =--tags= flag:
 | =aider= | Build/update Aider isolated venv and =fzl-aider= wrapper | =ansible-playbook playbooks/iamachine-setup.yml -K --tags aider= |
 | =ollama= | Install Ollama runtime and pull local LLM models | =ansible-playbook playbooks/iamachine-setup.yml -K --tags ollama= |
 | =kimi= | Install/update Kimi Code CLI assistant | =ansible-playbook playbooks/iamachine-setup.yml -K --tags kimi= |
+| =ai_gui= / =desktop_ai= | Install native AI desktop GUI apps (ChatGPT, Claude Desktop) | =ansible-playbook playbooks/iamachine-setup.yml -K --tags ai_gui= |
 
 * Getting Started with Installed AI CLI Tools
 
@@ -293,4 +294,22 @@ The playbook automatically installs and pulls:
 | **Shell-GPT** | =sgpt= | Isolated Python (=pipx=) | =OPENAI_API_KEY= or Local API |
 | **Open Interpreter**| =interpreter= | Isolated Python (=pipx=) | API Key or =--local= mode |
 | **Ollama** | =ollama= | Official Installer (=/usr/local/bin/ollama=) | None (Local execution) |
+| **ChatGPT Desktop** | =chatgpt= / =fzl-chatgpt= | Official Native RPM / DEB | OpenAI Account Login |
+| **Claude Desktop** | =claude-desktop= / =fzl-claude= | COPR RPM (Fedora) / Official APT (Debian) | Anthropic Account Login |
+
+* Native AI Desktop GUI Applications
+
+** 1. ChatGPT Desktop (=chatgpt=, =fzl-chatgpt=)
+OpenAI's official native desktop client for Linux (supports ChatGPT, Work, and Codex).
+- *Dedicated Playbook:* =playbooks/install-ai-desktop-apps.yml= (or =iamachine-setup.yml --tags chatgpt=)
+- *Foreground Launcher:* =fzl-chatgpt= or =chatgpt=
+- *Background Launcher:* =fzl-chatgpt-start=
+- *Desktop Menu Entry:* Available under Applications -> Office / Internet as *ChatGPT*
+
+** 2. Claude Desktop (=claude-desktop=, =fzl-claude=)
+Anthropic's official native desktop beta for Linux (supports Chat, Claude Code tab, and Cowork).
+- *Dedicated Playbook:* =playbooks/install-ai-desktop-apps.yml= (or =iamachine-setup.yml --tags claude=)
+- *Foreground Launcher:* =fzl-claude= or =claude-desktop=
+- *Background Launcher:* =fzl-claude-start=
+- *Desktop Menu Entry:* Available under Applications -> Office / Internet as *Claude*
 
