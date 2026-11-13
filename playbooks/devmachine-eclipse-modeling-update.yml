@@ -1,0 +1,200 @@
+---
+- name: Update Eclipse Modeling Tools IDE
+  hosts: devmachines_workstations, localhost
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_user_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    tools_basedir: "{{ target_user_home }}/WORKING"
+    ides_base_dir: "{{ tools_basedir }}/Progsativos/ides"
+    eclipse_modeling_dir: "{{ ides_base_dir }}/eclipse-modeling"
+
+    eclipse_version: "2026-03"
+    eclipse_release_stream: "R"
+    eclipse_modeling_url: "https://download.eclipse.org/technology/epp/downloads/release/{{ eclipse_version }}/{{ eclipse_release_stream }}/eclipse-modeling-{{ eclipse_version }}-{{ eclipse_release_stream }}-linux-gtk-x86_64.tar.gz"
+
+    eclipse_keep_backup: true
+    eclipse_ignore_running: false
+    eclipse_cleanup_tmp: true
+    eclipse_archive_tmp: "/tmp/eclipse-modeling-{{ eclipse_version }}-{{ eclipse_release_stream }}.tar.gz"
+    backup_timestamp: "{{ ansible_facts['date_time']['date'] }}-{{ ansible_facts['date_time']['hour'] }}{{ ansible_facts['date_time']['minute'] }}{{ ansible_facts['date_time']['second'] }}"
+    eclipse_backup_dir: "{{ eclipse_modeling_dir }}.bak-{{ backup_timestamp }}"
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # 1. RUNNING PROCESS GUARD
+    # --------------------------------------------------------------------------
+    - name: Check if Eclipse Modeling is currently running
+      ansible.builtin.command:
+        cmd: pgrep -f "{{ eclipse_modeling_dir }}/eclipse"
+      register: eclipse_running_check
+      failed_when: false
+      changed_when: false
+
+    - name: Abort update if Eclipse Modeling is currently running
+      ansible.builtin.fail:
+        msg: >-
+          Eclipse Modeling appears to be running ({{ eclipse_modeling_dir }}/eclipse).
+          Please close all Eclipse instances before updating to avoid workspace corruption,
+          or rerun with '-e eclipse_ignore_running=true'.
+      when:
+        - eclipse_running_check.rc == 0
+        - not (eclipse_ignore_running | bool)
+
+    # --------------------------------------------------------------------------
+    # 2. SYSTEM DEPENDENCIES & DIRECTORIES
+    # --------------------------------------------------------------------------
+    - name: Install system dependencies (Java JRE & WebKitGTK)
+      ansible.builtin.package:
+        name: "{{ ['default-jre', 'libwebkit2gtk-4.0-37', 'libwebkit2gtk-4.1-0'] if ansible_facts['os_family'] == 'Debian' else ['java-latest-openjdk', 'webkit2gtk4.1'] }}"
+        state: present
+      become: true
+      ignore_errors: true
+
+    - name: Ensure parent IDEs directory exists
+      ansible.builtin.file:
+        path: "{{ ides_base_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ target_user }}"
+      become: true
+
+    # --------------------------------------------------------------------------
+    # 3. DOWNLOAD-FIRST VALIDATION (WITH RETRIES)
+    # --------------------------------------------------------------------------
+    - name: Download Eclipse Modeling archive to temporary location
+      ansible.builtin.get_url:
+        url: "{{ eclipse_modeling_url }}"
+        dest: "{{ eclipse_archive_tmp }}"
+        mode: '0644'
+        timeout: 120
+      register: eclipse_dl_result
+      retries: 3
+      delay: 5
+      until: eclipse_dl_result is success
+
+    # --------------------------------------------------------------------------
+    # 4. BACKUP / REPLACE EXISTING INSTALLATION
+    # --------------------------------------------------------------------------
+    - name: Check if existing Eclipse Modeling installation exists
+      ansible.builtin.stat:
+        path: "{{ eclipse_modeling_dir }}/eclipse"
+      register: existing_eclipse_stat
+
+    - name: Backup existing Eclipse Modeling installation before update
+      ansible.builtin.command:
+        cmd: mv "{{ eclipse_modeling_dir }}" "{{ eclipse_backup_dir }}"
+      when:
+        - existing_eclipse_stat.stat.exists
+        - eclipse_keep_backup | bool
+      become: true
+
+    - name: Remove old Eclipse Modeling installation when backup is disabled
+      ansible.builtin.file:
+        path: "{{ eclipse_modeling_dir }}"
+        state: absent
+      when:
+        - existing_eclipse_stat.stat.exists
+        - not (eclipse_keep_backup | bool)
+      become: true
+
+    - name: Create clean Eclipse Modeling target directory
+      ansible.builtin.file:
+        path: "{{ eclipse_modeling_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ target_user }}"
+      become: true
+
+    - name: Extract new Eclipse Modeling archive into target directory
+      ansible.builtin.unarchive:
+        src: "{{ eclipse_archive_tmp }}"
+        dest: "{{ eclipse_modeling_dir }}"
+        remote_src: true
+        extra_opts: ["--strip-components=1"]
+        owner: "{{ target_user }}"
+      become: true
+
+    # --------------------------------------------------------------------------
+    # 5. CONFIGURATION & LAUNCHERS
+    # --------------------------------------------------------------------------
+    - name: Configure WebKit and SWT options in eclipse.ini to prevent GTK3 WebKit2 freeze
+      ansible.builtin.lineinfile:
+        path: "{{ eclipse_modeling_dir }}/eclipse.ini"
+        insertafter: "^-vmargs"
+        line: "{{ item }}"
+        state: present
+        owner: "{{ target_user }}"
+      loop:
+        - "-Dorg.eclipse.swt.browser.DefaultType=webkit"
+        - "-Dorg.eclipse.swt.browser.UseWebKitGTK=true"
+      become: true
+
+    - name: Create /usr/local/bin/fzl-eclipse-modeling-start background launcher
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-eclipse-modeling-start
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          mkdir -p "$HOME/.cache/eclipse-modeling"
+          nohup "{{ eclipse_modeling_dir }}/eclipse" "$@" > "$HOME/.cache/eclipse-modeling/eclipse.log" 2>&1 &
+        mode: '0755'
+      become: true
+
+    - name: Create /usr/local/bin/fzl-eclipse-modeling foreground launcher
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-eclipse-modeling
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          exec "{{ eclipse_modeling_dir }}/eclipse" "$@"
+        mode: '0755'
+      become: true
+
+    - name: Create /usr/local/bin/fzl-eclipse-modeling-logs helper command
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-eclipse-modeling-logs
+        content: |
+          #!/usr/bin/env bash
+          mkdir -p "$HOME/.cache/eclipse-modeling"
+          touch "$HOME/.cache/eclipse-modeling/eclipse.log"
+          exec tail -f "$HOME/.cache/eclipse-modeling/eclipse.log"
+        mode: '0755'
+      become: true
+
+    - name: Create Desktop Entry for Eclipse Modeling Tools
+      ansible.builtin.copy:
+        dest: /usr/share/applications/fzl-eclipse-modeling.desktop
+        content: |
+          [Desktop Entry]
+          Name=Eclipse Modeling Tools
+          Comment=Eclipse Modeling Tools IDE
+          Exec=env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ eclipse_modeling_dir }}/eclipse
+          Icon={{ eclipse_modeling_dir }}/icon.xpm
+          Terminal=false
+          Type=Application
+          Categories=Development;IDE;
+        mode: '0644'
+      become: true
+
+    # --------------------------------------------------------------------------
+    # 6. CLEANUP & SUMMARY
+    # --------------------------------------------------------------------------
+    - name: Remove temporary Eclipse Modeling archive
+      ansible.builtin.file:
+        path: "{{ eclipse_archive_tmp }}"
+        state: absent
+      when: eclipse_cleanup_tmp | bool
+
+    - name: Display Eclipse Modeling update summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - " Eclipse Modeling Tools Updated Successfully!"
+          - "========================================================="
+          - " Version:          {{ eclipse_version }}-{{ eclipse_release_stream }}"
+          - " Install Dir:      {{ eclipse_modeling_dir }}"
+          - " Backup Dir:       {{ eclipse_backup_dir if (existing_eclipse_stat.stat.exists and (eclipse_keep_backup | bool)) else 'None' }}"
+          - " Launchers:        fzl-eclipse-modeling-start | fzl-eclipse-modeling | fzl-eclipse-modeling-logs"
+          - "========================================================="

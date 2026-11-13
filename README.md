@@ -220,6 +220,17 @@ Distributes and links centralized AI agent skills (`skills/global`, `skills/devo
 ansible-playbook playbooks/setup-agent-skills.yml
 ```
 
+### 18. Update Eclipse IDEs (Eclipse Modeling & Eclipse Papyrus UML)
+Dedicated, fault-tolerant update playbooks that verify the IDE is not running, download and validate the archive before replacing files, create a timestamped backup of the previous directory, configure WebKit/SWT flags, and update FZL launchers:
+
+```bash
+# Update Eclipse Modeling Tools (override version with -e eclipse_version=2026-06)
+ansible-playbook playbooks/devmachine-eclipse-modeling-update.yml -K
+
+# Update Eclipse Papyrus UML (override version with -e papyrus_version=2025-06 -e papyrus_release=7.1.0)
+ansible-playbook playbooks/uml-papirus-update.yml -K
+```
+
 
 
 
@@ -276,7 +287,8 @@ This project implements a custom pattern for starting manually installed applica
 | **DataGrip** | `devmachine-setup.yml` | `fzl-datagrip-start` |
 | **Antigravity** | `devmachine-setup.yml` | `fzl-antigravity-start` |
 | **Cursor** | `devmachine-setup.yml` | `fzl-cursor-start` |
-| **Eclipse Modeling** | `devmachine-setup-ides.yml` | `fzl-eclipse-modeling-start` |
+| **Eclipse Modeling** | `devmachine-setup-ides.yml` / `devmachine-eclipse-modeling-update.yml` | `fzl-eclipse-modeling-start`, `fzl-eclipse-modeling`, `fzl-eclipse-modeling-logs` |
+| **Eclipse Papyrus UML** | `uml-papirus-install.yml` / `uml-papirus-update.yml` | `fzl-papyrus-start`, `fzl-papyrus`, `fzl-papyrus-logs` (and `fzl-papirus-*`) |
 | **AnyDesk** | `install-anydesk.yml` | `fzl-anydesk-start` |
 | **scrcpy** | `install-scrcpy.yml` | `fzl-scrcpy-start`, `fzl-scrcpy`, `fzl-scrcpy-tcpip` |
 | **Ansible Playbook List** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--playbook-list` (or `fzl-playbook-list`) |

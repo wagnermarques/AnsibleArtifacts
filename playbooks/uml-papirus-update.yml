@@ -1,0 +1,263 @@
+---
+- name: Update Eclipse Papyrus UML Modeling IDE
+  hosts: devmachines_workstations, localhost
+  gather_facts: true
+
+  vars:
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_user_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    tools_basedir: "{{ target_user_home }}/WORKING"
+    ides_base_dir: "{{ tools_basedir }}/Progsativos/ides"
+    papyrus_dir: "{{ ides_base_dir }}/papyrus"
+
+    papyrus_version: "2025-06"
+    papyrus_release: "7.1.0"
+    papyrus_url: "https://download.eclipse.org/modeling/mdt/papyrus/papyrus-desktop/rcp/{{ papyrus_version }}/{{ papyrus_release }}/papyrus-desktop-{{ papyrus_version }}-{{ papyrus_release }}-linux.gtk.x86_64.tar.gz"
+
+    papyrus_keep_backup: true
+    papyrus_ignore_running: false
+    papyrus_cleanup_tmp: true
+    papyrus_archive_tmp: "/tmp/papyrus-desktop-{{ papyrus_version }}-{{ papyrus_release }}.tar.gz"
+    backup_timestamp: "{{ ansible_facts['date_time']['date'] }}-{{ ansible_facts['date_time']['hour'] }}{{ ansible_facts['date_time']['minute'] }}{{ ansible_facts['date_time']['second'] }}"
+    papyrus_backup_dir: "{{ papyrus_dir }}.bak-{{ backup_timestamp }}"
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # 1. RUNNING PROCESS GUARD
+    # --------------------------------------------------------------------------
+    - name: Check if Eclipse Papyrus UML is currently running
+      ansible.builtin.command:
+        cmd: pgrep -f "{{ papyrus_dir }}/papyrus-desktop"
+      register: papyrus_running_check
+      failed_when: false
+      changed_when: false
+
+    - name: Abort update if Eclipse Papyrus UML is currently running
+      ansible.builtin.fail:
+        msg: >-
+          Eclipse Papyrus UML appears to be running ({{ papyrus_dir }}/papyrus-desktop).
+          Please close all Papyrus instances before updating to avoid workspace corruption,
+          or rerun with '-e papyrus_ignore_running=true'.
+      when:
+        - papyrus_running_check.rc == 0
+        - not (papyrus_ignore_running | bool)
+
+    # --------------------------------------------------------------------------
+    # 2. SYSTEM DEPENDENCIES & DIRECTORIES
+    # --------------------------------------------------------------------------
+    - name: Install system dependencies (Java JRE & WebKitGTK)
+      ansible.builtin.package:
+        name: "{{ ['default-jre', 'libwebkit2gtk-4.0-37', 'libwebkit2gtk-4.1-0'] if ansible_facts['os_family'] == 'Debian' else ['java-latest-openjdk', 'webkit2gtk4.1'] }}"
+        state: present
+      become: true
+      ignore_errors: true
+
+    - name: Ensure parent IDEs directory exists
+      ansible.builtin.file:
+        path: "{{ ides_base_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ target_user }}"
+      become: true
+
+    # --------------------------------------------------------------------------
+    # 3. DOWNLOAD-FIRST VALIDATION (WITH RETRIES)
+    # --------------------------------------------------------------------------
+    - name: Download Eclipse Papyrus UML archive to temporary location
+      ansible.builtin.get_url:
+        url: "{{ papyrus_url }}"
+        dest: "{{ papyrus_archive_tmp }}"
+        mode: '0644'
+        timeout: 120
+      register: papyrus_dl_result
+      retries: 3
+      delay: 5
+      until: papyrus_dl_result is success
+
+    # --------------------------------------------------------------------------
+    # 4. BACKUP / REPLACE EXISTING INSTALLATION
+    # --------------------------------------------------------------------------
+    - name: Check if existing Eclipse Papyrus UML installation exists
+      ansible.builtin.stat:
+        path: "{{ papyrus_dir }}/papyrus-desktop"
+      register: existing_papyrus_stat
+
+    - name: Backup existing Eclipse Papyrus UML installation before update
+      ansible.builtin.command:
+        cmd: mv "{{ papyrus_dir }}" "{{ papyrus_backup_dir }}"
+      when:
+        - existing_papyrus_stat.stat.exists
+        - papyrus_keep_backup | bool
+      become: true
+
+    - name: Remove old Eclipse Papyrus UML installation when backup is disabled
+      ansible.builtin.file:
+        path: "{{ papyrus_dir }}"
+        state: absent
+      when:
+        - existing_papyrus_stat.stat.exists
+        - not (papyrus_keep_backup | bool)
+      become: true
+
+    - name: Create clean Eclipse Papyrus UML target directory
+      ansible.builtin.file:
+        path: "{{ papyrus_dir }}"
+        state: directory
+        mode: '0755'
+        owner: "{{ target_user }}"
+      become: true
+
+    - name: Extract new Eclipse Papyrus UML archive into target directory
+      ansible.builtin.unarchive:
+        src: "{{ papyrus_archive_tmp }}"
+        dest: "{{ papyrus_dir }}"
+        remote_src: true
+        extra_opts: ["--strip-components=1"]
+        owner: "{{ target_user }}"
+      become: true
+
+    # --------------------------------------------------------------------------
+    # 5. SYMLINKS, WEBKIT CONFIGURATION & LAUNCHERS
+    # --------------------------------------------------------------------------
+    - name: Create papyrus binary symlink
+      ansible.builtin.file:
+        src: "{{ papyrus_dir }}/papyrus-desktop"
+        dest: "{{ papyrus_dir }}/papyrus"
+        state: link
+        owner: "{{ target_user }}"
+      become: true
+
+    - name: Create papyrus.ini symlink
+      ansible.builtin.file:
+        src: "{{ papyrus_dir }}/papyrus-desktop.ini"
+        dest: "{{ papyrus_dir }}/papyrus.ini"
+        state: link
+        owner: "{{ target_user }}"
+      become: true
+
+    - name: Configure WebKit and SWT options in papyrus-desktop.ini to prevent GTK3 WebKit2 deadlock freeze
+      ansible.builtin.lineinfile:
+        path: "{{ papyrus_dir }}/papyrus-desktop.ini"
+        insertafter: "^-vmargs"
+        line: "{{ item }}"
+        state: present
+        owner: "{{ target_user }}"
+      loop:
+        - "-Dorg.eclipse.swt.browser.DefaultType=webkit"
+        - "-Dorg.eclipse.swt.browser.UseWebKitGTK=true"
+      become: true
+
+    - name: Create Desktop Entry for Eclipse Papyrus UML
+      ansible.builtin.copy:
+        dest: /usr/share/applications/papyrus.desktop
+        content: |
+          [Desktop Entry]
+          Name=Eclipse Papyrus UML
+          Comment=Eclipse Papyrus UML Modeling Tool
+          Exec=env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop
+          Icon={{ papyrus_dir }}/icon.xpm
+          Terminal=false
+          Type=Application
+          Categories=Development;Building;GUIDesigner;
+        mode: '0644'
+      become: true
+
+    - name: Create /usr/local/bin/fzl-papyrus-start background launcher
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-papyrus-start
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          mkdir -p "$HOME/.cache/papyrus"
+          nohup "{{ papyrus_dir }}/papyrus-desktop" "$@" > "$HOME/.cache/papyrus/papyrus.log" 2>&1 &
+        mode: '0755'
+      become: true
+
+    - name: Create /usr/local/bin/fzl-papirus-start symlink
+      ansible.builtin.file:
+        src: /usr/local/bin/fzl-papyrus-start
+        dest: /usr/local/bin/fzl-papirus-start
+        state: link
+      become: true
+
+    - name: Create /usr/local/bin/fzl-papyrus foreground launcher
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-papyrus
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          exec "{{ papyrus_dir }}/papyrus-desktop" "$@"
+        mode: '0755'
+      become: true
+
+    - name: Create /usr/local/bin/fzl-papirus symlink
+      ansible.builtin.file:
+        src: /usr/local/bin/fzl-papyrus
+        dest: /usr/local/bin/fzl-papirus
+        state: link
+      become: true
+
+    - name: Create /usr/local/bin/fzl-papyrus-logs helper command
+      ansible.builtin.copy:
+        dest: /usr/local/bin/fzl-papyrus-logs
+        content: |
+          #!/usr/bin/env bash
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          mkdir -p "$HOME/.cache/papyrus"
+          touch "$HOME/.cache/papyrus/papyrus.log"
+          exec tail -f "$HOME/.cache/papyrus/papyrus.log"
+        mode: '0755'
+      become: true
+
+    - name: Create /usr/local/bin/fzl-papirus-logs symlink
+      ansible.builtin.file:
+        src: /usr/local/bin/fzl-papyrus-logs
+        dest: /usr/local/bin/fzl-papirus-logs
+        state: link
+      become: true
+
+    - name: Add UML Papyrus aliases to ~/.bashrc_dev_tools
+      ansible.builtin.blockinfile:
+        path: "{{ target_user_home }}/.bashrc_dev_tools"
+        marker: "# {mark} UML PAPYRUS ALIASES"
+        block: |
+          # Papyrus UML PATH, Environment & Aliases
+          export PATH="$PATH:{{ papyrus_dir }}"
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1
+          alias fzl-papyrus-start='mkdir -p ~/.cache/papyrus && nohup env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop > ~/.cache/papyrus/papyrus.log 2>&1 &'
+          alias fzl-papirus-start='mkdir -p ~/.cache/papyrus && nohup env WEBKIT_DISABLE_COMPOSITING_MODE=1 {{ papyrus_dir }}/papyrus-desktop > ~/.cache/papyrus/papyrus.log 2>&1 &'
+          alias fzl-papyrus-logs='mkdir -p ~/.cache/papyrus && touch ~/.cache/papyrus/papyrus.log && tail -f ~/.cache/papyrus/papyrus.log'
+          alias fzl-papirus-logs='mkdir -p ~/.cache/papyrus && touch ~/.cache/papyrus/papyrus.log && tail -f ~/.cache/papyrus/papyrus.log'
+        create: true
+        mode: '0644'
+        owner: "{{ target_user }}"
+      become: true
+
+    - name: Ensure ~/.bashrc sources ~/.bashrc_dev_tools
+      ansible.builtin.lineinfile:
+        path: "{{ target_user_home }}/.bashrc"
+        line: "source ~/.bashrc_dev_tools"
+        state: present
+        owner: "{{ target_user }}"
+      become: true
+
+    # --------------------------------------------------------------------------
+    # 6. CLEANUP & SUMMARY
+    # --------------------------------------------------------------------------
+    - name: Remove temporary Eclipse Papyrus UML archive
+      ansible.builtin.file:
+        path: "{{ papyrus_archive_tmp }}"
+        state: absent
+      when: papyrus_cleanup_tmp | bool
+
+    - name: Display Eclipse Papyrus UML update summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================================="
+          - " Eclipse Papyrus UML Updated Successfully!"
+          - "========================================================="
+          - " Version:          {{ papyrus_version }} ({{ papyrus_release }})"
+          - " Install Dir:      {{ papyrus_dir }}"
+          - " Backup Dir:       {{ papyrus_backup_dir if (existing_papyrus_stat.stat.exists and (papyrus_keep_backup | bool)) else 'None' }}"
+          - " Launchers:        fzl-papyrus-start | fzl-papyrus | fzl-papyrus-logs (and fzl-papirus-* aliases)"
+          - "========================================================="
