@@ -1,0 +1,182 @@
+#+TITLE: Desktop FZL Commands Setup & AnsibleArtifacts Management Suite Guide
+#+AUTHOR: FzlSoft
+#+DATE: [2026-11-09 Mon]
+#+OPTIONS: toc:2 num:nil
+
+* Overview
+The =playbooks/desktop-fzl-commands-setup.yml= playbook provisions a suite of ergonomic developer and administration commands for managing, listing, verifying, and executing Ansible playbooks within the =AnsibleArtifacts= repository.
+
+Following the standard **FZL Application Launch Pattern**, all commands are installed to =/usr/local/bin/= with double-dash namespaces (=fzl-ansible-artifacts--<command>=) and shorter convenience aliases (=fzl-playbook-list=, =fzl-playbook-run=, etc.), paired with system-wide Bash autocompletion.
+
+* Provisioning the Commands
+
+Execute the setup playbook with privilege escalation:
+
+#+begin_src bash
+ansible-playbook playbooks/desktop-fzl-commands-setup.yml -K
+#+end_src
+
+#+begin_quote
+*Note:* The playbook is fully idempotent and safe to re-run. It installs the master CLI wrapper into =/usr/local/bin/fzl-ansible-artifacts=, sets up symlinks, registers autocompletions in =/etc/bash_completion.d/fzl-ansible-artifacts=, and configures shell helpers in =/etc/profile.d/fzl-ansible-artifacts.sh=.
+#+end_quote
+
+* Command Reference
+
+** 1. Listing Available Playbooks: =fzl-ansible-artifacts--playbook-list=
+Scans the =playbooks/= directory and displays a formatted table of all available playbooks, including their human-readable descriptions parsed from the top-level play definition.
+
+#+begin_src bash
+# List all playbooks
+fzl-ansible-artifacts--playbook-list
+
+# Filter playbooks by keyword (matches name or description)
+fzl-ansible-artifacts--playbook-list desktop
+fzl-ansible-artifacts--playbook-list ai
+
+# Output names only (ideal for fzf, xargs, or scripts)
+fzl-ansible-artifacts--playbook-list --names-only
+
+# Display full filesystem paths
+fzl-ansible-artifacts--playbook-list --paths
+
+# Using the short alias:
+fzl-playbook-list
+#+end_src
+
+** 2. Running Playbooks: =fzl-ansible-artifacts--playbook-run=
+Executes an Ansible playbook with intelligent path resolution and safety defaults:
+- *Omit extensions:* Run =fzl-playbook-run iamachine-setup= without typing =playbooks/= or =.yml=.
+- *Fuzzy matching:* If an exact match is omitted, safely resolves unique partial matches or lists candidates.
+- *Automatic Inventory:* Passes =-i inventory/hosts.ini= automatically if =-i= is not specified.
+- *Privilege Escalation Detection:* Automatically appends =-K= (=--ask-become-pass=) when the playbook requires =become: true= and passwordless sudo is inactive.
+- *Vault Password Detection:* Automatically uses =.vault_pass= or =~/.vault_pass= if present.
+- *Working Directory Safety:* Always executes from the repository root to ensure roles, vars, and templates resolve properly.
+
+#+begin_src bash
+# Run by base name
+fzl-ansible-artifacts--playbook-run devmachine-setup-all-features
+
+# Run with tags or extra variables
+fzl-ansible-artifacts--playbook-run iamachine-setup --tags dev
+fzl-ansible-artifacts--playbook-run deploy-catracas -e "version=2.0.0"
+
+# Dry-run check
+fzl-ansible-artifacts--playbook-run devmachine-lsp-setup --check
+
+# Using the short alias:
+fzl-playbook-run devmachine-setup-all-features
+#+end_src
+
+** 3. Syntax Verification & Dry-Runs: =fzl-ansible-artifacts--playbook-check=
+Validates playbook syntax to comply with project development rules before committing changes.
+
+#+begin_src bash
+# Check syntax of a specific playbook
+fzl-ansible-artifacts--playbook-check devmachine-setup-all-features
+
+# Check syntax AND perform dry run (--check)
+fzl-ansible-artifacts--playbook-check devmachine-setup-all-features --check
+
+# Check syntax across ALL playbooks in the repository
+fzl-ansible-artifacts--playbook-check --all
+# (or simply run without arguments)
+fzl-ansible-artifacts--playbook-check
+
+# Using the short alias:
+fzl-playbook-check
+#+end_src
+
+** 4. Vault Management: =vault-edit=, =vault-view=, =vault-encrypt=, =vault-decrypt=
+Quickly inspect or modify encrypted secrets in =vars/vault.yml= without remembering verbose =ansible-vault= options.
+
+#+begin_src bash
+# Edit vars/vault.yml (uses .vault_pass if available)
+fzl-ansible-artifacts--vault-edit
+
+# Edit a specific file
+fzl-ansible-artifacts--vault-edit vars/custom-secrets.yml
+
+# View encrypted file in read-only mode
+fzl-ansible-artifacts--vault-view
+
+# Encrypt a plaintext file
+fzl-ansible-artifacts--vault-encrypt vars/new-secrets.yml
+
+# Decrypt a file (prompts for confirmation before writing plaintext)
+fzl-ansible-artifacts--vault-decrypt vars/temp-secrets.yml
+#+end_src
+
+** 5. Inventory Overview: =fzl-ansible-artifacts--inventory-list=
+Displays target hosts and groups defined in =inventory/hosts.ini=.
+
+#+begin_src bash
+# Hierarchical tree graph (default)
+fzl-ansible-artifacts--inventory-list
+
+# JSON or YAML output
+fzl-ansible-artifacts--inventory-list --list
+fzl-ansible-artifacts--inventory-list --yaml
+#+end_src
+
+** 6. System Doctor & Diagnostics: =fzl-ansible-artifacts--doctor=
+Runs automated checks on your local Ansible development setup:
+- Ansible Core and Python runtime versions.
+- Repository root resolution and Git tracking state (branch, uncommitted files).
+- Presence and syntax of =inventory/hosts.ini=.
+- Encryption state of =vars/vault.yml= and availability of =.vault_pass=.
+- Installation status of =/usr/local/bin/= symlinks and shell completion.
+
+#+begin_src bash
+fzl-ansible-artifacts--doctor
+#+end_src
+
+** 7. Documentation Browser: =fzl-ansible-artifacts--docs=
+Quickly browse or view guides in =docs/=, =README.md=, and =AGENTS.md=.
+
+#+begin_src bash
+# List all available guides and manuals
+fzl-ansible-artifacts--docs
+
+# View a specific document (rendered with bat or less)
+fzl-ansible-artifacts--docs iamachine-usage
+fzl-ansible-artifacts--docs desktop-bash-configuration
+fzl-ansible-artifacts--docs README
+#+end_src
+
+** 8. Repository Navigation: =fzl-ansible-artifacts--dir= & =fzl-ansible-artifacts--cd=
+Instantly print or navigate to the AnsibleArtifacts directory from anywhere in your shell.
+
+#+begin_src bash
+# Output directory path (for scripting or piping)
+fzl-ansible-artifacts--dir
+
+# Jump directly into the repository (shell function)
+fzl-ansible-artifacts--cd
+# Or via alias:
+fzl-cd
+#+end_src
+
+** 9. Unified Master Entrypoint: =fzl-ansible-artifacts=
+All subcommands can also be invoked via the single entrypoint:
+
+#+begin_src bash
+fzl-ansible-artifacts <subcommand> [options...]
+# Example:
+fzl-ansible-artifacts playbook-run iamachine-setup
+fzl-ansible-artifacts doctor
+fzl-ansible-artifacts help
+# Short alias:
+fzl-ansible help
+#+end_src
+
+* Bash Autocompletion
+The suite includes tab autocompletion registered in =/etc/bash_completion.d/fzl-ansible-artifacts=:
+- Typing =fzl-playbook-run <TAB><TAB>= dynamically autocompletes all available playbook names.
+- Typing =fzl-playbook-check <TAB><TAB>= autocompletes playbooks and flags (=--all=, =--check=).
+- Typing =fzl-ansible <TAB><TAB>= autocompletes subcommands.
+- Typing =fzl-ansible-artifacts--docs <TAB><TAB>= autocompletes document topics.
+
+To activate autocompletion immediately in an existing shell session:
+#+begin_src bash
+source /etc/bash_completion.d/fzl-ansible-artifacts
+#+end_src

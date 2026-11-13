@@ -1,0 +1,24 @@
+# FZL Ansible Artifacts Suite Shell Helpers & Aliases
+# Managed by Ansible - desktop-fzl-commands-setup.yml
+
+# Helper function to CD directly to the AnsibleArtifacts repository
+fzl-ansible-artifacts--cd() {
+    local target_dir
+    if command -v fzl-ansible-artifacts--dir >/dev/null 2>&1; then
+        target_dir="$(fzl-ansible-artifacts--dir 2>/dev/null)"
+        if [ -n "$target_dir" ] && [ -d "$target_dir" ]; then
+            cd "$target_dir" || return 1
+            echo -e "\033[1;36mAnsibleArtifacts:\033[0m $PWD"
+            return 0
+        fi
+    fi
+    echo "Error: Could not locate AnsibleArtifacts directory." >&2
+    return 1
+}
+
+# Shorter convenience aliases
+alias fzl-cd='fzl-ansible-artifacts--cd'
+alias fzl-playbook-list='fzl-ansible-artifacts--playbook-list'
+alias fzl-playbook-run='fzl-ansible-artifacts--playbook-run'
+alias fzl-playbook-check='fzl-ansible-artifacts--playbook-check'
+alias fzl-ansible='fzl-ansible-artifacts'

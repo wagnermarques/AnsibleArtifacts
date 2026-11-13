@@ -1,0 +1,142 @@
+# Bash autocompletion for FZL Ansible Artifacts Suite
+# Managed by Ansible - desktop-fzl-commands-setup.yml
+
+_fzl_ansible_artifacts_get_repo() {
+    if [ -n "$ANSIBLE_ARTIFACTS_DIR" ] && [ -d "$ANSIBLE_ARTIFACTS_DIR" ]; then
+        echo "$ANSIBLE_ARTIFACTS_DIR"
+        return 0
+    fi
+    local configured="{{ ansible_artifacts_dir | default(playbook_dir ~ '/..') }}"
+    if [ -d "$configured" ]; then
+        echo "$configured"
+        return 0
+    fi
+    for candidate in "$HOME/WORKING/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts" "/home/wgn/WORKING/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts" "$HOME/AnsibleArtifacts"; do
+        if [ -d "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+_fzl_ansible_artifacts_get_playbooks() {
+    local repo
+    repo="$(_fzl_ansible_artifacts_get_repo)" || return
+    if [ -d "$repo/playbooks" ]; then
+        find "$repo/playbooks" -maxdepth 1 \( -name "*.yml" -o -name "*.yaml" \) -exec basename {} \; 2>/dev/null | sed -E 's/\.ya?ml$//' | sort
+    fi
+}
+
+_fzl_ansible_artifacts_get_docs() {
+    local repo
+    repo="$(_fzl_ansible_artifacts_get_repo)" || return
+    local docs=()
+    [ -f "$repo/README.md" ] && docs+=("README")
+    [ -f "$repo/AGENTS.md" ] && docs+=("AGENTS")
+    if [ -d "$repo/docs" ]; then
+        while IFS= read -r f; do
+            docs+=("$f")
+        done < <(find "$repo/docs" -maxdepth 1 \( -name "*.org" -o -name "*.md" \) -exec basename {} \; 2>/dev/null | sed -E 's/\.(org|md)$//' | sort)
+    fi
+    echo "${docs[*]}"
+}
+
+_fzl_ansible_artifacts_completion() {
+    local cur prev words cword
+    _init_completion || return
+
+    local subcommands="playbook-list playbook-run playbook-check vault-edit vault-view vault-encrypt vault-decrypt inventory-list doctor docs dir help version"
+    local base_cmd="$(basename "${words[0]}")"
+
+    # Direct playbook run commands
+    if [[ "$base_cmd" == "fzl-ansible-artifacts--playbook-run" || "$base_cmd" == "fzl-playbook-run" ]]; then
+        if [ "$cword" -eq 1 ]; then
+            local playbooks
+            playbooks="$(_fzl_ansible_artifacts_get_playbooks)"
+            COMPREPLY=( $(compgen -W "$playbooks" -- "$cur") )
+            return 0
+        fi
+        return 0
+    fi
+
+    # Direct playbook check commands
+    if [[ "$base_cmd" == "fzl-ansible-artifacts--playbook-check" || "$base_cmd" == "fzl-playbook-check" ]]; then
+        if [ "$cword" -eq 1 ]; then
+            local playbooks
+            playbooks="$(_fzl_ansible_artifacts_get_playbooks) --all"
+            COMPREPLY=( $(compgen -W "$playbooks" -- "$cur") )
+            return 0
+        fi
+        return 0
+    fi
+
+    # Direct docs command
+    if [[ "$base_cmd" == "fzl-ansible-artifacts--docs" ]]; then
+        if [ "$cword" -eq 1 ]; then
+            local docs
+            docs="$(_fzl_ansible_artifacts_get_docs)"
+            COMPREPLY=( $(compgen -W "$docs" -- "$cur") )
+            return 0
+        fi
+        return 0
+    fi
+
+    # Direct inventory command
+    if [[ "$base_cmd" == "fzl-ansible-artifacts--inventory-list" ]]; then
+        COMPREPLY=( $(compgen -W "--graph --list --yaml --help" -- "$cur") )
+        return 0
+    fi
+
+    # Master command dispatcher
+    if [[ "$base_cmd" == "fzl-ansible-artifacts" || "$base_cmd" == "fzl-ansible" ]]; then
+        if [ "$cword" -eq 1 ]; then
+            COMPREPLY=( $(compgen -W "$subcommands" -- "$cur") )
+            return 0
+        fi
+
+        local subcmd="${words[1]}"
+        case "$subcmd" in
+            playbook-run)
+                if [ "$cword" -eq 2 ]; then
+                    local playbooks
+                    playbooks="$(_fzl_ansible_artifacts_get_playbooks)"
+                    COMPREPLY=( $(compgen -W "$playbooks" -- "$cur") )
+                fi
+                return 0
+                ;;
+            playbook-check)
+                if [ "$cword" -eq 2 ]; then
+                    local playbooks
+                    playbooks="$(_fzl_ansible_artifacts_get_playbooks) --all"
+                    COMPREPLY=( $(compgen -W "$playbooks" -- "$cur") )
+                fi
+                return 0
+                ;;
+            docs)
+                if [ "$cword" -eq 2 ]; then
+                    local docs
+                    docs="$(_fzl_ansible_artifacts_get_docs)"
+                    COMPREPLY=( $(compgen -W "$docs" -- "$cur") )
+                fi
+                return 0
+                ;;
+            inventory-list)
+                COMPREPLY=( $(compgen -W "--graph --list --yaml" -- "$cur") )
+                return 0
+                ;;
+        esac
+    fi
+}
+
+complete -F _fzl_ansible_artifacts_completion \
+    fzl-ansible-artifacts \
+    fzl-ansible \
+    fzl-ansible-artifacts--playbook-run \
+    fzl-playbook-run \
+    fzl-ansible-artifacts--playbook-check \
+    fzl-playbook-check \
+    fzl-ansible-artifacts--playbook-list \
+    fzl-playbook-list \
+    fzl-ansible-artifacts--docs \
+    fzl-ansible-artifacts--inventory-list

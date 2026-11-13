@@ -5,6 +5,15 @@ Infrastructure as Code (IaC) for setting up development environments, math/scien
 
 ## Key Playbooks
 
+### 0. Setup FZL Desktop Commands for Ansible Artifacts
+Installs ergonomic productivity commands (`fzl-ansible-artifacts--*` and `fzl-playbook-*`) for listing, running, checking, and managing Ansible playbooks with intelligent path resolution, auto-become detection, and Bash tab autocompletion.
+
+```bash
+ansible-playbook playbooks/desktop-fzl-commands-setup.yml -K
+```
+
+Guide: [docs/desktop-fzl-commands-usage.org](file:///home/wgn/WORKING/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/docs/desktop-fzl-commands-usage.org)
+
 ### 1. playbooks/devmachine-setup.yml
 Installs development languages (Node.js, Python, Java), IDEs (VSCode,
 JetBrains), and Docker.
@@ -188,7 +197,7 @@ Installs MetaTrader 5 via Wine 64-bit with all required system dependencies, cre
 ansible-playbook playbooks/fin-trader-metatrader5.yml --ask-become-pass
 ```
 
-For detailed setup instructions, broker connection steps, and Python/EA automation guides, see [docs/fin-trader-metatrader5-usage.org](file:///home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/docs/fin-trader-metatrader5-usage.org).
+For detailed setup instructions, broker connection steps, and Python/EA automation guides, see [docs/fin-trader-metatrader5-usage.org](docs/fin-trader-metatrader5-usage.org).
 
 ### 15. Install AnyDesk Remote Desktop
 Installs the official AnyDesk client across Fedora/RedHat and Debian/Ubuntu distributions via their official package repositories, sets up systemd service management, and registers `fzl-anydesk-start` background and `fzl-anydesk` foreground launcher commands.
@@ -219,10 +228,9 @@ ansible-playbook playbooks/setup-agent-skills.yml
 
 
 
-
 ## AI Agents & Documentation
 
-The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. For detailed getting started instructions for each tool, see [docs/iamachine-usage.org](file:///home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/docs/iamachine-usage.org).
+The `iamachine-setup.yml` playbook installs a powerful suite of AI assistants. For detailed getting started instructions for each tool, see [docs/iamachine-usage.org](docs/iamachine-usage.org).
 
 Below are the links to their official documentation and repositories:
 
@@ -271,6 +279,15 @@ This project implements a custom pattern for starting manually installed applica
 | **Eclipse Modeling** | `devmachine-setup-ides.yml` | `fzl-eclipse-modeling-start` |
 | **AnyDesk** | `install-anydesk.yml` | `fzl-anydesk-start` |
 | **scrcpy** | `install-scrcpy.yml` | `fzl-scrcpy-start`, `fzl-scrcpy`, `fzl-scrcpy-tcpip` |
+| **Ansible Playbook List** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--playbook-list` (or `fzl-playbook-list`) |
+| **Ansible Playbook Run** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--playbook-run` (or `fzl-playbook-run`) |
+| **Ansible Playbook Check** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--playbook-check` (or `fzl-playbook-check`) |
+| **Ansible Vault Tool** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--vault-edit`, `vault-view`, `encrypt`, `decrypt` |
+| **Ansible Inventory View** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--inventory-list` |
+| **Ansible Doctor & Health** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--doctor` |
+| **Ansible Docs Viewer** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--docs` |
+| **Ansible Directory / Jump** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts--dir`, `fzl-ansible-artifacts--cd` (`fzl-cd`) |
+| **Ansible CLI Suite Hub** | `desktop-fzl-commands-setup.yml` | `fzl-ansible-artifacts` (or `fzl-ansible`) |
 
 
 ### How to use

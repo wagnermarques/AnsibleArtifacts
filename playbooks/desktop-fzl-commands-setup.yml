@@ -1,0 +1,148 @@
+---
+- name: Setup FZL Desktop Commands for Ansible Artifacts
+  hosts: devmachines_workstations:localhost
+  become: true
+  gather_facts: true
+
+  vars:
+    ansible_artifacts_dir: "{{ (playbook_dir + '/..') | realpath }}"
+    target_user: "{{ ansible_facts['env']['SUDO_USER'] | default(lookup('env', 'SUDO_USER')) | default(ansible_facts['env']['USER'] | default(lookup('env', 'USER'))) }}"
+    target_home: "{{ '/home/' + target_user if target_user != 'root' else ansible_facts['user_dir'] | default(lookup('env', 'HOME')) }}"
+    bashrc_d_dir: "{{ target_home }}/.bashrc.d"
+
+    fzl_cli_symlinks:
+      - fzl-ansible-artifacts--playbook-list
+      - fzl-ansible-artifacts--playbook-run
+      - fzl-ansible-artifacts--playbook-check
+      - fzl-ansible-artifacts--vault-edit
+      - fzl-ansible-artifacts--vault-view
+      - fzl-ansible-artifacts--vault-encrypt
+      - fzl-ansible-artifacts--vault-decrypt
+      - fzl-ansible-artifacts--inventory-list
+      - fzl-ansible-artifacts--doctor
+      - fzl-ansible-artifacts--docs
+      - fzl-ansible-artifacts--dir
+      - fzl-playbook-list
+      - fzl-playbook-run
+      - fzl-playbook-check
+      - fzl-ansible
+
+  tasks:
+    # --------------------------------------------------------------------------
+    # 1. DIRECTORY PREPARATION
+    # --------------------------------------------------------------------------
+    - name: Ensure /usr/local/bin directory exists
+      ansible.builtin.file:
+        path: /usr/local/bin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure /etc/bash_completion.d directory exists
+      ansible.builtin.file:
+        path: /etc/bash_completion.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Ensure /etc/profile.d directory exists
+      ansible.builtin.file:
+        path: /etc/profile.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # --------------------------------------------------------------------------
+    # 2. INSTALL FZL ANSIBLE ARTIFACTS CORE CLI
+    # --------------------------------------------------------------------------
+    - name: Install /usr/local/bin/fzl-ansible-artifacts executable
+      ansible.builtin.template:
+        src: ../templates/fzl-ansible-artifacts.j2
+        dest: /usr/local/bin/fzl-ansible-artifacts
+        owner: root
+        group: root
+        mode: '0755'
+
+    # --------------------------------------------------------------------------
+    # 3. CREATE SYMLINKS FOR STANDALONE AND SHORT COMMANDS
+    # --------------------------------------------------------------------------
+    - name: Create symlinks for standalone fzl-ansible-artifacts--* commands
+      ansible.builtin.file:
+        src: /usr/local/bin/fzl-ansible-artifacts
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+        owner: root
+        group: root
+        force: true
+      loop: "{{ fzl_cli_symlinks }}"
+
+    # --------------------------------------------------------------------------
+    # 4. INSTALL BASH COMPLETION & PROFILE CONFIGURATION
+    # --------------------------------------------------------------------------
+    - name: Install system-wide bash completion for FZL Ansible Artifacts
+      ansible.builtin.template:
+        src: ../templates/fzl-ansible-artifacts-completion.bash.j2
+        dest: /etc/bash_completion.d/fzl-ansible-artifacts
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Install system-wide shell profile helpers and aliases
+      ansible.builtin.template:
+        src: ../templates/fzl-ansible-artifacts-profile.sh.j2
+        dest: /etc/profile.d/fzl-ansible-artifacts.sh
+        owner: root
+        group: root
+        mode: '0644'
+
+    # --------------------------------------------------------------------------
+    # 5. USER ~/.bashrc.d INTEGRATION (IF APPLICABLE)
+    # --------------------------------------------------------------------------
+    - name: Ensure user ~/.bashrc.d directory exists
+      ansible.builtin.file:
+        path: "{{ bashrc_d_dir }}"
+        state: directory
+        owner: "{{ target_user }}"
+        mode: '0755'
+      when: target_user is defined and target_user != ''
+
+    - name: Deploy user-level shell aliases and autocompletion to ~/.bashrc.d
+      ansible.builtin.template:
+        src: ../templates/fzl-ansible-artifacts-profile.sh.j2
+        dest: "{{ bashrc_d_dir }}/fzl-ansible-artifacts.bash"
+        owner: "{{ target_user }}"
+        mode: '0644'
+      when: target_user is defined and target_user != ''
+
+    # --------------------------------------------------------------------------
+    # 6. VERIFICATION AND REPORTING
+    # --------------------------------------------------------------------------
+    - name: Verify fzl-ansible-artifacts execution
+      ansible.builtin.command: /usr/local/bin/fzl-ansible-artifacts version
+      register: fzl_version_check
+      changed_when: false
+
+    - name: Display FZL Ansible Artifacts command suite summary
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================================="
+          - "FZL Ansible Artifacts Command Suite installed successfully!"
+          - "Version: {{ fzl_version_check.stdout }}"
+          - "Repository Root: {{ ansible_artifacts_dir }}"
+          - "--------------------------------------------------------------------------"
+          - "Available Commands:"
+          - "  fzl-ansible-artifacts--playbook-list    (or fzl-playbook-list)"
+          - "  fzl-ansible-artifacts--playbook-run     (or fzl-playbook-run <name>)"
+          - "  fzl-ansible-artifacts--playbook-check   (or fzl-playbook-check <name>|--all)"
+          - "  fzl-ansible-artifacts--vault-edit       (edit vars/vault.yml)"
+          - "  fzl-ansible-artifacts--vault-view       (view vars/vault.yml)"
+          - "  fzl-ansible-artifacts--inventory-list   (view inventory hosts graph)"
+          - "  fzl-ansible-artifacts--doctor           (system and health diagnostics)"
+          - "  fzl-ansible-artifacts--docs             (browse and view guides)"
+          - "  fzl-ansible-artifacts--dir              (print repository path)"
+          - "  fzl-ansible-artifacts--cd               (jump to repository directory)"
+          - "  fzl-ansible                             (unified CLI hub)"
+          - "=========================================================================="

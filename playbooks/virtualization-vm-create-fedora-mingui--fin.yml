@@ -42,7 +42,7 @@
 
     - name: Check alternative workspace ISO path if primary path is missing
       ansible.builtin.stat:
-        path: "/home/wgn/mnt/ext4/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/isos/Fedora-LXQt-Live-44-1.7.x86_64.iso"
+        path: "/home/wgn/WORKING/Projects-Srcs/Projects-Srcs-FzlSoft/AnsibleArtifacts/isos/Fedora-LXQt-Live-44-1.7.x86_64.iso"
       register: fedora_iso_alt_stat
       when: not fedora_iso_stat.stat.exists
 
