@@ -19,16 +19,73 @@
     mode: '0755'
   become: yes
 
-- name: Clone Emacs source repository
-  git:
-    repo: "{{ emacs_repo_url }}"
-    dest: "{{ emacs_source_dir }}"
-    version: "{{ emacs_version }}"
-    depth: 1
+- name: Check if Emacs binary already exists
+  ansible.builtin.stat:
+    path: "{{ emacs_install_dir }}/bin/emacs"
+  register: emacs_binary_stat
+
+- name: Check if Emacs source directory contains an existing git repository
+  ansible.builtin.stat:
+    path: "{{ emacs_source_dir }}/.git"
+  register: emacs_git_stat
+  when: not emacs_binary_stat.stat.exists or (emacs_force_rebuild | default(false))
+
+- name: Clean up corrupted or non-git emacs source directory before cloning
+  ansible.builtin.file:
+    path: "{{ emacs_source_dir }}"
+    state: absent
+  when:
+    - not emacs_binary_stat.stat.exists or (emacs_force_rebuild | default(false))
+    - not (emacs_git_stat.stat.exists | default(false))
+
+- name: Determine fallback Git repository URL
+  ansible.builtin.set_fact:
+    emacs_resolved_fallback_repo_url: "{{ 'https://github.com/emacs-mirror/emacs.git' if 'savannah' in emacs_repo_url else (emacs_fallback_repo_url | default('git://git.savannah.gnu.org/emacs.git')) }}"
+  when: not emacs_binary_stat.stat.exists or (emacs_force_rebuild | default(false))
+
+- name: Clone Emacs source repository with automatic mirror failover
+  block:
+    - name: Clone Emacs source repository from primary mirror
+      ansible.builtin.git:
+        repo: "{{ emacs_repo_url }}"
+        dest: "{{ emacs_source_dir }}"
+        version: "{{ emacs_version }}"
+        depth: 1
+        force: yes
+      register: emacs_clone_result
+      retries: 3
+      delay: 5
+      until: emacs_clone_result is success
+
+  rescue:
+    - name: Display warning when primary mirror clone fails
+      ansible.builtin.debug:
+        msg: >-
+          Primary git clone from '{{ emacs_repo_url }}' failed.
+          Cleaning corrupted destination and falling back to '{{ emacs_resolved_fallback_repo_url }}'...
+
+    - name: Clean up failed clone destination directory
+      ansible.builtin.file:
+        path: "{{ emacs_source_dir }}"
+        state: absent
+
+    - name: Clone Emacs source repository from fallback mirror
+      ansible.builtin.git:
+        repo: "{{ emacs_resolved_fallback_repo_url }}"
+        dest: "{{ emacs_source_dir }}"
+        version: "{{ emacs_version }}"
+        depth: 1
+        force: yes
+      register: emacs_fallback_clone_result
+      retries: 3
+      delay: 5
+      until: emacs_fallback_clone_result is success
+
+  when: not emacs_binary_stat.stat.exists or (emacs_force_rebuild | default(false))
   become: no
 
 - name: Build and Install Emacs
-  shell: |
+  ansible.builtin.shell: |
     ./autogen.sh
     ./configure {{ emacs_configure_flags }}
     make -j$(nproc)
@@ -36,14 +93,25 @@
   args:
     chdir: "{{ emacs_source_dir }}"
     creates: "{{ emacs_install_dir }}/bin/emacs"
+  when: not emacs_binary_stat.stat.exists or (emacs_force_rebuild | default(false))
   become: no
 
+- name: Clean up Emacs compilation source directory
+  ansible.builtin.file:
+    path: "{{ emacs_source_dir }}"
+    state: absent
+  when: emacs_cleanup_source | default(false)
+
 - name: Clone fzl-emacs configuration into isolated directory
-  git:
+  ansible.builtin.git:
     repo: "{{ emacs_config_repo }}"
     dest: "{{ emacs_config_dir }}"
     version: "{{ emacs_config_branch }}"
     force: yes
+  register: emacs_config_clone_result
+  retries: 3
+  delay: 5
+  until: emacs_config_clone_result is success
   become: no
 
 - name: Create fzl-emacs executable command wrapper in /usr/local/bin
